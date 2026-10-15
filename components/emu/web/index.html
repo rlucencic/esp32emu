@@ -335,7 +335,8 @@ async function sendOne(name, data) {
 
 /* "Disk images (.ST, .MSA), Mac archives (.SIT, ...) or .ZIP files" */
 function accepted() {
-  return [info.disks.description, ...converters.map(c => c.description)].join(", ") + " or .ZIP files";
+  const d = info.disks.description;               /* "Disk images (...)" mid-sentence */
+  return [d.charAt(0).toLowerCase() + d.slice(1), ...converters.map(c => c.description)].join(", ") + " or .ZIP files";
 }
 
 const drop = $("drop");
@@ -469,8 +470,8 @@ async function start() {
   }
   $("pick").accept = [...info.disks.extensions, ".zip", ...converters.flatMap(c => c.extensions)].join(",");
   $("drop-text").textContent = "Drop " + accepted() + " here";
-  if (converters.length) $("drop-hint").textContent = "or click to choose them. ZIP files are unpacked; " +
-    converters.map(c => c.description).join(", ") + " are put on a disk image.";
+  if (converters.length) $("drop-hint").textContent = "or click to choose them. ZIP files are unpacked, " +
+    converters.map(c => c.description.replace(/\s*\(.*\)/, "")).join(", ") + " put on a disk image of their own.";
   if (info.disks.can_create && info.disks.sizes.length) {
     $("new-size").innerHTML = info.disks.sizes.map(s => `<option value="${s.bytes}">${esc(s.label)}</option>`).join("");
     $("new").hidden = false;

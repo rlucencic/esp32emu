@@ -646,7 +646,7 @@ static void show_disks(lv_event_t *e)
 {
     if (disks_ready()) {
         char text[160];
-        snprintf(text, sizeof(text), "%s come from the \"%s\" folder on the SD card.",
+        snprintf(text, sizeof(text), "%s from the SD card's \"%s\" folder.",
                  ui.disks->description, ui.disks->folder);
         set_disk_status(text, COLOR_DIM);
     } else {
@@ -746,6 +746,8 @@ static void build_disk_screens(void)
     ui.disk_status = lv_label_create(s);
     lv_obj_set_width(ui.disk_status, lv_pct(100));
     lv_label_set_long_mode(ui.disk_status, LV_LABEL_LONG_DOT);
+    /* one line: the drive cards start right below it */
+    lv_obj_set_height(ui.disk_status, lv_font_get_line_height(lv_obj_get_style_text_font(ui.disk_status, 0)));
     lv_obj_align(ui.disk_status, LV_ALIGN_TOP_LEFT, 0, 44);
 
     static const char *const texts[3] = {
