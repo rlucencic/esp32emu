@@ -1,0 +1,448 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Emulator</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    --bg: #10141c; --card: #1e2533; --row: #283143; --text: #e8ecf2;
+    --dim: #8a94a6; --accent: #2196f3; --ok: #4cc38a; --warn: #e5a54b; --bad: #e5604b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  main { max-width: 900px; margin: 0 auto; padding: 32px 16px 48px; }
+  h1 { font-size: 26px; font-weight: 600; margin: 0 0 4px; }
+  .sub { color: var(--dim); margin: 0 0 24px; }
+  #drop {
+    border: 2px dashed #3a4559; border-radius: 12px; background: var(--card);
+    padding: 36px 16px; text-align: center; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  #drop.over { border-color: var(--accent); background: #22304a; }
+  #drop strong { display: block; font-size: 18px; margin-bottom: 4px; }
+  #drop span { color: var(--dim); }
+  #log { margin: 16px 0 0; padding: 0; list-style: none; }
+  #log li { padding: 4px 0; color: var(--dim); }
+  #log li.ok { color: var(--ok); }
+  #log li.bad { color: var(--bad); }
+  h2 {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
+    font-size: 18px; font-weight: 600; margin: 32px 0 12px;
+  }
+  h2 small { font-size: 14px; font-weight: 400; color: var(--dim); }
+  table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 12px; overflow: hidden; }
+  td { padding: 12px 16px; border-top: 1px solid var(--bg); vertical-align: middle; }
+  tr:first-child td { border-top: 0; }
+  td.name { word-break: break-all; }
+  td.size { color: var(--dim); white-space: nowrap; text-align: right; }
+  td.actions { white-space: nowrap; text-align: right; }
+  .badge {
+    display: inline-block; margin-left: 8px; padding: 1px 8px; border-radius: 10px;
+    background: var(--row); color: var(--warn); font-size: 13px;
+  }
+  a, button, select {
+    font: inherit; font-size: 14px; color: var(--text); background: var(--row);
+    border: 0; border-radius: 8px; padding: 6px 12px; margin-left: 6px;
+    text-decoration: none; cursor: pointer;
+  }
+  a:hover, button:hover, select:hover { background: #34405a; }
+  button:disabled { opacity: .4; cursor: default; }
+  .empty { color: var(--dim); text-align: center; padding: 24px; }
+  .new { display: flex; align-items: center; gap: 6px; font-size: 14px; color: var(--dim); }
+  @media (max-width: 560px) {
+    td { padding: 10px; }
+    td.size { display: none; }
+    td.actions { white-space: normal; }
+    a, button, select { margin: 2px; }
+  }
+
+  /* Status */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+  .card { background: var(--card); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+  .card h3 {
+    display: flex; justify-content: space-between; align-items: center;
+    margin: 0 0 10px; font-size: 15px; font-weight: 600; color: var(--dim);
+    text-transform: uppercase; letter-spacing: .04em;
+  }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; font-size: 15px; margin: 0; }
+  .kv dt { color: var(--dim); }
+  .kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+  .pill { font-size: 12px; font-weight: 600; padding: 2px 10px; border-radius: 10px; text-transform: none; letter-spacing: 0; }
+  .pill.running { background: #1d3b2e; color: var(--ok); }
+  .pill.paused, .pill.setup { background: #3b321d; color: var(--warn); }
+  .pill.offline { background: #3b211d; color: var(--bad); }
+  .bar { height: 6px; border-radius: 3px; background: var(--row); margin-top: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--accent); width: 0; transition: width .4s; }
+  .bar i.warn { background: var(--warn); }
+  .bar i.bad { background: var(--bad); }
+  .drive { display: grid; grid-template-columns: 14px auto 1fr auto; gap: 2px 8px; align-items: baseline; padding: 6px 0; }
+  .drive + .drive { border-top: 1px solid var(--bg); }
+  .led { width: 10px; height: 10px; border-radius: 50%; background: #2c3546; align-self: start; margin-top: 7px; }
+  .led.on { background: #ff5a3c; box-shadow: 0 0 8px #ff5a3c; }
+  .drive b { font-weight: 600; white-space: nowrap; }
+  .drive .what { min-width: 0; overflow-wrap: anywhere; }
+  .drive .detail { grid-column: 3 / 5; color: var(--dim); font-size: 13px; }
+  .drive button { padding: 2px 10px; font-size: 13px; }
+  .dim { color: var(--dim); }
+  .msg { color: var(--warn); }
+  .dev { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
+  .dev + .dev { border-top: 1px solid var(--bg); }
+  .dev .batt { width: 90px; flex: none; text-align: right; font-size: 13px; color: var(--dim); }
+</style>
+</head>
+<body>
+<main>
+  <h1 id="title">Emulator</h1>
+  <p class="sub">The emulator on the MaTouch board, and the disk images on its SD card.</p>
+
+  <div class="grid">
+    <section class="card">
+      <h3><span id="short">Machine</span> <span id="state" class="pill"></span></h3>
+      <dl class="kv" id="machine"></dl>
+    </section>
+    <section class="card">
+      <h3>Drives</h3>
+      <div id="drives"></div>
+    </section>
+    <section class="card">
+      <h3>Board</h3>
+      <dl class="kv" id="board"></dl>
+    </section>
+    <section class="card">
+      <h3>Bluetooth</h3>
+      <div id="bluetooth"></div>
+    </section>
+  </div>
+
+  <h2 id="disks-title">Disk images</h2>
+
+  <div id="drop" tabindex="0">
+    <strong id="drop-text">Drop disk images or .ZIP files here</strong>
+    <span>or click to choose them. ZIP files are unpacked.</span>
+    <input id="pick" type="file" multiple hidden>
+  </div>
+  <ul id="log"></ul>
+
+  <h2><span>On the SD card <small id="free"></small></span>
+    <span class="new" id="new" hidden>New blank disk <select id="new-size"></select><button id="new-make">Make</button></span></h2>
+  <table><tbody id="disks"><tr><td class="empty">Loading…</td></tr></tbody></table>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let info = { name: "Emulator", short_name: "Machine", disks: { drives: [], extensions: [], sizes: [], max_upload: 0 } };
+let imageRe = /^$/;
+
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+const kv = rows => rows.filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
+const bar = (pct, warn = 75, bad = 90) =>
+  `<div class="bar"><i class="${pct >= bad ? "bad" : pct >= warn ? "warn" : ""}" style="width:${Math.min(100, pct)}%"></i></div>`;
+
+function size(n) {
+  return n >= 1073741824 ? (n / 1073741824).toFixed(1) + " GB" :
+         n >= 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.round(n / 1024) + " KB";
+}
+
+function duration(s) {
+  const d = Math.floor(s / 86400), h = Math.floor(s / 3600) % 24, m = Math.floor(s / 60) % 60;
+  return d ? `${d} d ${h} h` : h ? `${h} h ${m} min` : m ? `${m} min ${s % 60} s` : `${s} s`;
+}
+
+function log(text, cls) {
+  const li = document.createElement("li");
+  li.textContent = text;
+  if (cls) li.className = cls;
+  $("log").prepend(li);
+  return li;
+}
+
+async function request(method, url, body) {
+  const r = await fetch(url, { method, body });
+  if (!r.ok) throw new Error(await r.text());
+  return r;
+}
+
+/* ---- disk images ---- */
+
+async function refresh() {
+  let data;
+  try {
+    data = await (await fetch("/api/disks")).json();
+  } catch (e) {
+    $("disks").innerHTML = '<tr><td class="empty">The board does not answer.</td></tr>';
+    return;
+  }
+  $("free").textContent = data.ready ? size(data.free) + " free" : "no SD card";
+  const rows = data.disks.map(d => {
+    const tr = document.createElement("tr");
+    const name = document.createElement("td");
+    name.className = "name";
+    name.textContent = d.name;
+    if (d.drive) {
+      const b = document.createElement("span");
+      b.className = "badge";
+      b.textContent = "in " + d.drive;
+      name.append(b);
+    }
+    const sz = document.createElement("td");
+    sz.className = "size";
+    sz.textContent = size(d.size);
+    const act = document.createElement("td");
+    act.className = "actions";
+    const ins = document.createElement("select");
+    ins.innerHTML = '<option value="">Insert into…</option>' +
+      info.disks.drives.map((n, i) => `<option value="${i + 1}">${esc(n)}</option>`).join("");
+    ins.onchange = async () => {
+      if (!ins.value) return;
+      try {
+        await request("PUT", "/api/drive/" + ins.value, d.name);
+        log(d.name + " is in " + info.disks.drives[ins.value - 1], "ok");
+      } catch (e) {
+        log(d.name + ": " + e.message, "bad");
+      }
+      refresh();
+      status();
+    };
+    const dl = document.createElement("a");
+    dl.href = "/disks/" + encodeURIComponent(d.name);
+    dl.textContent = "Download";
+    const del = document.createElement("button");
+    del.textContent = "Delete";
+    del.disabled = !!d.drive;
+    del.title = d.drive ? "Eject it first" : "";
+    del.onclick = async () => {
+      if (!confirm("Delete " + d.name + "?")) return;
+      try {
+        await request("DELETE", dl.href);
+      } catch (e) {
+        log(d.name + ": " + e.message, "bad");
+      }
+      refresh();
+    };
+    act.append(ins, dl, del);
+    tr.append(name, sz, act);
+    return tr;
+  });
+  $("disks").replaceChildren(...rows);
+  if (!rows.length) {
+    $("disks").innerHTML = '<tr><td class="empty">No disk images yet.</td></tr>';
+  }
+}
+
+async function upload(name, data) {
+  const bytes = data.byteLength ?? data.size;
+  if (info.disks.max_upload && bytes > info.disks.max_upload) {
+    log(name + ": too big (" + size(bytes) + ", at most " + size(info.disks.max_upload) + ")", "bad");
+    return;
+  }
+  const line = log("Sending " + name + " …");
+  try {
+    await request("PUT", "/disks/" + encodeURIComponent(name), data);
+    line.textContent = name + " is on the board (" + size(bytes) + ")";
+    line.className = "ok";
+  } catch (e) {
+    line.textContent = name + ": " + (e.message || "the board does not answer");
+    line.className = "bad";
+  }
+}
+
+/* The disk images in a ZIP file: [{name, data}] */
+async function unzip(file) {
+  const buf = await file.arrayBuffer();
+  const v = new DataView(buf);
+  let eocd = -1;
+  for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) {
+    if (v.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error("not a ZIP file");
+  const count = v.getUint16(eocd + 10, true);
+  let p = v.getUint32(eocd + 16, true);
+  const out = [];
+  for (let n = 0; n < count; n++) {
+    if (v.getUint32(p, true) !== 0x02014b50) throw new Error("damaged ZIP file");
+    const method = v.getUint16(p + 10, true);
+    const csize = v.getUint32(p + 20, true);
+    const nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
+    const local = v.getUint32(p + 42, true);
+    const full = new TextDecoder().decode(new Uint8Array(buf, p + 46, nlen));
+    p += 46 + nlen + xlen + clen;
+    const name = full.split("/").pop();
+    if (!imageRe.test(name) || name.startsWith(".")) continue;
+    const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
+    const raw = new Uint8Array(buf, start, csize);
+    let data;
+    if (method === 0) {
+      data = raw;
+    } else if (method === 8) {
+      const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+      data = new Uint8Array(await new Response(stream).arrayBuffer());
+    } else {
+      log(name + ": compressed in a way this page can't unpack", "bad");
+      continue;
+    }
+    out.push({ name, data });
+  }
+  return out;
+}
+
+async function send(files) {
+  for (const file of files) {
+    if (/\.zip$/i.test(file.name)) {
+      try {
+        const disks = await unzip(file);
+        if (!disks.length) log(file.name + ": no disk image inside", "bad");
+        for (const d of disks) await upload(d.name, d.data);
+      } catch (e) {
+        log(file.name + ": " + e.message, "bad");
+      }
+    } else if (imageRe.test(file.name)) {
+      await upload(file.name, file);
+    } else {
+      log(file.name + ": not a disk image (" + info.disks.description + ") or .ZIP file", "bad");
+    }
+  }
+  refresh();
+}
+
+const drop = $("drop");
+drop.onclick = () => $("pick").click();
+drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") $("pick").click(); };
+$("pick").onchange = e => { send([...e.target.files]); e.target.value = ""; };
+drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+drop.ondragleave = () => drop.classList.remove("over");
+drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); send([...e.dataTransfer.files]); };
+document.ondragover = e => e.preventDefault();
+document.ondrop = e => e.preventDefault();
+
+$("new-make").onclick = async () => {
+  const b = $("new-make");
+  b.disabled = true;
+  const line = log("Making a blank disk …");
+  try {
+    const r = await request("POST", "/api/new?size=" + $("new-size").value);
+    line.textContent = "New blank disk " + await r.text();
+    line.className = "ok";
+  } catch (e) {
+    line.textContent = e.message;
+    line.className = "bad";
+  }
+  b.disabled = false;
+  refresh();
+};
+
+/* ---- status ---- */
+
+function signal(rssi) {
+  const q = rssi >= -55 ? "excellent" : rssi >= -65 ? "good" : rssi >= -75 ? "fair" : "weak";
+  return `${q} (${rssi} dBm)`;
+}
+
+let previous = null;
+
+function eject(i) {
+  request("DELETE", "/api/drive/" + (i + 1))
+    .catch(e => log(e.message, "bad"))
+    .then(() => { refresh(); status(); });
+}
+
+function showStatus(s) {
+  const m = s.machine;
+  const state = { running: "Running", paused: "Paused: setup screen", setup: "Setup screen",
+                  halted: "Crashed: reset needed" }[m.state];
+  $("state").className = "pill " + (m.state === "halted" ? "offline" : m.state);
+  $("state").textContent = state;
+  const started = m.rows !== undefined;
+  $("machine").innerHTML = kv([
+    ...(m.rows || []).map(([k, v, pct]) => [esc(k), v + (pct !== undefined ? bar(pct) : "")]),
+    started && m.state === "running" && ["Speed", `${m.speed}% <span class="dim">(${m.fps.toFixed(1)} of ${m.hz} frames/s)</span>${bar(m.speed, 101, 101)}`],
+    started && ["Running for", duration(m.session)],
+    !started && ["System", '<span class="dim">not started yet</span>'],
+    m.message && ["Problem", `<span class="msg">${esc(m.message)}</span>`],
+    ["Clock", m.clock + (m.clock_set ? "" : ' <span class="dim">(not set from the internet)</span>')],
+  ]);
+
+  /* A drive is busy if its counters moved since the last update */
+  $("drives").innerHTML = s.drives.map((d, i) => {
+    const p = previous && previous.drives[i];
+    const reading = p && d.reads > p.reads, writing = p && d.writes > p.writes;
+    const busy = writing ? "writing" : reading ? "reading" : "";
+    const what = d.name ? esc(d.name) + (d.read_only ? ' <span class="dim">(read-only)</span>' : "")
+                        : '<span class="dim">no disk</span>';
+    const counters = d.name && (d.reads || d.writes || d.detail === null)
+      ? `${busy ? busy + " · " : ""}${d.reads} blocks read, ${d.writes} written` : "";
+    const detail = [d.detail !== null ? esc(d.detail) : "", counters].filter(Boolean).join(" · ");
+    const ej = d.name && i < info.disks.drives.length && info.disks.drives[i] === d.label
+      ? `<button onclick="eject(${i})">Eject</button>` : "<span></span>";
+    return `<div class="drive"><span class="led${d.light || reading || writing ? " on" : ""}"></span>` +
+           `<b>${esc(d.label)}</b><span class="what">${what}</span>${ej}<span class="detail">${detail}</span></div>`;
+  }).join("") || '<span class="dim">No drives.</span>';
+
+  const b = s.board;
+  const mb = n => (n / 1048576).toFixed(1) + " MB", kb = n => Math.round(n / 1024) + " KB";
+  $("board").innerHTML = kv([
+    ["WiFi", b.wifi.ssid ? `${esc(b.wifi.ssid)}, ${signal(b.wifi.rssi)}` : '<span class="dim">not connected</span>'],
+    b.wifi.ip && ["Address", `${b.wifi.ip}`],
+    ["Up for", duration(b.uptime)],
+    ["Core 0", `${b.load[0]}% busy <span class="dim">(screen, WiFi, Bluetooth)</span>${bar(b.load[0])}`],
+    ["Core 1", `${b.load[1]}% busy <span class="dim">(68000 emulation)</span>${bar(b.load[1], 101, 101)}`],
+    b.temperature !== null && ["Chip", `${b.temperature.toFixed(0)} °C`],
+    ["Internal RAM", `${kb(b.internal_free)} free <span class="dim">(lowest ${kb(b.internal_min)}, largest block ${kb(b.internal_largest)})</span>`],
+    ["PSRAM", `${mb(b.psram_free)} free of ${mb(b.psram_total)}`],
+    b.sd_total && ["SD card", `${size(b.sd_free)} free of ${size(b.sd_total)}`],
+  ]);
+
+  const kinds = { keyboard: "⌨️", mouse: "🖱️", device: "🔵" };
+  $("bluetooth").innerHTML = s.bluetooth.length ? s.bluetooth.map(dev =>
+    `<div class="dev"><span>${kinds[dev.kind] || ""} ${esc(dev.name)}<br>` +
+    `<span class="dim">${dev.connected ? "connected" : "not connected"}</span></span>` +
+    `<span class="batt">${dev.battery !== null ? "battery " + dev.battery + "%" + bar(dev.battery, 101, 101) : ""}</span></div>`
+  ).join("") : '<span class="dim">No keyboard or mouse paired. Pair them on the setup screen.</span>';
+
+  previous = s;
+}
+
+async function status() {
+  if (document.hidden) return;
+  try {
+    const r = await fetch("/api/status");
+    showStatus(await r.json());
+  } catch (e) {
+    $("state").className = "pill offline";
+    $("state").textContent = "Board not answering";
+  }
+}
+
+async function start() {
+  try {
+    info = await (await fetch("/api/info")).json();
+  } catch (e) {
+    /* the defaults will do until the board answers */
+  }
+  document.title = info.name;
+  $("title").textContent = info.name;
+  $("short").textContent = info.short_name;
+  $("disks-title").textContent = info.disks.title || "Disk images";
+  const exts = info.disks.extensions.map(e => e.replace(/^\./, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+  imageRe = new RegExp("\\.(" + exts.join("|") + ")$", "i");
+  $("pick").accept = [...info.disks.extensions, ".zip"].join(",");
+  $("drop-text").textContent = "Drop " + info.disks.description + " or .ZIP files here";
+  if (info.disks.can_create && info.disks.sizes.length) {
+    $("new-size").innerHTML = info.disks.sizes.map(s => `<option value="${s.bytes}">${esc(s.label)}</option>`).join("");
+    $("new").hidden = false;
+  }
+  refresh();
+  status();
+  setInterval(refresh, 10000);
+  setInterval(status, 1000);
+}
+
+start();
+</script>
+</body>
+</html>

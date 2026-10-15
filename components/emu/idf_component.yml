@@ -1,0 +1,9 @@
+dependencies:
+  idf:
+    version: ">=5.5"
+  lvgl/lvgl:
+    version: "~9.4.0"   # 9.4 is what the boards were tested with
+  espressif/mdns:
+    version: "^1.8.0"
+    rules:
+      - if: "$CONFIG{EMU_WEB} == True"

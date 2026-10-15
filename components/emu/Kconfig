@@ -1,0 +1,92 @@
+menu "Emulator board"
+
+    config EMU_WIFI
+        bool "WiFi"
+        default y
+        help
+            Connect to WiFi (stays connected while the machine runs) and set
+            the clock from the internet; the machine's clock follows it.
+
+    config EMU_HOSTNAME
+        string "Network name of the board"
+        depends on EMU_WIFI
+        default "esp32emu"
+        help
+            Announced over mDNS (<name>.local) and DHCP.
+
+    config EMU_TIMEZONE
+        string "Time zone (POSIX TZ)"
+        depends on EMU_WIFI
+        default "CET-1CEST,M3.5.0,M10.5.0/3"
+        help
+            Local time rules, e.g. "CET-1CEST,M3.5.0,M10.5.0/3" for Central
+            Europe or "GMT0BST,M3.5.0/1,M10.5.0" for the UK.
+
+    config EMU_WEB
+        bool "Web page for disk images"
+        depends on EMU_WIFI
+        default y
+        help
+            A web server on the board (http://<hostname>.local) to upload
+            disk images from a computer (drag and drop, .ZIP files are
+            unpacked), put them into drives, download and delete them, and
+            see the machine and the board live. Also for scripts:
+            curl -T game.img http://<hostname>.local/disks/
+
+    config EMU_SETUP_SCREEN
+        bool "Setup screen before the machine starts"
+        depends on EMU_WIFI
+        default y
+        help
+            Touch screen for WiFi, Bluetooth, disks and the machine's
+            settings. Hold the top-right corner for 2 s to come back to it.
+
+    config EMU_AUTOSTART
+        bool "Start the machine by itself"
+        depends on EMU_SETUP_SCREEN
+        default n
+        help
+            Leave the setup screen after a countdown once the time is known
+            (or without WiFi set up), for boards nobody is watching.
+
+    config EMU_AUTOSTART_SECONDS
+        int "Countdown (seconds)"
+        depends on EMU_AUTOSTART
+        range 1 60
+        default 5
+
+    config EMU_BLE_HID
+        bool "BLE keyboard and mouse"
+        default y
+        depends on BT_NIMBLE_ENABLED
+        help
+            Connect a Bluetooth LE keyboard and mouse as the machine's.
+            New devices pair when put into pairing mode.
+
+    config EMU_MOUSE_DIVIDER
+        int "Mouse speed divider"
+        depends on EMU_BLE_HID
+        range 1 8
+        default 2
+        help
+            BLE mouse motion is divided by this before it reaches the
+            machine. Higher is slower.
+
+    config EMU_SPEAKER
+        bool "Sound on the board speaker"
+        default n
+        help
+            Play the machine's sound through the onboard MAX98357A
+            amplifier. Its I2S pins are shared with the native USB port
+            (GPIO19/20), so that port stops working once the machine starts:
+            the console (logs, tools/emu_console.py) moves to the
+            USB-to-UART port at 921600 baud, and flashing goes through that
+            port too.
+
+    config EMU_SPEAKER_VOLUME
+        int "Speaker volume (%)"
+        depends on EMU_SPEAKER
+        range 0 100
+        default 60
+
+endmenu
