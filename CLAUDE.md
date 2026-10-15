@@ -98,6 +98,41 @@ Changes here affect both emulators: build both after any change.
   `emu_console.py send` calls, or LVGL sees one press sliding between them.
 - Flash writes (NVS) briefly stall both cores: write from core 0 tasks, not
   from the emulation.
+- **A setup screen label above fixed-position widgets must stay one line**:
+  the Disks page placed the drive cards for a one-line description, the
+  Mac's longer one wrapped and its second line hid under the first card.
+  The label has a one-line height now (`LV_LABEL_LONG_DOT` truncates).
+
+## Repositories
+
+Three public GitHub repositories, cloned side by side:
+`github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`. The user pushes
+straight to `main`; commit messages end with the `Co-Authored-By` line the
+session gives. When the user says "commit and push all", that's all three
+(esp32emu first: the others build against it). Topics on GitHub: emulator,
+esp-idf, esp32-s3, lvgl, m68k, retrocomputing, makerfabs, matouch, plus
+the machine's own (atari-st, macintosh, ...); each README has badges and
+screenshots, the About text lists the main features.
+
+## README screenshots
+
+- The machine's screen: `emu_console.py PORT screenshot F.png` (its own
+  resolution); the whole panel: `lcd F.png` (1024x600).
+- The setup screen: hold the corner with `send "t 1010 12 2600"` (pauses
+  the machine), tap buttons with `t x y`, capture with `lcd`. Its status
+  lines show the WiFi name, IP and time: cut rows 104-190 out (PIL, in a
+  scratch venv), which leaves 1024x514 with the first buttons at y=112,
+  like the ST's image. Taken before the machine starts, it says "Start X".
+- The web page: never the live board's page (WiFi name, IP, SD card).
+  Serve the real `web/index.html` (and the machine's `/machine.js`) from a
+  small local node server that answers `/api/info` (copied from the
+  board), `/api/status` and `/api/disks` with example data (HomeNetwork,
+  192.168.1.42, Keyboard/Mouse, made-up disk names) and saves `PUT
+  /disks/...`; open it in Chrome (devtools: dark scheme, 1185 px wide),
+  drop a file to show the log, full-page screenshot. Chrome's file upload
+  only takes files inside the project folders (stage them in `build/`).
+- Never overwrite an existing screenshot: a new file name each time (the
+  user asks for "another screenshot" to add one, not to replace one).
 
 ## Working with the user
 
