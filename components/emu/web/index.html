@@ -124,7 +124,7 @@
 
   <div id="drop" tabindex="0">
     <strong id="drop-text">Drop disk images or .ZIP files here</strong>
-    <span>or click to choose them. ZIP files are unpacked.</span>
+    <span id="drop-hint">or click to choose them. ZIP files are unpacked.</span>
     <input id="pick" type="file" multiple hidden>
   </div>
   <ul id="log"></ul>
@@ -138,6 +138,12 @@
 const $ = id => document.getElementById(id);
 let info = { name: "Emulator", short_name: "Machine", disks: { drives: [], extensions: [], sizes: [], max_upload: 0 } };
 let imageRe = /^$/;
+
+/* Converters from the machine's script (/machine.js): files with their
+ * extensions are turned into disk images here before they're sent */
+const converters = [];
+window.registerConverter = c => converters.push(c);
+const converterFor = name => converters.find(c => c.extensions.some(e => name.toLowerCase().endsWith(e)));
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const kv = rows => rows.filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
@@ -252,7 +258,7 @@ async function upload(name, data) {
   }
 }
 
-/* The disk images in a ZIP file: [{name, data}] */
+/* The disk images (and files for the converters) in a ZIP file: [{name, data}] */
 async function unzip(file) {
   const buf = await file.arrayBuffer();
   const v = new DataView(buf);
@@ -273,7 +279,7 @@ async function unzip(file) {
     const full = new TextDecoder().decode(new Uint8Array(buf, p + 46, nlen));
     p += 46 + nlen + xlen + clen;
     const name = full.split("/").pop();
-    if (!imageRe.test(name) || name.startsWith(".")) continue;
+    if (!(imageRe.test(name) || converterFor(name)) || name.startsWith(".")) continue;
     const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
     const raw = new Uint8Array(buf, start, csize);
     let data;
@@ -297,17 +303,39 @@ async function send(files) {
       try {
         const disks = await unzip(file);
         if (!disks.length) log(file.name + ": no disk image inside", "bad");
-        for (const d of disks) await upload(d.name, d.data);
+        for (const d of disks) await sendOne(d.name, d.data);
       } catch (e) {
         log(file.name + ": " + e.message, "bad");
       }
-    } else if (imageRe.test(file.name)) {
-      await upload(file.name, file);
+    } else if (imageRe.test(file.name) || converterFor(file.name)) {
+      await sendOne(file.name, file);
     } else {
-      log(file.name + ": not a disk image (" + info.disks.description + ") or .ZIP file", "bad");
+      log(file.name + ": not " + accepted(), "bad");
     }
   }
   refresh();
+}
+
+/* One image, or a file a converter makes images of */
+async function sendOne(name, data) {
+  const conv = converterFor(name);
+  if (!conv || imageRe.test(name)) return upload(name, data);
+  const line = log("Unpacking " + name + " …");
+  try {
+    await new Promise(r => setTimeout(r, 0));          /* show the line first */
+    const bytes = new Uint8Array(data instanceof Blob ? await data.arrayBuffer() : data);
+    const disks = await conv.convert(name, bytes, { isImage: n => imageRe.test(n), log: t => log(t) });
+    line.remove();
+    for (const d of disks) await upload(d.name, d.data);
+  } catch (e) {
+    line.textContent = e.message.startsWith(name) ? e.message : name + ": " + e.message;
+    line.className = "bad";
+  }
+}
+
+/* "Disk images (.ST, .MSA), Mac archives (.SIT, ...) or .ZIP files" */
+function accepted() {
+  return [info.disks.description, ...converters.map(c => c.description)].join(", ") + " or .ZIP files";
 }
 
 const drop = $("drop");
@@ -430,8 +458,19 @@ async function start() {
   $("disks-title").textContent = info.disks.title || "Disk images";
   const exts = info.disks.extensions.map(e => e.replace(/^\./, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   imageRe = new RegExp("\\.(" + exts.join("|") + ")$", "i");
-  $("pick").accept = [...info.disks.extensions, ".zip"].join(",");
-  $("drop-text").textContent = "Drop " + info.disks.description + " or .ZIP files here";
+  if (info.script) {
+    /* the machine's converters register themselves */
+    await new Promise(done => {
+      const s = document.createElement("script");
+      s.src = "/machine.js";
+      s.onload = s.onerror = done;
+      document.head.append(s);
+    });
+  }
+  $("pick").accept = [...info.disks.extensions, ".zip", ...converters.flatMap(c => c.extensions)].join(",");
+  $("drop-text").textContent = "Drop " + accepted() + " here";
+  if (converters.length) $("drop-hint").textContent = "or click to choose them. ZIP files are unpacked; " +
+    converters.map(c => c.description).join(", ") + " are put on a disk image.";
   if (info.disks.can_create && info.disks.sizes.length) {
     $("new-size").innerHTML = info.disks.sizes.map(s => `<option value="${s.bytes}">${esc(s.label)}</option>`).join("");
     $("new").hidden = false;

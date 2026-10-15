@@ -45,6 +45,13 @@ Changes here affect both emulators: build both after any change.
   `emu_paused()` (between frames). A machine that ejects a disk itself calls
   `disks_ejected(drive)` from the emulation task; NVS is written later from
   the stats task.
+- Web page script (optional): `web_script`..`web_script_end` (usually an
+  `EMBED_FILES` file) is served as `/machine.js`; `/api/info` says
+  `"script": true` and the page loads it before setting up the drop area.
+  It calls `registerConverter({description, extensions, convert(name,
+  bytes, {isImage, log})})`, which returns `[{name, data}]` images: files
+  with those extensions (also inside ZIP files) are converted in the browser,
+  then uploaded as usual. The Mac uses it for StuffIt/BinHex archives.
 - Status: `status(j, EMU_STATUS_ROWS)` adds `emu_json_row()`s for the
   machine card, `status(j, EMU_STATUS_DRIVES)` adds `emu_json_drive()`s.
 - Presenter: `render_line()` at the machine's resolution, scaled to

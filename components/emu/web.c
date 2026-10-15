@@ -2,6 +2,7 @@
  * Web page for the disk images and the machine: http://<CONFIG_EMU_HOSTNAME>.local
  *
  *   GET    /                    the page (web/index.html)
+ *   GET    /machine.js          the machine's script for the page, if it has one
  *   GET    /api/info            machine name, drives, image kinds, blank disk sizes
  *   GET    /api/disks           {"ready", "free", "disks": [{"name", "size", "drive"}]}
  *   GET    /api/status          machine, drives, board and Bluetooth status
@@ -115,6 +116,18 @@ static esp_err_t page_get(httpd_req_t *req)
     return httpd_resp_send(req, index_html_start, index_html_end - index_html_start);
 }
 
+/* The machine's own script for the page (converters) */
+static esp_err_t script_get(httpd_req_t *req)
+{
+    const emu_machine_t *m = emu_machine();
+    if (!m->web_script) {
+        return send_text(req, "404 Not Found", "No script");
+    }
+    httpd_resp_set_type(req, "text/javascript; charset=utf-8");
+    httpd_resp_set_hdr(req, "Cache-Control", "no-cache");
+    return httpd_resp_send(req, m->web_script, m->web_script_end - m->web_script);
+}
+
 /* ---- What the machine is ---- */
 
 static esp_err_t info_get(httpd_req_t *req)
@@ -127,6 +140,7 @@ static esp_err_t info_get(httpd_req_t *req)
     emu_json_str(&j, "name", m->name);
     emu_json_str(&j, "short_name", m->short_name);
     emu_json_str(&j, "hostname", CONFIG_EMU_HOSTNAME);
+    emu_json_bool(&j, "script", m->web_script != NULL);
     emu_json_object(&j, "disks");
     emu_json_str(&j, "title", d->title);
     emu_json_str(&j, "description", d->description);
@@ -566,6 +580,7 @@ void emu_web_start(void)
     static const httpd_uri_t uris[] = {
         { .uri = "/",               .method = HTTP_GET,    .handler = page_get },
         { .uri = "/api/info",       .method = HTTP_GET,    .handler = info_get },
+        { .uri = "/machine.js",     .method = HTTP_GET,    .handler = script_get },
         { .uri = "/api/disks",      .method = HTTP_GET,    .handler = list_get },
         { .uri = "/api/floppies",   .method = HTTP_GET,    .handler = list_get },
         { .uri = "/api/status",     .method = HTTP_GET,    .handler = status_get },

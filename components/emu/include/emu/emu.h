@@ -80,6 +80,12 @@ typedef struct {
 
     /* Disk images on the SD card for the machine's drives (NULL: none) */
     const disks_config_t *disks;
+    /* JavaScript for the web page, served as /machine.js (NULL: none): it can
+     * call registerConverter({description, extensions, convert}) so that
+     * dropped files with those extensions are turned into disk images in the
+     * browser (see web/index.html). Usually an EMBED_FILES start and end.
+     */
+    const char *web_script, *web_script_end;
 
     /* Status for the web page: EMU_STATUS_ROWS adds the machine card's rows
      * (emu_json_row()), EMU_STATUS_DRIVES its drives (emu_json_drive())

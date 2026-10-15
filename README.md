@@ -43,6 +43,8 @@ static const emu_machine_t machine = {
     .choices = choices, .choice_count = 2,            /* setup screen rows */
     .disks = &disks,                                  /* drives and image folder */
     .status = status,                                 /* web page rows and drives */
+    .web_script = macfiles_js_start,                  /* optional: converters for the page */
+    .web_script_end = macfiles_js_end,
     ...
 };
 
@@ -60,7 +62,7 @@ the speaker). Everything else runs on core 0.
 |---|---|
 | Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start, and any time by holding the top-right corner of the screen for 2 s; changing a choice there restarts the machine |
 | Disks | One folder of images on the SD card for the machine's drives; inserted disks are remembered in NVS. Blank disks of the sizes the machine offers |
-| Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks |
+| Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks (a machine can add a script that turns other files into images in the browser, e.g. the Mac's StuffIt archives) |
 | Console | Native USB port (or the UART with the speaker on): screenshots, simulated touches, disk changes, reset, plus the machine's own commands |
 | Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages |
 
@@ -69,6 +71,7 @@ the speaker). Everything else runs on core 0.
 | Request | |
 |---|---|
 | `GET /api/info` | Machine name, drives, image kinds, blank disk sizes |
+| `GET /machine.js` | The machine's script for the page (`web_script`), if it has one |
 | `GET /api/status` | Machine (state, speed, the machine's rows), drives, board, Bluetooth |
 | `GET /api/disks` | Images in the folder: name, size, drive |
 | `PUT /disks/<name>` | Upload (body = the image); also `POST` |
