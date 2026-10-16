@@ -1,11 +1,13 @@
-# esp32emu: the shared board runtime for the 68000 emulators
+# esp32emu: the shared board runtime for the emulators
 
-ESP-IDF components used by `../esp32ste` (Atari STE) and `../esp32mac`
-(Macintosh Plus/SE/Classic) on the Makerfabs MaTouch ESP32-S3 7". It is a
-library: it isn't built on its own. Build and test through one of the
-projects (each has `EXTRA_COMPONENT_DIRS` pointing here). ESP-IDF v5.5.4, C.
+ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
+(Macintosh Plus/SE/Classic) and `../esp32cpc` (Amstrad CPC and Plus) on the
+Makerfabs MaTouch ESP32-S3 7". It is a library: it isn't built on its own.
+Build and test through one of the projects (each has `EXTRA_COMPONENT_DIRS`
+pointing here). ESP-IDF v5.5.4, C. The CPC brings its own Z80 and doesn't
+use Musashi.
 
-Changes here affect both emulators: build both after any change.
+Changes here affect all three emulators: build all of them after any change.
 
 ## Layout
 
@@ -41,6 +43,10 @@ Changes here affect both emulators: build both after any change.
   usages $E0-$E7, each side separately), `hid_mouse(dx, dy, buttons)`,
   `touch(x, y, pressed)` in machine screen pixels (only if the machine sets
   it; the top-right setup corner is never forwarded).
+- Drives of different kinds (the CPC's floppies and cartridge slot): the
+  optional `disks_config_t.accepts(drive, name)` limits the setup screen's
+  image list for a drive, `takes_blank(drive)` its "New" button. The web
+  page offers every drive; `insert()` refuses what doesn't fit.
 - Disk changes from the setup screen, web page and console run inside
   `emu_paused()` (between frames). A machine that ejects a disk itself calls
   `disks_ejected(drive)` from the emulation task; NVS is written later from
@@ -105,13 +111,14 @@ Changes here affect both emulators: build both after any change.
 
 ## Repositories
 
-Three public GitHub repositories, cloned side by side:
-`github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`. The user pushes
-straight to `main`; commit messages end with the `Co-Authored-By` line the
-session gives. When the user says "commit and push all", that's all three
-(esp32emu first: the others build against it). Topics on GitHub: emulator,
-esp-idf, esp32-s3, lvgl, m68k, retrocomputing, makerfabs, matouch, plus
-the machine's own (atari-st, macintosh, ...); each README has badges and
+Public GitHub repositories, cloned side by side:
+`github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`. The
+user pushes straight to `main`; commit messages end with the
+`Co-Authored-By` line the session gives. When the user says "commit and
+push all", that's all of them (esp32emu first: the others build against
+it). Topics on GitHub: emulator, esp-idf, esp32-s3, lvgl, m68k (z80 for the
+CPC), retrocomputing, makerfabs, matouch, plus the machine's own
+(atari-st, macintosh, amstrad-cpc, ...); each README has badges and
 screenshots, the About text lists the main features.
 
 ## README screenshots
@@ -136,7 +143,7 @@ screenshots, the About text lists the main features.
 
 ## Working with the user
 
-- Expects changes built (both projects), flashed and checked on the board,
+- Expects changes built (all projects), flashed and checked on the board,
   then a short report of what was verified and what wasn't. Flashing ends
   the session on the board: say so first.
 - Keep their private data (WiFi name, IP, SD card contents) out of anything

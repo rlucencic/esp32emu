@@ -16,6 +16,7 @@
  * the machine runs brings this screen back ("Back to ..." then).
  */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include "esp_heap_caps.h"
@@ -626,7 +627,8 @@ static void update_disks(void)
         }
         for (int b = 0; b < 3; b++) {
             bool usable = disks_ready() && (b != BTN_EJECT || name != NULL) &&
-                          (b != BTN_NEW || ui.disks->create != NULL);
+                          (b != BTN_NEW || (ui.disks->create != NULL &&
+                                            (ui.disks->takes_blank == NULL || ui.disks->takes_blank(d))));
             if (usable) {
                 lv_obj_remove_state(ui.drive_buttons[d][b], LV_STATE_DISABLED);
             } else {
@@ -679,6 +681,18 @@ static void insert_clicked(lv_event_t *e)
     int d = ui.images_drive = (int)(intptr_t)lv_event_get_user_data(e);
     disks_free_list(ui.images, ui.image_count);
     ui.image_count = disks_list(&ui.images);
+    if (ui.disks->accepts != NULL) {
+        /* only the images this drive takes */
+        int kept = 0;
+        for (int i = 0; i < ui.image_count; i++) {
+            if (ui.disks->accepts(d, ui.images[i])) {
+                ui.images[kept++] = ui.images[i];
+            } else {
+                free(ui.images[i]);
+            }
+        }
+        ui.image_count = kept;
+    }
 
     lv_label_set_text_fmt(ui.images_title, "Insert into %s", ui.disks->drive_names[d]);
     lv_label_set_text_fmt(ui.images_count, "%d disk%s", ui.image_count,

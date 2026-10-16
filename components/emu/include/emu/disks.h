@@ -43,6 +43,12 @@ typedef struct {
     bool (*create)(const char *path, uint32_t bytes);
     /* An image is deleted or replaced: drop files made from it (optional) */
     void (*removed)(const char *path);
+    /* Optional, for drives of different kinds (floppies and a cartridge
+     * slot): which images a drive takes (the setup screen lists only
+     * those), and whether it gets "New" blank disks. NULL: all of them.
+     */
+    bool (*accepts)(int drive, const char *name);
+    bool (*takes_blank)(int drive);
 } disks_config_t;
 
 /* Make the folder if needed; false without an SD card */
