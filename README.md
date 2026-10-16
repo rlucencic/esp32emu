@@ -1,15 +1,16 @@
 <h1 align="center">esp32emu</h1>
 
 <p align="center">
-  <b>The shared board runtime for 68000 emulators on the Makerfabs MaTouch ESP32-S3 7".</b><br>
-  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE) and <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic).
+  <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7".</b><br>
+  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic) and <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC).
 </p>
 
 esp32emu is everything an emulator on this board needs apart from the machine
 itself: the display and touch panel, the SD card, WiFi with the clock from the
 internet, Bluetooth keyboards and mice, a setup screen, a web page for disk
-images, a serial console for testing, and the 68000 core. A machine describes
-itself in one struct, and `emu_run()` does the rest.
+images, a serial console for testing, and a 68000 core for the machines that
+need one. A machine describes itself in one struct, and `emu_run()` does the
+rest.
 
 ## Components
 
@@ -27,8 +28,9 @@ In the project's top-level `CMakeLists.txt`, before `project()`:
 set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/../esp32emu/components")
 ```
 
-Then `main` requires `emu`, and the machine's core requires `musashi`. The
-machine fills in an `emu_machine_t` (`components/emu/include/emu/emu.h`):
+Then `main` requires `emu`, and a 68000 machine's core requires `musashi`
+(the CPC brings its own Z80). The machine fills in an `emu_machine_t`
+(`components/emu/include/emu/emu.h`):
 
 ```c
 static const emu_machine_t machine = {
