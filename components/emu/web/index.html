@@ -419,7 +419,7 @@ function showStatus(s) {
     b.wifi.ip && ["Address", `${b.wifi.ip}`],
     ["Up for", duration(b.uptime)],
     ["Core 0", `${b.load[0]}% busy <span class="dim">(screen, WiFi, Bluetooth)</span>${bar(b.load[0])}`],
-    ["Core 1", `${b.load[1]}% busy <span class="dim">(68000 emulation)</span>${bar(b.load[1], 101, 101)}`],
+    ["Core 1", `${b.load[1]}% busy <span class="dim">(${esc(info.short_name)} emulation)</span>${bar(b.load[1], 101, 101)}`],
     b.temperature !== null && ["Chip", `${b.temperature.toFixed(0)} °C`],
     ["Internal RAM", `${kb(b.internal_free)} free <span class="dim">(lowest ${kb(b.internal_min)}, largest block ${kb(b.internal_largest)})</span>`],
     ["PSRAM", `${mb(b.psram_free)} free of ${mb(b.psram_total)}`],
