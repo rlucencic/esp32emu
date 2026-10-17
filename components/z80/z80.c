@@ -217,10 +217,24 @@ static inline void contend(uint16_t a, int cycles)
 #define IO_AT(at)       (at)
 #endif
 
+/* A bank's byte (or the machine's) */
+static inline uint8_t mem(uint16_t a)
+{
+#if Z80_READ_SPECIAL
+    const uint8_t *p = z80_rd[a >> 14];
+    if (__builtin_expect(p == NULL, 0)) {
+        return s_bus.read_special(a);
+    }
+    return p[a & 0x3FFF];
+#else
+    return z80_rd[a >> 14][a & 0x3FFF];
+#endif
+}
+
 static inline uint8_t rd(uint16_t a)
 {
     contend(a, 3);
-    return z80_rd[a >> 14][a & 0x3FFF];
+    return mem(a);
 }
 
 static inline void wr(uint16_t a, uint8_t v)
@@ -252,7 +266,7 @@ static inline void io_out(uint16_t port, uint8_t v, int at)
 static inline uint8_t fetch_op(void)
 {
     contend(PC, 4);
-    uint8_t op = z80_rd[PC >> 14][PC & 0x3FFF];
+    uint8_t op = mem(PC);
     PC++;
     return op;
 }
@@ -897,7 +911,7 @@ static int exec_op(uint8_t op, z80_pair_t *xy, int idx)
 
 static int exec_xy(z80_pair_t *xy)
 {
-    uint8_t op = z80_peek(PC);
+    uint8_t op = mem(PC);                   /* (a look ahead: not z80_peek(), blind to read_special()) */
     if (op == 0xDD || op == 0xFD || op == 0xED) {
         return T_PREFIX;    /* this prefix does nothing; the next one counts */
     }
@@ -962,12 +976,12 @@ static const char *const rotn[8] = { "RLC", "RRC", "RL", "RR", "SLA", "SRA", "SL
 int z80_disassemble(uint16_t pc, char *buf, int len)
 {
     uint16_t start = pc;
-    uint8_t op = z80_peek(pc++);
+    uint8_t op = mem(pc++);
     const char *xyn = NULL;
     int8_t d = 0;
     if (op == 0xDD || op == 0xFD) {
         xyn = op == 0xDD ? "IX" : "IY";
-        op = z80_peek(pc++);
+        op = mem(pc++);
     }
     char hl[12], mhl[16], h[8], l[8];
     snprintf(hl, sizeof(hl), "%s", xyn ? xyn : "HL");
@@ -976,9 +990,9 @@ int z80_disassemble(uint16_t pc, char *buf, int len)
 
     if (op == 0xCB) {
         if (xyn) {
-            d = z80_peek(pc++);
+            d = mem(pc++);
         }
-        uint8_t o = z80_peek(pc++);
+        uint8_t o = mem(pc++);
         int r = o & 7, n = (o >> 3) & 7;
         if (xyn) {
             snprintf(mhl, sizeof(mhl), "(%s%+d)", xyn, d);
@@ -994,7 +1008,7 @@ int z80_disassemble(uint16_t pc, char *buf, int len)
         return (uint16_t)(pc - start);
     }
     if (op == 0xED) {
-        uint8_t o = z80_peek(pc++);
+        uint8_t o = mem(pc++);
         int r = (o >> 3) & 7;
         uint16_t nn;
         switch (o) {
@@ -1005,10 +1019,10 @@ int z80_disassemble(uint16_t pc, char *buf, int len)
         case 0x42: case 0x52: case 0x62: case 0x72: snprintf(buf, len, "SBC HL,%s", r16n[r >> 1]); break;
         case 0x4A: case 0x5A: case 0x6A: case 0x7A: snprintf(buf, len, "ADC HL,%s", r16n[r >> 1]); break;
         case 0x43: case 0x53: case 0x63: case 0x73:
-            nn = z80_peek(pc) | (z80_peek(pc + 1) << 8); pc += 2;
+            nn = mem(pc) | (mem(pc + 1) << 8); pc += 2;
             snprintf(buf, len, "LD ($%04X),%s", nn, r16n[r >> 1]); break;
         case 0x4B: case 0x5B: case 0x6B: case 0x7B:
-            nn = z80_peek(pc) | (z80_peek(pc + 1) << 8); pc += 2;
+            nn = mem(pc) | (mem(pc + 1) << 8); pc += 2;
             snprintf(buf, len, "LD %s,($%04X)", r16n[r >> 1], nn); break;
         case 0x44: snprintf(buf, len, "NEG"); break;
         case 0x45: snprintf(buf, len, "RETN"); break;
@@ -1044,7 +1058,7 @@ int z80_disassemble(uint16_t pc, char *buf, int len)
         uses_m = false;
     }
     if (xyn && uses_m) {
-        d = z80_peek(pc++);
+        d = mem(pc++);
         snprintf(mhl, sizeof(mhl), "(%s%+d)", xyn, d);
     } else {
         snprintf(mhl, sizeof(mhl), "(HL)");
@@ -1061,7 +1075,7 @@ int z80_disassemble(uint16_t pc, char *buf, int len)
             if (y == 0) snprintf(buf, len, "NOP");
             else if (y == 1) snprintf(buf, len, "EX AF,AF'");
             else {
-                d = z80_peek(pc++);
+                d = mem(pc++);
                 uint16_t target = pc + d;
                 if (y == 2) snprintf(buf, len, "DJNZ $%04X", target);
                 else if (y == 3) snprintf(buf, len, "JR $%04X", target);
@@ -1070,7 +1084,7 @@ int z80_disassemble(uint16_t pc, char *buf, int len)
             break;
         case 1:
             if (!q) {
-                nn = z80_peek(pc) | (z80_peek(pc + 1) << 8); pc += 2;
+                nn = mem(pc) | (mem(pc + 1) << 8); pc += 2;
                 snprintf(buf, len, "LD %s,$%04X", p == 2 ? hl : r16n[p], nn);
             } else {
                 snprintf(buf, len, "ADD %s,%s", hl, p == 2 ? hl : r16n[p]);
@@ -1080,7 +1094,7 @@ int z80_disassemble(uint16_t pc, char *buf, int len)
             if (p < 2) {
                 snprintf(buf, len, q ? "LD A,(%s)" : "LD (%s),A", r16n[p]);
             } else {
-                nn = z80_peek(pc) | (z80_peek(pc + 1) << 8); pc += 2;
+                nn = mem(pc) | (mem(pc + 1) << 8); pc += 2;
                 if (p == 2 && q) snprintf(buf, len, "LD %s,($%04X)", hl, nn);
                 if (p == 2 && !q) snprintf(buf, len, "LD ($%04X),%s", nn, hl);
                 if (p == 3) snprintf(buf, len, q ? "LD A,($%04X)" : "LD ($%04X),A", nn);
@@ -1089,7 +1103,7 @@ int z80_disassemble(uint16_t pc, char *buf, int len)
         case 3: snprintf(buf, len, "%s %s", q ? "DEC" : "INC", p == 2 ? hl : r16n[p]); break;
         case 4: snprintf(buf, len, "INC %s", rn[y]); break;
         case 5: snprintf(buf, len, "DEC %s", rn[y]); break;
-        case 6: n = z80_peek(pc++); snprintf(buf, len, "LD %s,$%02X", rn[y], n); break;
+        case 6: n = mem(pc++); snprintf(buf, len, "LD %s,$%02X", rn[y], n); break;
         default: {
             static const char *const m[8] = { "RLCA", "RRCA", "RLA", "RRA", "DAA", "CPL", "SCF", "CCF" };
             snprintf(buf, len, "%s", m[y]);
@@ -1113,22 +1127,22 @@ int z80_disassemble(uint16_t pc, char *buf, int len)
             else if (p == 2) snprintf(buf, len, "JP (%s)", hl);
             else snprintf(buf, len, "LD SP,%s", hl);
             break;
-        case 2: nn = z80_peek(pc) | (z80_peek(pc + 1) << 8); pc += 2; snprintf(buf, len, "JP %s,$%04X", ccn[y], nn); break;
+        case 2: nn = mem(pc) | (mem(pc + 1) << 8); pc += 2; snprintf(buf, len, "JP %s,$%04X", ccn[y], nn); break;
         case 3:
-            if (y == 0) { nn = z80_peek(pc) | (z80_peek(pc + 1) << 8); pc += 2; snprintf(buf, len, "JP $%04X", nn); }
-            else if (y == 2) { n = z80_peek(pc++); snprintf(buf, len, "OUT ($%02X),A", n); }
-            else if (y == 3) { n = z80_peek(pc++); snprintf(buf, len, "IN A,($%02X)", n); }
+            if (y == 0) { nn = mem(pc) | (mem(pc + 1) << 8); pc += 2; snprintf(buf, len, "JP $%04X", nn); }
+            else if (y == 2) { n = mem(pc++); snprintf(buf, len, "OUT ($%02X),A", n); }
+            else if (y == 3) { n = mem(pc++); snprintf(buf, len, "IN A,($%02X)", n); }
             else if (y == 4) snprintf(buf, len, "EX (SP),%s", hl);
             else if (y == 5) snprintf(buf, len, "EX DE,HL");
             else if (y == 6) snprintf(buf, len, "DI");
             else snprintf(buf, len, "EI");
             break;
-        case 4: nn = z80_peek(pc) | (z80_peek(pc + 1) << 8); pc += 2; snprintf(buf, len, "CALL %s,$%04X", ccn[y], nn); break;
+        case 4: nn = mem(pc) | (mem(pc + 1) << 8); pc += 2; snprintf(buf, len, "CALL %s,$%04X", ccn[y], nn); break;
         case 5:
             if (!q) snprintf(buf, len, "PUSH %s", p == 2 ? hl : r16p[p]);
-            else { nn = z80_peek(pc) | (z80_peek(pc + 1) << 8); pc += 2; snprintf(buf, len, "CALL $%04X", nn); }
+            else { nn = mem(pc) | (mem(pc + 1) << 8); pc += 2; snprintf(buf, len, "CALL $%04X", nn); }
             break;
-        case 6: n = z80_peek(pc++); snprintf(buf, len, "%s$%02X", alun[y], n); break;
+        case 6: n = mem(pc++); snprintf(buf, len, "%s$%02X", alun[y], n); break;
         default: snprintf(buf, len, "RST $%02X", y * 8); break;
         }
     }

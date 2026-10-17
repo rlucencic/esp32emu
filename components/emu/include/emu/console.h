@@ -10,6 +10,8 @@
  *                      eject without a name, "+" for a new blank disk
  *   t <x> <y> [ms]     touch the screen there (default 150 ms)
  *   i                  print the machine state
+ *   p [samples]        sample core 1's program counter at 20 kHz (default
+ *                      8000 samples): "EMUPROF <hex> ..." lines, "EMUPROF END"
  *
  * Anything else goes to the machine (emu_machine_t.console_command), e.g.
  * keys and mouse.

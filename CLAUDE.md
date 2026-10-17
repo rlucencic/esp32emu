@@ -1,14 +1,15 @@
 # esp32emu: the shared board runtime for the emulators
 
 ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
-(Macintosh Plus/SE/Classic), `../esp32cpc` (Amstrad CPC and Plus) and
-`../esp32zx` (ZX Spectrum 128K, +2, +3) on the Makerfabs MaTouch ESP32-S3
-7". It is a library: it isn't built on its own. Build and test through one
-of the projects (each has `EXTRA_COMPONENT_DIRS` pointing here). ESP-IDF
-v5.5.4, C. The 68000 machines use Musashi, the Z80 ones the Z80 core; the
-CPC and the +3 share the uPD765.
+(Macintosh Plus/SE/Classic), `../esp32cpc` (Amstrad CPC and Plus),
+`../esp32zx` (ZX Spectrum 128K, +2, +3) and `../esp32cbm` (Commodore 64 and
+128) on the Makerfabs MaTouch ESP32-S3 7". It is a library: it isn't built
+on its own. Build and test through one of the projects (each has
+`EXTRA_COMPONENT_DIRS` pointing here). ESP-IDF v5.5.4, C. The 68000
+machines use Musashi, the Z80 ones the Z80 core, the Commodores the 6502
+core (the C128 the Z80 too); the CPC and the +3 share the uPD765.
 
-Changes here affect all four emulators: build all of them after any change
+Changes here affect all five emulators: build all of them after any change
 (only the components a project requires get built: MINIMAL_BUILD).
 
 ## Layout
@@ -16,19 +17,20 @@ Changes here affect all four emulators: build all of them after any change
 | Path | What |
 |---|---|
 | `components/musashi/` | 68000 core (Musashi, evansm7 fork) + `m68kconf.h` with the `m68k_host_*()` hooks; `test/` host tests (`make -C components/musashi/test`) |
-| `components/z80/` | Z80 core (from the CPC): T-states with optional ZX contention, or CPC microseconds (menuconfig "Z80 core"); `test/` zexdoc/zexall host test for both |
+| `components/z80/` | Z80 core (from the CPC): T-states with optional ZX contention, or CPC microseconds (menuconfig "Z80 core"); `Z80_READ_SPECIAL` sends reads of NULL banks to the bus (the C128's MMU); `test/` zexdoc/zexall host test for each build |
+| `components/m6502/` | 6502 core (from the Commodore): every bus cycle, all 256 opcodes, several CPUs at once, `m6502_run()` to the machine's next event; `linker.lf` keeps its jump table in internal RAM; `test/` Klaus Dormann's functional test and an opcode cycle table (`make -C components/m6502/test`) |
 | `components/upd765/` | uPD765A floppy controller with DSK/EDSK images (CPC, +3) |
 | `components/emu/include/emu/emu.h` | The machine interface (`emu_machine_t`) and runtime API |
 | `components/emu/emu.c` | Boot order, emulation task (core 1), presenter, stats, temperature, supervisor (touch: setup corner and machine touches), pausing |
 | `components/emu/setup_ui.c` | LVGL setup screen (status, WiFi, password, Bluetooth, pairing, drives, images) |
 | `components/emu/web.c` + `web/index.html` | Web server and the page (one page for all machines: it reads `/api/info`) |
 | `components/emu/disks.c` | Disk image folder, drives, NVS memory of inserted disks, blank disks |
-| `components/emu/console.c` | Serial console (`include/emu/console.h` lists the commands) |
+| `components/emu/console.c` | Serial console (`include/emu/console.h` lists the commands), with `p`: a 20 kHz sampling profiler of core 1 |
 | `components/emu/ble_hid.c` | BLE HID host: pairing, reconnecting, reports -> HID usages |
 | `components/emu/net.c` | WiFi station + SNTP |
 | `components/emu/lcd.c`, `touch.c`, `sdcard.c`, `speaker.c` | Board drivers; pins in `include/emu/board.h` |
 | `components/emu/json.c` | Small JSON builder for the web API |
-| `tools/emu_console.py` | Console client (run with the IDF venv's Python, `-I`) |
+| `tools/emu_console.py` | Console client (run with the IDF venv's Python, `-I`); `profile ELF [N [TOP]]` runs `p` and names the hottest functions |
 
 ## How a machine plugs in
 
@@ -108,6 +110,17 @@ Changes here affect all four emulators: build all of them after any change
   `emu_console.py send` calls, or LVGL sees one press sliding between them.
 - Flash writes (NVS) briefly stall both cores: write from core 0 tasks, not
   from the emulation.
+- **Profile before optimising**: `emu_console.py PORT profile build/X.elf`.
+  On the Commodore, two good guesses (the CPU core in IRAM, more inlining)
+  gained nothing; the profile showed the real costs below.
+- **Read-only data in flash is slow for hot code**: it is read through a
+  data cache that the LCD's PSRAM traffic keeps flushing. A CPU core's
+  opcode jump table there cost a tenth of the emulation's time (the 6502's
+  `linker.lf`: `noflash_data`; the ST copies Musashi's tables to PSRAM).
+- **A 32 KB instruction cache** (`CONFIG_ESP32S3_INSTRUCTION_CACHE_32KB`)
+  made the Commodore's busy disk drive 25% faster, for 16 KB of internal RAM.
+- **No 64-bit division in hot paths**: it is a libgcc call (the
+  Commodore's drive clock conversion did one per drive instruction).
 - **A setup screen label above fixed-position widgets must stay one line**:
   the Disks page placed the drive cards for a one-line description, the
   Mac's longer one wrapped and its second line hid under the first card.
@@ -116,13 +129,15 @@ Changes here affect all four emulators: build all of them after any change
 ## Repositories
 
 Public GitHub repositories, cloned side by side:
-`github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`. The
+`github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
+`esp32cbm`. The
 user pushes straight to `main`; commit messages end with the
 `Co-Authored-By` line the session gives. When the user says "commit and
 push all", that's all of them (esp32emu first: the others build against
 it). Topics on GitHub: emulator, esp-idf, esp32-s3, lvgl, m68k (z80 for the
-CPC and the Spectrum), retrocomputing, makerfabs, matouch, plus the
-machine's own (atari-st, macintosh, amstrad-cpc, zx-spectrum, ...); each README has badges and
+CPC and the Spectrum, 6502 for the Commodore), retrocomputing, makerfabs,
+matouch, plus the machine's own (atari-st, macintosh, amstrad-cpc,
+zx-spectrum, ...); each README has badges and
 screenshots, the About text lists the main features.
 
 ## README screenshots

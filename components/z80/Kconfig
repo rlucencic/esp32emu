@@ -15,6 +15,13 @@ menu "Z80 core"
                 1 us grid: each instruction takes a whole number of them.
     endchoice
 
+    config Z80_READ_SPECIAL
+        bool "Reads from unmapped banks through the machine"
+        default n
+        help
+            A NULL read bank goes to the bus's read_special() (the
+            Commodore 128's MMU maps by the page). Costs a test per read.
+
     config Z80_CONTENTION
         bool "Memory contention (ZX Spectrum)"
         depends on Z80_TIMING_TSTATES

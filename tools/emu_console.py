@@ -7,8 +7,15 @@
   emu_console.py PORT send "r" ...         send console commands
   emu_console.py PORT info                 print the machine state
   emu_console.py PORT reset                hard-reset the board, then log 10 s
+  emu_console.py PORT profile ELF [N [TOP]]  where core 1 (the emulation) spends its
+                                           time: N samples at 20 kHz (default 8000),
+                                           the TOP functions (default 25), by the
+                                           build's ELF (its toolchain's nm)
 """
 import base64
+import bisect
+import collections
+import glob
 import os
 import re
 import subprocess
@@ -108,6 +115,56 @@ def write_png(width, height, rgb565, out_png, repeat=1):
     print(f"{width}x{height} -> {out_png}")
 
 
+def find_nm():
+    """The ESP-IDF toolchain's nm for the ESP32-S3 (on PATH, or under ~/.espressif)"""
+    for d in os.environ.get("PATH", "").split(os.pathsep):
+        p = os.path.join(d, "xtensa-esp32s3-elf-nm")
+        if os.access(p, os.X_OK):
+            return p
+    tools = os.environ.get("IDF_TOOLS_PATH", os.path.expanduser("~/.espressif"))
+    found = sorted(glob.glob(os.path.join(tools, "tools/xtensa-esp-elf/*/xtensa-esp-elf/bin/xtensa-esp32s3-elf-nm")))
+    if not found:
+        sys.exit("no xtensa-esp32s3-elf-nm: run with the ESP-IDF environment")
+    return found[-1]
+
+
+def profile(port, elf, samples, top):
+    syms = []
+    out = subprocess.run([find_nm(), "-S", "--defined-only", elf], capture_output=True, text=True).stdout
+    for line in out.splitlines():
+        f = line.split()
+        if len(f) == 4 and f[2].lower() in "tw":
+            syms.append((int(f[0], 16), int(f[1], 16), f[3]))
+    syms.sort()
+    starts = [s[0] for s in syms]
+    port.reset_input_buffer()
+    port.write(b"p %d\n" % samples)
+    pcs = []
+    end = time.time() + samples / 20000 + 15
+    while time.time() < end:
+        line = port.readline()
+        if line.startswith(b"EMUPROF END"):
+            break
+        if line.startswith(b"EMUPROF"):
+            for x in line.split()[1:]:
+                try:
+                    pcs.append(int(x, 16))
+                except ValueError:
+                    pass
+    if not pcs:
+        sys.exit("no samples")
+    count = collections.Counter()
+    for pc in pcs:
+        i = bisect.bisect_right(starts, pc) - 1
+        if i >= 0 and pc < syms[i][0] + max(syms[i][1], 1):
+            count[syms[i][2]] += 1
+        else:
+            count["?%08x" % (pc & ~0xFFF)] += 1
+    print("%d samples" % len(pcs))
+    for name, n in count.most_common(top):
+        print("%5.1f%%  %s" % (100.0 * n / len(pcs), name))
+
+
 def main():
     if len(sys.argv) < 3:
         sys.exit(__doc__)
@@ -132,6 +189,9 @@ def main():
             if line.startswith(b"EMUINFO"):
                 print(line.decode().strip())
                 break
+    elif cmd == "profile":
+        profile(port, sys.argv[3], int(sys.argv[4]) if len(sys.argv) > 4 else 8000,
+                int(sys.argv[5]) if len(sys.argv) > 5 else 25)
     elif cmd == "reset":
         if is_native_usb(sys.argv[1]):
             port.dtr = False

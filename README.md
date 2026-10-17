@@ -2,14 +2,14 @@
 
 <p align="center">
   <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7".</b><br>
-  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC) and <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3).
+  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3) and <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128).
 </p>
 
 esp32emu is everything an emulator on this board needs apart from the machine
 itself: the display and touch panel, the SD card, WiFi with the clock from the
 internet, Bluetooth keyboards and mice, a setup screen, a web page for disk
 images, a serial console for testing, and the CPU cores and chips the
-machines share: a 68000, a Z80 and a uPD765 floppy controller. A machine
+machines share: a 68000, a Z80, a 6502 and a uPD765 floppy controller. A machine
 describes itself in one struct, and `emu_run()` does the rest.
 
 ## Components
@@ -17,10 +17,11 @@ describes itself in one struct, and `emu_run()` does the rest.
 | Component | What |
 |---|---|
 | `components/musashi` | The 68000 core: [Musashi](https://github.com/kstenerud/Musashi), evansm7's embedded fork, with static opcode tables (see its README) |
-| `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
+| `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds, optionally reading unmapped banks through the machine (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
+| `components/m6502` | The 6502 core (6510, 8502, disk drives): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing; `test/` runs Klaus Dormann's functional test on a desktop |
 | `components/upd765` | The uPD765A floppy controller as the CPC and the Spectrum +3 wire it up, with DSK and extended DSK images |
 | `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console |
-| `tools/emu_console.py` | Console client: log, screenshots of the machine or the whole LCD, commands |
+| `tools/emu_console.py` | Console client: log, screenshots of the machine or the whole LCD, commands, a profile of the emulation (hottest functions) |
 
 ## Using it
 
@@ -30,8 +31,8 @@ In the project's top-level `CMakeLists.txt`, before `project()`:
 set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/../esp32emu/components")
 ```
 
-Then `main` requires `emu`, and the machine's core requires `musashi` or
-`z80` (and `upd765` for DSK drives). The machine fills in an
+Then `main` requires `emu`, and the machine's core requires `musashi`,
+`z80` or `m6502` (and `upd765` for DSK drives). The machine fills in an
 `emu_machine_t` (`components/emu/include/emu/emu.h`):
 
 ```c
@@ -67,7 +68,7 @@ the speaker). Everything else runs on core 0.
 | Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start, and any time by holding the top-right corner of the screen for 2 s; changing a choice there restarts the machine |
 | Disks | One folder of images on the SD card for the machine's drives; inserted disks are remembered in NVS. Blank disks of the sizes the machine offers |
 | Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks (a machine can add a script that turns other files into images in the browser, e.g. the Mac's StuffIt archives) |
-| Console | Native USB port (or the UART with the speaker on): screenshots, simulated touches, disk changes, reset, plus the machine's own commands |
+| Console | Native USB port (or the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, plus the machine's own commands |
 | Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages |
 
 ## Web API

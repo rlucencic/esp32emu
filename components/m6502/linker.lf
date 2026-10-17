@@ -1,0 +1,7 @@
+# The opcode switch's jump table (and the core's other read-only data) in
+# internal RAM: from flash, through a data cache that the video keeps
+# flushing, the dispatch was a tenth of the emulation's time
+[mapping:m6502]
+archive: libm6502.a
+entries:
+    m6502 (noflash_data)

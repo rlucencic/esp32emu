@@ -2,3 +2,4 @@ components/musashi/test/build/
 __pycache__/
 .DS_Store
 components/z80/test/build/
+components/m6502/test/build/

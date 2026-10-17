@@ -32,6 +32,12 @@
 #define Z80_HOT
 #endif
 
+#ifdef CONFIG_Z80_READ_SPECIAL
+#define Z80_READ_SPECIAL 1
+#else
+#define Z80_READ_SPECIAL 0
+#endif
+
 #if defined(CONFIG_Z80_CONTENTION) && !defined(CONFIG_Z80_TIMING_CPC)
 #define Z80_CONTENTION 1
 #else
@@ -66,7 +72,8 @@ extern z80_t z80;
 /* ---- The machine's side ---- */
 
 /* 16 KB banks as the CPU sees them; a NULL write bank goes to the bus's
- * write_special()
+ * write_special(), a NULL read bank (CONFIG_Z80_READ_SPECIAL) to
+ * read_special()
  */
 extern uint8_t *z80_rd[4];
 extern uint8_t *z80_wr[4];
@@ -78,6 +85,7 @@ typedef struct {
     /* Interrupt acknowledge: the byte on the data bus (the IM 2 vector) */
     uint8_t (*int_ack)(void);
     void (*write_special)(uint16_t addr, uint8_t v);    /* may be NULL */
+    uint8_t (*read_special)(uint16_t addr);             /* CONFIG_Z80_READ_SPECIAL */
 } z80_bus_t;
 
 void z80_set_bus(const z80_bus_t *bus);
@@ -88,9 +96,14 @@ extern const uint8_t *z80_contention;
 extern uint8_t z80_contended[4];
 #endif
 
-/* Memory as the CPU sees it, without side effects */
+/* Memory as the CPU sees it, without side effects (an unmapped bank: 0xFF) */
 static inline uint8_t z80_peek(uint16_t a)
 {
+#if Z80_READ_SPECIAL
+    if (z80_rd[a >> 14] == NULL) {
+        return 0xFF;
+    }
+#endif
     return z80_rd[a >> 14][a & 0x3FFF];
 }
 

@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include "driver/gptimer.h"
 #include "driver/uart.h"
 #include "driver/usb_serial_jtag.h"
 #include "driver/usb_serial_jtag_vfs.h"
@@ -252,6 +253,78 @@ static void disk_command(void *arg)
     }
 }
 
+/* ---- p: a profile of the emulation (core 1) ---- */
+
+#define PROFILE_HZ      20000
+#define PROFILE_MAX     32000
+
+static uint32_t *s_prof;
+static volatile int s_prof_n, s_prof_want;
+
+/* The interrupted program counter (a level 1 interrupt: EPC1) */
+static bool IRAM_ATTR profile_tick(gptimer_handle_t t, const gptimer_alarm_event_data_t *e, void *ctx)
+{
+    uint32_t pc;
+    __asm__ volatile("rsr.epc1 %0" : "=a"(pc));
+    if (s_prof_n < s_prof_want) {
+        s_prof[s_prof_n++] = pc;
+    }
+    return false;
+}
+
+/* On core 1, above the emulation (it doesn't yield while it's behind), so
+ * the timer's interrupt is that core's
+ */
+static void profile_task(void *arg)
+{
+    TaskHandle_t console = arg;
+    gptimer_handle_t t = NULL;
+    gptimer_config_t cfg = { .clk_src = GPTIMER_CLK_SRC_DEFAULT, .direction = GPTIMER_COUNT_UP,
+                             .resolution_hz = 1000000 };
+    gptimer_event_callbacks_t cbs = { .on_alarm = profile_tick };
+    gptimer_alarm_config_t alarm = { .alarm_count = 1000000 / PROFILE_HZ, .flags.auto_reload_on_alarm = true };
+    if (gptimer_new_timer(&cfg, &t) == ESP_OK && gptimer_register_event_callbacks(t, &cbs, NULL) == ESP_OK &&
+        gptimer_set_alarm_action(t, &alarm) == ESP_OK && gptimer_enable(t) == ESP_OK && gptimer_start(t) == ESP_OK) {
+        while (s_prof_n < s_prof_want) {
+            vTaskDelay(pdMS_TO_TICKS(20));
+        }
+        gptimer_stop(t);
+        gptimer_disable(t);
+    }
+    if (t) {
+        gptimer_del_timer(t);
+    }
+    xTaskNotifyGive(console);
+    vTaskDelete(NULL);
+}
+
+static void profile(int samples)
+{
+    if (samples <= 0 || samples > PROFILE_MAX) {
+        samples = 8000;
+    }
+    if (s_prof == NULL) {
+        s_prof = heap_caps_malloc(PROFILE_MAX * sizeof(uint32_t), MALLOC_CAP_SPIRAM);
+        if (s_prof == NULL) {
+            emu_console_printf("EMUPROF END\n");
+            return;
+        }
+    }
+    s_prof_n = 0;
+    s_prof_want = samples;
+    xTaskCreatePinnedToCore(profile_task, "profile", 3072, xTaskGetCurrentTaskHandle(), 20, NULL, 1);
+    ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(samples * 1000 / PROFILE_HZ + 5000));
+    for (int i = 0; i < s_prof_n; i += 16) {
+        char line[16 * 9 + 16];
+        int n = snprintf(line, sizeof(line), "EMUPROF");
+        for (int j = i; j < i + 16 && j < s_prof_n; j++) {
+            n += snprintf(line + n, sizeof(line) - n, " %08lx", (unsigned long)s_prof[j]);
+        }
+        emu_console_printf("%s\n", line);
+    }
+    emu_console_printf("EMUPROF END\n");
+}
+
 static void console_task(void *arg)
 {
     char line[128];
@@ -291,6 +364,9 @@ static void console_task(void *arg)
         }
         case 'i':
             print_info();
+            break;
+        case 'p':
+            profile(atoi(line + 1));
             break;
         default:
             if (emu_machine()->console_command) {
