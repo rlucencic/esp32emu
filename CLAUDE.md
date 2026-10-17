@@ -116,13 +116,13 @@ Changes here affect all four emulators: build all of them after any change
 ## Repositories
 
 Public GitHub repositories, cloned side by side:
-`github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`. The
+`github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`. The
 user pushes straight to `main`; commit messages end with the
 `Co-Authored-By` line the session gives. When the user says "commit and
 push all", that's all of them (esp32emu first: the others build against
 it). Topics on GitHub: emulator, esp-idf, esp32-s3, lvgl, m68k (z80 for the
-CPC), retrocomputing, makerfabs, matouch, plus the machine's own
-(atari-st, macintosh, amstrad-cpc, ...); each README has badges and
+CPC and the Spectrum), retrocomputing, makerfabs, matouch, plus the
+machine's own (atari-st, macintosh, amstrad-cpc, zx-spectrum, ...); each README has badges and
 screenshots, the About text lists the main features.
 
 ## README screenshots
