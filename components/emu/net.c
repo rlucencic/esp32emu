@@ -14,6 +14,9 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/timers.h"
 #include "emu/net.h"
+#if CONFIG_IDF_TARGET_ESP32P4
+#include "tab5.h"
+#endif
 
 #define MAX_SCAN    24
 
@@ -37,6 +40,9 @@ static void time_synced(struct timeval *tv)
     char buf[32];
     strftime(buf, sizeof(buf), "%Y-%m-%d %H:%M:%S", &tm);
     ESP_LOGI(TAG, "time set: %s", buf);
+#if CONFIG_IDF_TARGET_ESP32P4
+    tab5_clock_save();
+#endif
 }
 
 static void retry(TimerHandle_t t)
@@ -225,7 +231,15 @@ void net_connect(const char *ssid, const char *password)
     esp_wifi_connect();
 }
 
-bool net_time_synced(void)
+net_time_t net_time_source(void)
 {
-    return s_time_synced;
+    if (s_time_synced) {
+        return NET_TIME_INTERNET;
+    }
+#if CONFIG_IDF_TARGET_ESP32P4
+    if (tab5_clock_loaded()) {
+        return NET_TIME_BOARD;
+    }
+#endif
+    return NET_TIME_NONE;
 }

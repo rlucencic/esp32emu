@@ -13,7 +13,7 @@
  * It waits for [Start]. With CONFIG_EMU_AUTOSTART it also starts the
  * machine after a countdown once the clock is set (or without saved WiFi);
  * any touch stops the countdown. Long-pressing the top-right corner while
- * the machine runs brings this screen back ("Back to ..." then).
+ * the machine runs brings this screen back ([Back] then).
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -229,16 +229,16 @@ static bool choices_changed(void)
     return false;
 }
 
-/* Paused machine: "Back to ..." resumes it, "Restart ..." when a choice changed */
+/* Paused machine: [Back] resumes it, [Restart] when a choice changed */
 static void update_start_label(void)
 {
     const char *symbol = LV_SYMBOL_PLAY, *verb = "Start";
     if (ui.running) {
         bool changed = choices_changed();
         symbol = changed ? LV_SYMBOL_REFRESH : LV_SYMBOL_PLAY;
-        verb = changed ? "Restart" : "Back to";
+        verb = changed ? "Restart" : "Back";
     }
-    lv_label_set_text_fmt(ui.start_label, "%s  %s %s", symbol, verb, ui.m->short_name);
+    lv_label_set_text_fmt(ui.start_label, "%s  %s", symbol, verb);
 }
 
 static void choice_changed(lv_event_t *e)
@@ -320,9 +320,7 @@ static void build_status_screen(void)
     update_start_label();
 
     if (ui.running) {
-        char text[40];
-        snprintf(text, sizeof(text), LV_SYMBOL_REFRESH "  Reset %s", ui.m->short_name);
-        lv_obj_t *reset = make_button(s, text, reset_clicked, 230);
+        lv_obj_t *reset = make_button(s, LV_SYMBOL_REFRESH "  Reset", reset_clicked, 160);
         lv_obj_set_height(reset, SY(48));
         lv_obj_align(reset, LV_ALIGN_TOP_RIGHT, 0, -SY(4));
         lv_obj_set_style_bg_color(reset, COLOR_CARD, 0);
@@ -358,7 +356,7 @@ static void update_status(void)
         break;
     }
 
-    if (net_time_synced()) {
+    if (net_time_source() != NET_TIME_NONE) {
         time_t now = time(NULL);
         struct tm tm;
         localtime_r(&now, &tm);
@@ -380,7 +378,7 @@ static void update_status(void)
         ui.countdown_end = 0;
         lv_label_set_text(ui.countdown_label, "");
     } else if (ui.countdown_end == 0) {
-        if (net_time_synced()) {
+        if (net_time_source() != NET_TIME_NONE) {
             ui.countdown_end = now_us + AUTOSTART_S * 1000000LL;
         } else if (net_state() == NET_OFF) {
             ui.countdown_end = now_us + OFFLINE_START_S * 1000000LL;

@@ -38,5 +38,13 @@ void net_resume(void);
 /* Connect to a network and save it for next time */
 void net_connect(const char *ssid, const char *password);
 
-/* True once the clock has been set from the internet */
-bool net_time_synced(void);
+/* Where the clock came from: the board's own clock at boot (the Tab5's
+ * RTC), then the internet (which also sets the board's clock)
+ */
+typedef enum {
+    NET_TIME_NONE,
+    NET_TIME_BOARD,
+    NET_TIME_INTERNET,
+} net_time_t;
+
+net_time_t net_time_source(void);

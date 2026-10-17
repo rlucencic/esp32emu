@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7" and the M5Stack Tab5 (ESP32-P4).</b><br>
-  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3) and <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128).
+  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128) and <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE).
 </p>
 
 esp32emu is everything an emulator on these boards needs apart from the
@@ -19,9 +19,9 @@ the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 |---|---|
 | `components/musashi` | The 68000 core: [Musashi](https://github.com/kstenerud/Musashi), evansm7's embedded fork, with static opcode tables (see its README) |
 | `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds, optionally reading unmapped banks through the machine (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
-| `components/m6502` | The 6502 core (6510, 8502, disk drives): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing; `test/` runs Klaus Dormann's functional test on a desktop |
+| `components/m6502` | The 6502 core (6510, 8502, disk drives, the Atari's 6502C): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing (the VIC-II's, or the Atari's ANTIC, whose DMA cycles on a line it skips from a table by itself); `test/` runs Klaus Dormann's functional test on a desktop |
 | `components/upd765` | The uPD765A floppy controller as the CPC and the Spectrum +3 wire it up, with DSK and extended DSK images |
-| `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console; on the Tab5 also the ESP32-C6 radio, the Tab5 Keyboard and battery charging |
+| `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console; on the Tab5 also the ESP32-C6 radio, the Tab5 Keyboard, battery charging and the real-time clock |
 | `components/fatfs` | ESP-IDF 5.5.4's FAT file system with exFAT turned on (from esp32_basic), so SD cards formatted exFAT (64 GB and up) work too |
 | `components/esp_lcd` | ESP-IDF 5.5.4's LCD drivers with one fix in the RGB panel's (the MaTouch): after refill interrupts were held off (a flash write, a busy core), the picture could stay shifted by 10 lines with artefacts until a restart; now it's back in step at the next frame |
 | `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings, loaded after a project's own when it builds for `esp32p4` |
@@ -92,7 +92,7 @@ panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
 
 | | |
 |---|---|
-| Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start, and any time by holding the top-right corner of the screen for 2 s; changing a choice there restarts the machine, unless the machine applies it at once (e.g. the ST's CPU speed on the Tab5) |
+| Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start (**Start**), and any time by holding the top-right corner of the screen for 2 s (**Back** returns, **Reset** resets the machine); changing a choice there restarts the machine (**Restart**), unless the machine applies it at once (e.g. the ST's CPU speed on the Tab5) |
 | Disks | One folder of images on the SD card for the machine's drives; inserted disks are remembered in NVS. Blank disks of the sizes the machine offers |
 | Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks (a machine can add a script that turns other files into images in the browser, e.g. the Mac's StuffIt archives) |
 | Console | Native USB port (MaTouch: the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, plus the machine's own commands |
@@ -100,11 +100,11 @@ panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
 | Tab5 Keyboard | M5Stack's keyboard for the Tab5 (Ext.Port1), found at start-up; its keys arrive like a Bluetooth keyboard's |
 
 <p align="center">
-  <img src="docs/images/matouch-setup-st.png" width="44.4%" alt="The setup screen on the MaTouch's 1024×600 panel, here the Atari STE's: TOS and memory">
-  <img src="docs/images/tab5-setup.png" width="55.5%" alt="The same setup screen on the Tab5's 1280×720 panel, with the ST's CPU speed as well">
-  <br><sub>The setup screen, here esp32ste's, on the MaTouch (1024×600) and the Tab5 (1280×720):
-  one layout, scaled to the panel; the machine adds its choice rows (the ST's CPU speed
-  only on the Tab5, which has time to spare for it)</sub>
+  <img src="docs/images/matouch-setup-xl.png" width="49%" alt="The setup screen on the MaTouch's 1024×600 panel, here the Atari XL's: model, TV and BASIC, and the WiFi, Bluetooth, Disks and Start buttons">
+  <img src="docs/images/tab5-setup-xl.png" width="50.9%" alt="The same setup screen on the Tab5's 1280×720 panel">
+  <br><sub>The setup screen, here esp32xl's, on the MaTouch (1024×600) and the Tab5 (1280×720):
+  one layout, scaled to the panel; the machine adds its choice rows (the WiFi and clock
+  lines above them are cut out here)</sub>
 </p>
 
 ## Web API
@@ -113,7 +113,7 @@ panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
 |---|---|
 | `GET /api/info` | Machine name, drives, image kinds, blank disk sizes |
 | `GET /machine.js` | The machine's script for the page (`web_script`), if it has one |
-| `GET /api/status` | Machine (state, speed, the machine's rows), drives, board, Bluetooth |
+| `GET /api/status` | Machine (state, speed, the machine's rows, the clock and where it came from), drives, board (its name, WiFi, memory, load, SD card), Bluetooth |
 | `GET /api/disks` | Images in the folder: name, size, drive |
 | `PUT /disks/<name>` | Upload (body = the image); also `POST` |
 | `GET /disks/<name>` / `DELETE /disks/<name>` | Download / delete (not while in a drive) |
@@ -131,7 +131,7 @@ such as the network name):
 
 | Option | Default | |
 |---|---|---|
-| WiFi | on | Stays connected while the machine runs; the clock comes from the internet |
+| WiFi | on | Stays connected while the machine runs; the clock comes from the internet (on the Tab5 from its own clock at once, then from the internet) |
 | Network name | `esp32emu` | `http://<name>.local` |
 | Time zone | Central Europe | POSIX TZ string |
 | Web page | on | |

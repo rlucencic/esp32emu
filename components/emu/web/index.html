@@ -393,7 +393,8 @@ function showStatus(s) {
     started && ["Running for", duration(m.session)],
     !started && ["System", '<span class="dim">not started yet</span>'],
     m.message && ["Problem", `<span class="msg">${esc(m.message)}</span>`],
-    ["Clock", m.clock + (m.clock_set ? "" : ' <span class="dim">(not set from the internet)</span>')],
+    ["Clock", m.clock + (m.clock_from === "internet" ? "" : ` <span class="dim">(${m.clock_from === "board" ?
+      "from the board's clock" : "not set from the internet"})</span>`)],
   ]);
 
   /* A drive is busy if its counters moved since the last update */
@@ -415,6 +416,7 @@ function showStatus(s) {
   const b = s.board;
   const mb = n => (n / 1048576).toFixed(1) + " MB", kb = n => Math.round(n / 1024) + " KB";
   $("board").innerHTML = kv([
+    b.name && ["Board", esc(b.name)],
     ["WiFi", b.wifi.ssid ? `${esc(b.wifi.ssid)}, ${signal(b.wifi.rssi)}` : '<span class="dim">not connected</span>'],
     b.wifi.ip && ["Address", `${b.wifi.ip}`],
     ["Up for", duration(b.uptime)],

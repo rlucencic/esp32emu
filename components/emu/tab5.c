@@ -7,7 +7,17 @@
  *   - the ESP32-C6 (WiFi, Bluetooth): powered by the BSP's WiFi feature and
  *     PI4IOE5V6408 0x44 pin 0, ~2 s to boot its SDIO slave, then
  *     esp_hosted; its Bluetooth controller is off until enabled
+ *   - the RX8130CE real-time clock (0x32, a supercap keeps it running),
+ *     kept in UTC like esp32_basic (wmbus_hub keeps local time): the system
+ *     clock comes from it at boot when it holds a time, and goes into it
+ *     whenever the internet sets it. An unset one reads as plausible
+ *     garbage: VLF (the oscillator stopped) and the date are both checked.
+ *     M5Stack's own firmware wrote tm_mon (0-11) into the month register,
+ *     which counts 1-12: a clock it set reads a month early until then
  */
+#include <string.h>
+#include <sys/time.h>
+#include <time.h>
 #include "bsp/m5stack_tab5.h"
 #include "driver/i2c_master.h"
 #include "esp_hosted.h"
@@ -28,8 +38,20 @@
 #define REG_HIGH_IMPEDANCE  0x07
 #define C6_POWER_BIT        0x01
 
+/* RX8130CE registers */
+#define RTC_ADDR            0x32
+#define RTC_SEC             0x10    /* sec, min, hour, weekday (one bit each), day, month, year */
+#define RTC_FLAG            0x1D
+#define RTC_CTRL0           0x1E
+#define RTC_CTRL1           0x1F
+#define RTC_FLAG_VLF        0x02    /* the oscillator stopped: the time is lost */
+#define RTC_CTRL0_STOP      0x40
+#define RTC_CTRL1_BACKUP    0x30    /* INIEN, CHGEN: the backup supply, as M5Stack's firmware sets */
+
 static const char *TAG = "tab5";
 static int64_t s_c6_powered_at;
+static i2c_master_dev_handle_t s_rtc;
+static bool s_clock_loaded;
 
 static void charging_on(void)
 {
@@ -81,12 +103,136 @@ static void c6_power_on(void)
     }
 }
 
+static esp_err_t rtc_read(uint8_t reg, uint8_t *buf, size_t n)
+{
+    return i2c_master_transmit_receive(s_rtc, &reg, 1, buf, n, 100);
+}
+
+static esp_err_t rtc_write(uint8_t reg, const uint8_t *buf, size_t n)
+{
+    uint8_t data[8] = { reg };
+    memcpy(data + 1, buf, n);
+    return i2c_master_transmit(s_rtc, data, n + 1, 100);
+}
+
+static int from_bcd(uint8_t v)
+{
+    return (v & 0x0F) > 9 || (v >> 4) > 9 ? -1 : (v >> 4) * 10 + (v & 0x0F);
+}
+
+static uint8_t to_bcd(int v)
+{
+    return (v / 10) << 4 | v % 10;
+}
+
+/* Days since 1970-01-01 */
+static int64_t days_from_civil(int y, int m, int d)
+{
+    y -= m <= 2;
+    int64_t era = (y >= 0 ? y : y - 399) / 400;
+    int64_t yoe = y - era * 400;
+    int64_t doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1;
+    int64_t doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    return era * 146097 + doe - 719468;
+}
+
+static void clock_load(void)
+{
+    const i2c_device_config_t cfg = {
+        .dev_addr_length = I2C_ADDR_BIT_LEN_7,
+        .device_address = RTC_ADDR,
+        .scl_speed_hz = 400000,
+    };
+    uint8_t r[RTC_CTRL1 - RTC_SEC + 1];
+    if (i2c_master_bus_add_device(bsp_i2c_get_handle(), &cfg, &s_rtc) != ESP_OK ||
+        rtc_read(RTC_SEC, r, sizeof(r)) != ESP_OK) {
+        ESP_LOGW(TAG, "clock: no RX8130");
+        if (s_rtc != NULL) {
+            i2c_master_bus_rm_device(s_rtc);
+            s_rtc = NULL;
+        }
+        return;
+    }
+    uint8_t ctrl1 = r[RTC_CTRL1 - RTC_SEC];
+    if ((ctrl1 & RTC_CTRL1_BACKUP) != RTC_CTRL1_BACKUP) {
+        ctrl1 |= RTC_CTRL1_BACKUP;
+        rtc_write(RTC_CTRL1, &ctrl1, 1);
+    }
+    int sec = from_bcd(r[0] & 0x7F), min = from_bcd(r[1] & 0x7F), hour = from_bcd(r[2] & 0x3F);
+    int day = from_bcd(r[4] & 0x3F), month = from_bcd(r[5] & 0x1F), year = 2000 + from_bcd(r[6]);
+    bool lost = r[RTC_FLAG - RTC_SEC] & RTC_FLAG_VLF;
+    if (lost || sec < 0 || sec > 59 || min < 0 || min > 59 || hour < 0 || hour > 23 ||
+        day < 1 || day > 31 || month < 1 || month > 12 || year < 2024) {
+        ESP_LOGI(TAG, "clock: not set (%02x %02x %02x %02x %02x %02x, %s)", r[6], r[5], r[4],
+                 r[2], r[1], r[0], lost ? "stopped" : "no date");
+        return;
+    }
+    /* Somewhere within that second; a software restart keeps the system
+     * clock, which is closer then
+     */
+    struct timeval tv = {
+        .tv_sec = days_from_civil(year, month, day) * 86400 + hour * 3600 + min * 60 + sec,
+        .tv_usec = 500000,
+    };
+    if (time(NULL) < tv.tv_sec - 60) {
+        settimeofday(&tv, NULL);
+    }
+    s_clock_loaded = true;
+    ESP_LOGI(TAG, "clock: %04d-%02d-%02d %02d:%02d:%02d UTC", year, month, day, hour, min, sec);
+}
+
+bool tab5_clock_loaded(void)
+{
+    return s_clock_loaded;
+}
+
+void tab5_clock_save(void)
+{
+    if (s_rtc == NULL) {
+        return;
+    }
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    time_t t = tv.tv_sec + (tv.tv_usec >= 500000);
+    struct tm tm;
+    gmtime_r(&t, &tm);
+    const uint8_t date[7] = {
+        to_bcd(tm.tm_sec), to_bcd(tm.tm_min), to_bcd(tm.tm_hour), 1 << tm.tm_wday,
+        to_bcd(tm.tm_mday), to_bcd(tm.tm_mon + 1), to_bcd(tm.tm_year % 100),
+    };
+    /* Stopped while it's written; the flag of a lost time cleared after */
+    uint8_t ctrl0, flags;
+    esp_err_t err = rtc_read(RTC_CTRL0, &ctrl0, 1);
+    if (err == ESP_OK) {
+        ctrl0 |= RTC_CTRL0_STOP;
+        err = rtc_write(RTC_CTRL0, &ctrl0, 1);
+    }
+    if (err == ESP_OK) {
+        err = rtc_write(RTC_SEC, date, sizeof(date));
+    }
+    ctrl0 &= ~RTC_CTRL0_STOP;
+    if (err == ESP_OK) {
+        err = rtc_write(RTC_CTRL0, &ctrl0, 1);
+    }
+    if (err == ESP_OK) {
+        err = rtc_read(RTC_FLAG, &flags, 1);
+    }
+    if (err == ESP_OK && (flags & RTC_FLAG_VLF)) {
+        flags &= ~RTC_FLAG_VLF;
+        err = rtc_write(RTC_FLAG, &flags, 1);
+    }
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "clock: not saved (%s)", esp_err_to_name(err));
+    }
+}
+
 void tab5_init(void)
 {
     if (bsp_i2c_init() != ESP_OK) {
         ESP_LOGE(TAG, "I2C bus failed");
         return;
     }
+    clock_load();
     charging_on();
     c6_power_on();
     s_c6_powered_at = esp_timer_get_time();

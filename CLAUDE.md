@@ -2,15 +2,16 @@
 
 ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 (Macintosh Plus/SE/Classic), `../esp32cpc` (Amstrad CPC and Plus),
-`../esp32zx` (ZX Spectrum 128K, +2, +3) and `../esp32cbm` (Commodore 64 and
-128) on two boards: the Makerfabs MaTouch ESP32-S3 7" (target esp32s3, the
-default) and the M5Stack Tab5 (target esp32p4). It is a library: it isn't
-built on its own. Build and test through one of the projects (each has
-`EXTRA_COMPONENT_DIRS` pointing here). ESP-IDF v5.5.4, C. The 68000
-machines use Musashi, the Z80 ones the Z80 core, the Commodores the 6502
-core (the C128 the Z80 too); the CPC and the +3 share the uPD765.
+`../esp32zx` (ZX Spectrum 128K, +2, +3), `../esp32cbm` (Commodore 64 and
+128) and `../esp32xl` (Atari 800XL and 130XE) on two boards: the Makerfabs
+MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
+(target esp32p4). It is a library: it isn't built on its own. Build and
+test through one of the projects (each has `EXTRA_COMPONENT_DIRS` pointing
+here). ESP-IDF v5.5.4, C. The 68000 machines use Musashi, the Z80 ones the
+Z80 core, the Commodores and the Atari XL the 6502 core (the C128 the Z80
+too); the CPC and the +3 share the uPD765.
 
-Changes here affect all five emulators on both boards: build all ten after
+Changes here affect all six emulators on both boards: build all twelve after
 any change (only the components a project requires get built: MINIMAL_BUILD).
 
 ## The two boards
@@ -28,11 +29,13 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
   removes the other's, which then come back from the component manager's
   cache, and that build compiles everything again (~2.5 min).
 - Both boards running the same project have the same mDNS name: one of them
-  becomes `<name>-2.local` (`/api/info` says which board: `"board"`).
+  becomes `<name>-2.local`, and after more restarts `-3`, `-4`, while the
+  Mac's cache still answers the old names (`/api/info` says which board:
+  `"board"`; the status's `board.name`, the web page's first Board row).
 - The board code: `include/emu/board.h` picks `board_matouch7.h` or
   `board_tab5.h`; `lcd.c` (RGB panel) or `lcd_tab5.c` (MIPI-DSI through the
   BSP); `touch.c`, `sdcard.c`, `speaker.c` have both; `tab5.c` (charging, the
-  C6, esp_hosted) and `tab5_keyboard.c` only build for the Tab5.
+  C6, esp_hosted, the RTC) and `tab5_keyboard.c` only build for the Tab5.
 - `BOARD_LCD_H_RES` x `BOARD_LCD_V_RES` is the landscape picture everything
   draws (presenter, setup screen, `L` dumps, touches): 1024x600 or 1280x720.
   On the Tab5 `lcd_flush(y0, y1)` has the PPA turn those rows onto the
@@ -49,7 +52,7 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
 |---|---|
 | `components/musashi/` | 68000 core (Musashi, evansm7 fork) + `m68kconf.h` with the `m68k_host_*()` hooks; `test/` host tests (`make -C components/musashi/test`) |
 | `components/z80/` | Z80 core (from the CPC): T-states with optional ZX contention, or CPC microseconds (menuconfig "Z80 core"); `Z80_READ_SPECIAL` sends reads of NULL banks to the bus (the C128's MMU); `test/` zexdoc/zexall host test for each build |
-| `components/m6502/` | 6502 core (from the Commodore): every bus cycle, all 256 opcodes, several CPUs at once, `m6502_run()` to the machine's next event; `linker.lf` keeps its jump table in internal RAM; `test/` Klaus Dormann's functional test and an opcode cycle table (`make -C components/m6502/test`) |
+| `components/m6502/` | 6502 core (from the Commodore): every bus cycle, all 256 opcodes, several CPUs at once, `m6502_run()` to the machine's next event; stalls from `stall_from` (reads only, or writes too with `stall_writes`: the Atari's HALT), and for the Atari's ANTIC tables of a line's busy and free cycles (`dma_free`, `dma_busy`, `dma_base`, `dma_len`, `dma_stop`) that it skips by itself, calling `bus.stall()` only past them or at `dma_stop` (WSYNC); `linker.lf` keeps its jump table in internal RAM; `test/` Klaus Dormann's functional test and an opcode cycle table (`make -C components/m6502/test`) |
 | `components/upd765/` | uPD765A floppy controller with DSK/EDSK images (CPC, +3) |
 | `components/emu/include/emu/emu.h` | The machine interface (`emu_machine_t`) and runtime API |
 | `components/emu/emu.c` | Boot order, emulation task (core 1), presenter, stats, temperature, supervisor (touch: setup corner and machine touches), pausing |
@@ -70,7 +73,8 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
 ## How a machine plugs in
 
 - `emu_run(&machine)` from `app_main`. Order: NVS, `reserve_memory()` (the
-  machine's big PSRAM blocks first), (Tab5: charging, C6 power), SD card ->
+  machine's big PSRAM blocks first), (Tab5: the clock from the RTC,
+  charging, C6 power), SD card ->
   `storage(sd)`, disks restored, LCD, touch, console, (Tab5: esp_hosted),
   WiFi, web, (Tab5: the C6's Bluetooth controller), BLE, (Tab5 Keyboard),
   stats/temperature tasks, setup screen, `start()`; the setup screen comes back with `emu_set_message()` text when
@@ -78,8 +82,10 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
 - `start()` may be called again (setup screen choices changed, console):
   always with the emulation paused. If it can't get its memory any more,
   `emu_reboot_into_machine()` restarts the board straight into the machine.
-- Setup screen choices: `get`/`set` (set saves). Changing one while running
-  turns "Back to X" into "Restart X"; if the restart fails, the runtime sets
+- Setup screen choices: `get`/`set` (set saves). The buttons don't name the
+  machine: Start before it starts, Back while it's paused, Reset at the top
+  right. Changing a choice while running turns Back into Restart; if the
+  restart fails, the runtime sets
   the old choices back and starts again. A `live` choice (the ST's CPU
   speed, Tab5 only) changes the machine as it's set, no restart; `set()` may run on
   another task, so the machine picks the value up between frames. Three
@@ -194,6 +200,13 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
   so a network another firmware joined is joined again.
 - **Tab5: the battery charges only with CHG_EN** (IO expander 0x44 pin 7)
   high, which nothing else sets (esp32_basic).
+- **Tab5: the RX8130CE RTC (0x32) holds UTC**, like esp32_basic (wmbus_hub
+  writes local time: after it the hour is off until the internet time).
+  At boot it sets the system clock (`net_time_source()` says `BOARD`, the
+  setup screen shows the time before WiFi is up, ~20 s before the internet
+  time comes); each internet time is written back. An unset chip reads as
+  plausible garbage (`a1 00 00 11 37 37`, year 2101, VLF set): VLF and the
+  date are checked; writing clears VLF.
 - **Tab5: pinned versions** (`idf_component.yml`): BSP 1.3.0, esp_hosted
   2.12.9 (3.x changed its API), esp_wifi_remote ~1.6.4, esp_lvgl_port < 2.9
   (2.9 needs a newer ESP-IDF), the set esp32_basic runs.
@@ -209,21 +222,23 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`. The
+`esp32cbm`, `esp32xl`. The
 user pushes straight to `main`; commit messages end with the
 `Co-Authored-By` line the session gives. When the user says "commit and
 push all", that's all of them (esp32emu first: the others build against
 it). Topics on GitHub: emulator, esp-idf, esp32-s3, lvgl, m68k (z80 for the
-CPC and the Spectrum, 6502 for the Commodore), retrocomputing, makerfabs,
-matouch, esp32-p4, m5stack, m5stack-tab5, risc-v, plus the machine's own
-(atari-st, macintosh, amstrad-cpc, zx-spectrum, ...); each README has badges
-and screenshots, the About text lists the main features. esp32emu's own:
-the CPUs (m68k, z80, 6502), upd765, both boards' and one per machine
-(atari-st, macintosh, amstrad-cpc, zx-spectrum, commodore-64). esp32emu,
-esp32mac, esp32cpc, esp32zx and esp32cbm are at GitHub's limit of 20: a new
-topic replaces one (for the Tab5: embedded, floppy-controller, musashi,
-ble-hid, floppy-disk, tape-emulation, cp-m, vic-ii and 1571 went). Its About
-text names the runtime's parts and the cores.
+CPC and the Spectrum, 6502 for the Commodore and the Atari XL),
+retrocomputing, makerfabs, matouch, esp32-p4, m5stack, m5stack-tab5,
+risc-v, plus the machine's own (atari-st, macintosh, amstrad-cpc,
+zx-spectrum, atari-8bit, ...); each README has badges and screenshots, the
+About text lists the main features. esp32emu's own: the CPUs (m68k, z80,
+6502), upd765, both boards' and one per machine (atari-st, macintosh,
+amstrad-cpc, zx-spectrum, commodore-64, atari-8bit). esp32emu, esp32mac,
+esp32cpc, esp32zx and esp32cbm are at GitHub's limit of 20: a new topic
+replaces one (for the Tab5: embedded, floppy-controller, musashi, ble-hid,
+floppy-disk, tape-emulation, cp-m, vic-ii and 1571 went; esp32emu's risc-v
+for atari-8bit, esp32-p4 says it). Its About text names the runtime's parts
+and the cores.
 
 ## README screenshots
 
@@ -236,11 +251,15 @@ text names the runtime's parts and the cores.
   (PIL, in a scratch venv). MaTouch, up to two choice rows: rows 104-190
   (1024x514, the first buttons at y=112); three rows (closer): 104-180
   (1024x524). Tab5, three rows: 124-214 (1280x630). Taken before the
-  machine starts, it says "Start X".
-- This repo's own: `docs/images/matouch-setup-st.png` (two rows: the ST on
-  the MaTouch has no CPU choice), `tab5-setup.png` (three rows) — the ST's
-  setup screen on each board. `matouch-setup.png` (the MaTouch with a CPU
-  row) is gone.
+  machine starts, it says "Start" (while it's paused "Back").
+- This repo's own: `docs/images/matouch-setup-xl.png` (1024x524) and
+  `tab5-setup-xl.png` (1280x630), the Atari XL's setup screen on each board
+  with the new button labels (shown 49% / 50.9%: the same height). The
+  ST's older ones (`matouch-setup-st.png`, `tab5-setup.png`, "Start
+  Atari") are no longer shown.
+- The other projects' setup screenshots (esp32ste, esp32mac, esp32cpc,
+  esp32zx, esp32cbm) still show "Start Atari", "Start Mac", ...: retake
+  them (new files) when that machine is on the board again.
 - The web page: never the live board's page (WiFi name, IP, SD card).
   Serve the real `web/index.html` (and the machine's `/machine.js`) from a
   small local node server that answers `/api/info` (copied from the

@@ -40,6 +40,7 @@ typedef struct {
     bool quirk;                         /* a taken branch polls a cycle early */
     uint32_t n;                         /* cycles into the instruction */
     uint32_t lim;                       /* reads from cycle n >= lim take the slow path (a stall) */
+    uint32_t wlim;                      /* writes likewise (lim with stall_writes, else never) */
     uint32_t until;                     /* no instruction starts from n >= until */
     uint32_t stop_pc;
     uint64_t base;                      /* the cycle the instruction started at */
@@ -67,6 +68,7 @@ INLINE void load(m6502_t *c, regs_t *r)
     r->base = c->cycles;
     r->n = 0;
     r->lim = relative(c->stall_from, r->base);
+    r->wlim = c->stall_writes ? r->lim : UINT32_MAX;
     r->until = relative(c->until, r->base);
     r->stop_pc = c->stop_pc;
     c->limits_changed = false;
@@ -83,11 +85,37 @@ INLINE void store(m6502_t *c, const regs_t *r)
     c->cycles = r->base + r->n;
 }
 
+/* A stall that the DMA tables answer: the access moves to the next free
+ * cycle and the next stall point is the busy one after it; false when the
+ * machine must see it (out of the table, or at dma_stop)
+ */
+static inline bool dma_skip(m6502_t *c, uint64_t now)
+{
+    if (!c->dma_free || now >= c->dma_stop) {
+        return false;
+    }
+    uint64_t k = now - c->dma_base;
+    if (k >= c->dma_len) {
+        return false;
+    }
+    uint32_t f = c->dma_free[k];
+    uint64_t t = c->dma_base + f;
+    if (f >= c->dma_len || t >= c->dma_stop) {
+        return false;
+    }
+    uint64_t s = c->dma_base + c->dma_busy[f + 1];
+    c->cycles = t;
+    c->stall_from = s < c->dma_stop ? s : c->dma_stop;
+    c->limits_changed = true;
+    return true;
+}
+
 /* The slow paths out of line, at cycle 'now': a stall, I/O */
 static uint8_t __attribute__((noinline)) M6502_HOT rd_slow(m6502_t *c, uint16_t a, uint64_t now)
 {
     c->cycles = now;
-    if (now >= c->stall_from && c->bus.stall) {
+    if (now >= c->stall_from && c->bus.stall && !dma_skip(c, now)) {
+        c->stall_is_write = false;
         c->bus.stall(c->bus.ctx, c);
     }
     const uint8_t *p = c->rd[a >> 8];
@@ -99,7 +127,16 @@ static uint8_t __attribute__((noinline)) M6502_HOT rd_slow(m6502_t *c, uint16_t 
 static void __attribute__((noinline)) M6502_HOT wr_slow(m6502_t *c, uint16_t a, uint8_t v, uint64_t now)
 {
     c->cycles = now;
-    c->bus.write(c->bus.ctx, a, v);
+    if (c->stall_writes && now >= c->stall_from && c->bus.stall && !dma_skip(c, now)) {
+        c->stall_is_write = true;
+        c->bus.stall(c->bus.ctx, c);
+    }
+    uint8_t *p = c->wr[a >> 8];
+    if (p) {
+        p[a & 0xFF] = v;
+    } else {
+        c->bus.write(c->bus.ctx, a, v);
+    }
     c->cycles++;
 }
 
@@ -119,6 +156,7 @@ INLINE void resync(m6502_t *c, regs_t *r)
     if (__builtin_expect(c->limits_changed, 0)) {
         c->limits_changed = false;
         r->lim = relative(c->stall_from, r->base);
+        r->wlim = c->stall_writes ? r->lim : UINT32_MAX;
         r->until = relative(c->until, r->base);
     }
 }
@@ -138,7 +176,7 @@ INLINE uint8_t rd(m6502_t *c, regs_t *r, uint16_t a)
 INLINE void wr(m6502_t *c, regs_t *r, uint16_t a, uint8_t v)
 {
     uint8_t *p = c->wr[a >> 8];
-    if (__builtin_expect(p != NULL, 1)) {
+    if (__builtin_expect(p != NULL && r->n < r->wlim, 1)) {
         p[a & 0xFF] = v;
         r->n++;
         return;

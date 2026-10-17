@@ -252,7 +252,10 @@ static esp_err_t status_get(httpd_req_t *req)
     localtime_r(&now, &tm);
     strftime(clock, sizeof(clock), "%Y-%m-%d %H:%M:%S", &tm);
     emu_json_str(&j, "clock", clock);
-    emu_json_bool(&j, "clock_set", net_time_synced());
+    net_time_t from = net_time_source();
+    emu_json_bool(&j, "clock_set", from != NET_TIME_NONE);
+    emu_json_str(&j, "clock_from", from == NET_TIME_INTERNET ? "internet" :
+                                   from == NET_TIME_BOARD ? "board" : NULL);
     emu_json_end_object(&j);
 
     /* Drives */
@@ -272,6 +275,7 @@ static esp_err_t status_get(httpd_req_t *req)
     uint64_t total = 0, free_bytes = 0;
     bool sd = sdcard_space(&total, &free_bytes);
     emu_json_object(&j, "board");
+    emu_json_str(&j, "name", BOARD_NAME);
     emu_json_int(&j, "uptime", esp_timer_get_time() / 1000000);
     emu_json_object(&j, "wifi");
     emu_json_str(&j, "ssid", connected ? net_ssid() : NULL);

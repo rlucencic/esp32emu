@@ -16,7 +16,8 @@
  * functions, e.g. I/O). `cycles` counts bus cycles; a machine that steals
  * them (the VIC-II's bad lines, BA) sets `stall_from`: a read at or after
  * that cycle calls `stall()` first, which may move `cycles` on and set the
- * next `stall_from`.
+ * next `stall_from`. With `stall_writes` writes stall too (the Atari's
+ * 6502C, whose HALT stops any cycle; RDY only stops reads).
  */
 #pragma once
 
@@ -50,6 +51,20 @@ struct m6502 {
     uint8_t a, x, y, s, p;
     uint64_t cycles;                /* bus cycles since power-on */
     uint64_t stall_from;            /* reads from this cycle on ask bus.stall() */
+    bool stall_writes;              /* ... and writes (set before m6502_run()) */
+    bool stall_is_write;            /* in bus.stall(): the access waiting is a write */
+    /* Optional DMA tables, for a machine whose DMA takes known cycles of a
+     * period (the Atari's ANTIC, per scan line): for the cycle offsets c <
+     * dma_len from dma_base, dma_free[c] is the first cycle the CPU may use
+     * from c on and dma_busy[c] the first it may not (dma_len: none; both
+     * hold dma_len + 1 entries). An access at or after stall_from then skips
+     * taken cycles by itself, and calls bus.stall() only when that runs out
+     * of the table or reaches dma_stop (the machine's business: a WSYNC
+     * wait). NULL: bus.stall() for every stall.
+     */
+    const uint8_t *dma_free, *dma_busy;
+    uint64_t dma_base, dma_stop;
+    uint32_t dma_len;
     /* m6502_run() stops before an instruction at `until` or later (bus
      * callbacks may lower it, an earlier device event), and after one
      * that leaves pc at stop_pc (> 0xFFFF: none)
