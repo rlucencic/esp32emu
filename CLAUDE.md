@@ -79,7 +79,10 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
   `emu_reboot_into_machine()` restarts the board straight into the machine.
 - Setup screen choices: `get`/`set` (set saves). Changing one while running
   turns "Back to X" into "Restart X"; if the restart fails, the runtime sets
-  the old choices back and starts again.
+  the old choices back and starts again. A `live` choice (the ST's CPU
+  speed) changes the machine as it's set, no restart; `set()` may run on
+  another task, so the machine picks the value up between frames. Three
+  choice rows fit closer (`tight` in setup_ui.c).
 - Inputs arrive from other tasks: `hid_key(usage, pressed)` (modifiers as
   usages $E0-$E7, each side separately), `hid_mouse(dx, dy, buttons)`,
   `touch(x, y, pressed)` in machine screen pixels (only if the machine sets
@@ -213,11 +216,15 @@ text names the runtime's parts and the cores.
 - The machine's screen: `emu_console.py PORT screenshot F.png` (its own
   resolution); the whole picture: `lcd F.png` (1024x600, the Tab5 1280x720:
   the landscape picture, not the panel's own framebuffer).
-- The setup screen: hold the corner with `send "t 1010 12 2600"` (pauses
-  the machine), tap buttons with `t x y`, capture with `lcd`. Its status
-  lines show the WiFi name, IP and time: cut rows 104-190 out (PIL, in a
-  scratch venv), which leaves 1024x514 with the first buttons at y=112,
-  like the ST's image. Taken before the machine starts, it says "Start X".
+- The setup screen: hold the corner with `send "t 1010 12 2600"` (Tab5:
+  `t 1265 15 2600`; pauses the machine), tap buttons with `t x y`, capture
+  with `lcd`. Its status lines show the WiFi name, IP and time: cut them out
+  (PIL, in a scratch venv). MaTouch, up to two choice rows: rows 104-190
+  (1024x514, the first buttons at y=112); three rows (closer): 104-180
+  (1024x524). Tab5, three rows: 124-214 (1280x630). Taken before the
+  machine starts, it says "Start X".
+- This repo's own: `docs/images/matouch-setup.png`, `tab5-setup.png` (the
+  ST's setup screen on each board).
 - The web page: never the live board's page (WiFi name, IP, SD card).
   Serve the real `web/index.html` (and the machine's `/machine.js`) from a
   small local node server that answers `/api/info` (copied from the

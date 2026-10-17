@@ -33,13 +33,15 @@ typedef enum {
 } emu_scale_t;
 
 /* A row of choices on the setup screen: "System   [TOS 1.62] [TOS 2.06]".
- * Changing one while the machine runs makes "Start" a "Restart".
+ * Changing one while the machine runs makes "Start" a "Restart", unless
+ * it's `live`: set() changes the running machine itself (between frames).
  */
 typedef struct {
     const char *label;
     const char *const *names;   /* button labels, ends with "" */
     int (*get)(void);
     void (*set)(int index);     /* also saves it */
+    bool live;                  /* takes effect without a restart */
 } emu_choice_t;
 
 typedef struct {

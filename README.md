@@ -69,7 +69,7 @@ static const emu_machine_t machine = {
     .render_line = mac_render_line_rgb565,
     .hid_key = hid_key, .hid_mouse = hid_mouse,       /* Bluetooth */
     .touch = touch,                                   /* optional */
-    .choices = choices, .choice_count = 2,            /* setup screen rows */
+    .choices = choices, .choice_count = 2,            /* setup screen rows: label, names, get, set, live */
     .disks = &disks,                                  /* drives and image folder */
     .status = status,                                 /* web page rows and drives */
     .web_script = macfiles_js_start,                  /* optional: converters for the page */
@@ -91,12 +91,19 @@ panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
 
 | | |
 |---|---|
-| Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start, and any time by holding the top-right corner of the screen for 2 s; changing a choice there restarts the machine |
+| Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start, and any time by holding the top-right corner of the screen for 2 s; changing a choice there restarts the machine, unless the machine applies it at once (e.g. the ST's CPU speed) |
 | Disks | One folder of images on the SD card for the machine's drives; inserted disks are remembered in NVS. Blank disks of the sizes the machine offers |
 | Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks (a machine can add a script that turns other files into images in the browser, e.g. the Mac's StuffIt archives) |
 | Console | Native USB port (MaTouch: the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, plus the machine's own commands |
 | Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages. On the Tab5 the radio is its ESP32-C6, through esp_hosted |
 | Tab5 Keyboard | M5Stack's keyboard for the Tab5 (Ext.Port1), found at start-up; its keys arrive like a Bluetooth keyboard's |
+
+<p align="center">
+  <img src="docs/images/matouch-setup.png" width="44.4%" alt="The setup screen on the MaTouch's 1024×600 panel, here the Atari STE's: TOS, memory and CPU speed">
+  <img src="docs/images/tab5-setup.png" width="55.5%" alt="The same setup screen on the Tab5's 1280×720 panel">
+  <br><sub>The setup screen, here esp32ste's, on the MaTouch (1024×600) and the Tab5 (1280×720):
+  one layout, scaled to the panel; the machine adds its choice rows</sub>
+</p>
 
 ## Web API
 

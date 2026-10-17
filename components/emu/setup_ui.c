@@ -176,11 +176,11 @@ static lv_obj_t *add_row(lv_obj_t *list, const char *icon, const char *text)
 
 /* A row "label  [a][b][c]" with one choice checked */
 static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *const *names,
-                             int checked, lv_event_cb_t cb, void *user_data)
+                             int checked, int height, lv_event_cb_t cb, void *user_data)
 {
     lv_obj_t *row = lv_obj_create(parent);
     lv_obj_remove_style_all(row);
-    lv_obj_set_size(row, lv_pct(100), SY(60));
+    lv_obj_set_size(row, lv_pct(100), SY(height));
     lv_obj_t *l = lv_label_create(row);
     lv_label_set_text(l, label);
     lv_obj_set_style_text_color(l, COLOR_TEXT, 0);
@@ -191,7 +191,7 @@ static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *co
     lv_buttonmatrix_set_button_ctrl_all(m, LV_BUTTONMATRIX_CTRL_CHECKABLE);
     lv_buttonmatrix_set_one_checked(m, true);
     lv_buttonmatrix_set_button_ctrl(m, checked, LV_BUTTONMATRIX_CTRL_CHECKED);
-    lv_obj_set_size(m, SX(560), SY(60));
+    lv_obj_set_size(m, SX(560), SY(height));
     lv_obj_align(m, LV_ALIGN_LEFT_MID, SX(160), 0);
     lv_obj_set_style_bg_opa(m, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(m, 0, 0);
@@ -218,10 +218,11 @@ static void back_to_status(lv_event_t *e)
     lv_screen_load(ui.status_screen);
 }
 
+/* Live choices change the machine as they're set: no restart for them */
 static bool choices_changed(void)
 {
     for (int i = 0; i < ui.m->choice_count && i < EMU_UI_MAX_CHOICES; i++) {
-        if (ui.m->choices[i].get() != ui.before[i]) {
+        if (!ui.m->choices[i].live && ui.m->choices[i].get() != ui.before[i]) {
             return true;
         }
     }
@@ -268,16 +269,18 @@ static void build_status_screen(void)
     lv_obj_align(card, LV_ALIGN_TOP_LEFT, 0, SY(56));
     lv_obj_set_style_bg_color(card, COLOR_CARD, 0);
     lv_obj_set_style_border_width(card, 0, 0);
+    /* Three rows of choices (and the lines around them) only fit closer */
+    bool tight = ui.m->choice_count >= 3;
     lv_obj_set_style_pad_all(card, SY(24), 0);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(card, SY(16), 0);
+    lv_obj_set_style_pad_row(card, SY(tight ? 10 : 16), 0);
 
     ui.wifi_label = lv_label_create(card);
     ui.time_label = lv_label_create(card);
 
     for (int i = 0; i < ui.m->choice_count && i < EMU_UI_MAX_CHOICES; i++) {
         const emu_choice_t *c = &ui.m->choices[i];
-        make_choice(card, c->label, c->names, c->get(), choice_changed, (void *)c);
+        make_choice(card, c->label, c->names, c->get(), tight ? 54 : 60, choice_changed, (void *)c);
     }
 
     ui.message_label = lv_label_create(card);
