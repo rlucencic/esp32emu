@@ -155,11 +155,14 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
   heap in PSRAM (`lv_mem_psram.c`). Keep big buffers of machines in PSRAM.
 - **The HTTP server handles one request at a time**: uploads and downloads
   run in tasks of their own (`httpd_req_async_handler_begin`), or a large
-  disk image blocks the page and the API for minutes.
+  disk image blocks the page and the API for minutes. Two at a time: each
+  upload has its own temporary file (`<name>.tmp`; a shared `upload.tmp`
+  failed the second).
 - **macOS waits 5 s for an IPv6 answer** for `.local` names: the board makes
   an IPv6 link-local address so mDNS answers it.
-- **SD writes from a PSRAM buffer go sector by sector**: use DMA-capable
-  internal buffers for big writes (web uploads).
+- **SD writes from a PSRAM buffer go sector by sector** on the S3: use
+  DMA-capable internal buffers for big writes (web uploads). The P4's SDMMC
+  takes PSRAM buffers directly when they're aligned to the cache line.
 - **The LCD screen dump streams 12 rows at a time**: a whole frame plus
   base64 (2.8 MB) doesn't fit next to a 4 MB machine.
 - **Opening the serial port** with RTS=1 and DTR=0 resets the chip;
@@ -192,6 +195,18 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
   deinitialises its slot, and the host with the last slot: esp_hosted has
   started the host by then but not its slot. `sdcard.c` gives the mount a
   `deinit_p` that does nothing.
+- **Tab5: web transfers don't alternate between the SD card and WiFi**
+  (same host: while the card writes, the C6 can't pass packets on and drops
+  them). A file is received whole into PSRAM, then written (`write()` past
+  stdio, a 128-byte aligned buffer: FATFS writes cluster runs from it); a
+  download is read whole, then sent with a Content-Length (`WHOLE_FILES` in
+  `web.c`, when it fits with 4 MB to spare; else 8 KB pieces). With the
+  Tab5's TCP windows at 64 KB (board `sdkconfig.defaults`; the S3's 16 KB /
+  5.7 KB stay): 4 MB up 0.28 → 1.3-1.6 MB/s, 16 MB 2 MB/s; down 0.6 →
+  0.75-1.6 MB/s (the C6 sends; it reads 4 MB from the card in 0.26 s).
+  32 KB pieces in between were worse (0.33 MB/s up). The MaTouch: 0.55 up,
+  0.31 down, as before. The C6's own transmit settings (BA window) are in
+  its firmware: esp_hosted passes only buffer counts and the receive window.
 - **Tab5: power the C6 before esp_hosted connects** (BSP WiFi feature and
   PI4IOE5V6408 0x44 pin 0, ~2 s to boot); esp_hosted's constructor tries at
   boot, `esp_hosted_init()` connects later. Its Bluetooth controller is off

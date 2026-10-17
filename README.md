@@ -122,7 +122,12 @@ panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
 | `POST /api/new?size=<bytes>` | Make a blank disk image |
 
 `curl -T game.st http://atari-ste.local/disks/` uploads from a script.
-`/floppies/` works as `/disks/` for older scripts.
+`/floppies/` works as `/disks/` for older scripts. Two transfers can run at
+once. On the MaTouch an upload runs at about 550 KB/s and a download at
+about 310 KB/s; the Tab5 receives a whole file into PSRAM before writing it
+to the SD card, and reads one before sending it (its SD card and WiFi
+share a controller), with larger TCP windows: 1.3 to 2 MB/s up, 0.75 to
+1.6 MB/s down.
 
 ## Configuration
 

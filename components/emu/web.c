@@ -15,15 +15,17 @@
  *   DELETE /disks/<name>        delete, unless it's in a drive
  *
  * /floppies/<name> works as /disks/<name> (older scripts). Uploads go to a
- * temporary file first, so a broken transfer leaves no half disk behind.
- * Uploads and downloads run in tasks of their own (two at a time), so the
- * server keeps answering meanwhile: big disk images take minutes.
+ * temporary file first (<name>.tmp), so a broken transfer leaves no half
+ * disk behind. Uploads and downloads run in tasks of their own (two at a
+ * time), so the server keeps answering meanwhile: big disk images take
+ * minutes. On the Tab5 a file goes through PSRAM whole (WHOLE_FILES).
  */
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <unistd.h>
 #include <sys/stat.h>
 #include "esp_heap_caps.h"
 #include "esp_http_server.h"
@@ -42,6 +44,19 @@
 #include "emu_internal.h"
 
 #define CHUNK           8192
+
+/* The Tab5: its SD card and the C6's WiFi link share the SDMMC host, so a
+ * transfer that alternates between them waits on both, and while the card
+ * writes the C6 drops packets (32 KB pieces: a third of the speed). With
+ * PSRAM to spare, a whole file is received before it's written and read
+ * before it's sent; the SD driver takes PSRAM buffers aligned to the cache
+ * line directly. Only with WHOLE_RESERVE left over, else in pieces.
+ */
+#if CONFIG_IDF_TARGET_ESP32P4
+#define WHOLE_FILES     1
+#define WHOLE_ALIGN     128
+#define WHOLE_RESERVE   (4 * 1024 * 1024)
+#endif
 #define STATUS_SIZE     4096
 #define TRANSFERS       2           /* uploads + downloads at the same time */
 
@@ -408,6 +423,91 @@ static esp_err_t new_post(httpd_req_t *req)
 
 /* ---- Disk image files ---- */
 
+/* Straight to the file system, past stdio's buffer: FATFS then reads and
+ * writes runs of sectors in the caller's buffer
+ */
+static bool write_all(FILE *f, const char *p, size_t n)
+{
+    while (n > 0) {
+        ssize_t w = write(fileno(f), p, n);
+        if (w <= 0) {
+            return false;
+        }
+        p += w;
+        n -= w;
+    }
+    return true;
+}
+
+static bool read_all(FILE *f, char *p, size_t n)
+{
+    while (n > 0) {
+        ssize_t r = read(fileno(f), p, n);
+        if (r <= 0) {
+            return false;
+        }
+        p += r;
+        n -= r;
+    }
+    return true;
+}
+
+/* A buffer for a whole file in PSRAM, or NULL: then in pieces */
+static char *whole_alloc(size_t size)
+{
+#if WHOLE_FILES
+    size_t rounded = (size + WHOLE_ALIGN - 1) / WHOLE_ALIGN * WHOLE_ALIGN;
+    if (heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM) >= rounded + WHOLE_RESERVE) {
+        return heap_caps_aligned_alloc(WHOLE_ALIGN, rounded, MALLOC_CAP_SPIRAM);
+    }
+#endif
+    (void)size;
+    return NULL;
+}
+
+/* The request's body into the file */
+static bool receive_file(httpd_req_t *req, FILE *f)
+{
+    size_t size = req->content_len;
+    char *whole = whole_alloc(size);
+    if (whole != NULL) {
+        size_t got = 0;
+        while (got < size) {
+            int n = httpd_req_recv(req, whole + got, size - got);
+            if (n == HTTPD_SOCK_ERR_TIMEOUT) {
+                continue;
+            }
+            if (n <= 0) {
+                break;
+            }
+            got += n;
+        }
+        bool ok = got == size && write_all(f, whole, size);
+        heap_caps_free(whole);
+        return ok;
+    }
+
+    /* DMA-capable: the SD driver then writes whole runs of sectors at once
+     * instead of copying them one by one (several times faster)
+     */
+    char *buf = heap_caps_malloc(CHUNK, MALLOC_CAP_DMA);
+    if (buf == NULL) {
+        return false;
+    }
+    size_t left = size;
+    bool ok = true;
+    while (left > 0 && ok) {
+        int n = httpd_req_recv(req, buf, left < CHUNK ? left : CHUNK);
+        if (n == HTTPD_SOCK_ERR_TIMEOUT) {
+            continue;
+        }
+        ok = n > 0 && fwrite(buf, 1, n, f) == (size_t)n;
+        left -= n > 0 ? n : 0;
+    }
+    free(buf);
+    return ok;
+}
+
 static esp_err_t disk_put_work(httpd_req_t *req)
 {
     char name[100], path[160], tmp[170];
@@ -425,31 +525,13 @@ static esp_err_t disk_put_work(httpd_req_t *req)
     }
 
     disk_path(path, sizeof(path), name);
-    snprintf(tmp, sizeof(tmp), "%s/upload.tmp", disks_folder());
+    /* One per upload: two at a time shared "upload.tmp", and the second failed */
+    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
     FILE *f = fopen(tmp, "wb");
-    /* DMA-capable: the SD driver then writes whole runs of sectors at once
-     * instead of copying them one by one (several times faster)
-     */
-    char *buf = heap_caps_malloc(CHUNK, MALLOC_CAP_DMA);
-    if (f == NULL || buf == NULL) {
-        if (f) {
-            fclose(f);
-        }
-        free(buf);
+    if (f == NULL) {
         return send_text(req, "500 Internal Server Error", "Can't write to the SD card");
     }
-
-    size_t left = req->content_len;
-    bool ok = true;
-    while (left > 0 && ok) {
-        int n = httpd_req_recv(req, buf, left < CHUNK ? left : CHUNK);
-        if (n == HTTPD_SOCK_ERR_TIMEOUT) {
-            continue;
-        }
-        ok = n > 0 && fwrite(buf, 1, n, f) == (size_t)n;
-        left -= n > 0 ? n : 0;
-    }
-    free(buf);
+    bool ok = receive_file(req, f);
     ok = fclose(f) == 0 && ok;
     if (ok) {
         remove(path);
@@ -473,18 +555,33 @@ static esp_err_t disk_get_work(httpd_req_t *req)
     }
     disk_path(path, sizeof(path), name);
     FILE *f = fopen(path, "rb");
-    if (f == NULL) {
+    struct stat st;
+    if (f == NULL || fstat(fileno(f), &st) != 0) {
+        if (f) {
+            fclose(f);
+        }
         return send_text(req, "404 Not Found", "No such disk");
+    }
+    char disposition[140];
+    snprintf(disposition, sizeof(disposition), "attachment; filename=\"%.100s\"", name);
+    httpd_resp_set_type(req, "application/octet-stream");
+    httpd_resp_set_hdr(req, "Content-Disposition", disposition);
+
+    size_t size = st.st_size;
+    char *whole = whole_alloc(size);
+    if (whole != NULL) {
+        bool ok = read_all(f, whole, size);
+        fclose(f);
+        esp_err_t err = ok ? httpd_resp_send(req, whole, size)
+                           : send_text(req, "500 Internal Server Error", "Can't read the SD card");
+        heap_caps_free(whole);
+        return err;
     }
     char *buf = heap_caps_malloc(CHUNK, MALLOC_CAP_DMA);
     if (buf == NULL) {
         fclose(f);
         return send_text(req, "500 Internal Server Error", "Out of memory");
     }
-    char disposition[140];
-    snprintf(disposition, sizeof(disposition), "attachment; filename=\"%.100s\"", name);
-    httpd_resp_set_type(req, "application/octet-stream");
-    httpd_resp_set_hdr(req, "Content-Disposition", disposition);
     size_t n;
     esp_err_t err = ESP_OK;
     while (err == ESP_OK && (n = fread(buf, 1, CHUNK, f)) > 0) {
