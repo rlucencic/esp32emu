@@ -10,6 +10,8 @@
  *                      eject without a name, "+" for a new blank disk
  *   t <x> <y> [ms]     touch the screen there (default 150 ms)
  *   i                  print the machine state
+ *   x <ms>             hold off core 0's interrupts for 1-100 ms, as a flash
+ *                      write does (a test of the RGB panel's recovery)
  *   p [samples]        sample core 1's program counter at 20 kHz (default
  *                      8000 samples): "EMUPROF <hex> ..." lines, "EMUPROF END"
  *

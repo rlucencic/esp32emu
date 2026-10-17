@@ -170,3 +170,8 @@ uint16_t *lcd_init(void)
              BOARD_LCD_H_RES, BOARD_LCD_V_RES);
     return s_picture;
 }
+
+uint32_t lcd_resyncs(void)
+{
+    return 0;       /* no bounce buffers: the DSI panel's DMA reads its framebuffer */
+}

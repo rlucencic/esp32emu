@@ -62,6 +62,7 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
 | `components/emu/lcd.c`, `lcd_tab5.c`, `touch.c`, `sdcard.c`, `speaker.c` | Board drivers; `include/emu/board.h` picks the board's header |
 | `components/emu/tab5.c`, `tab5_keyboard.c` | Tab5: battery charging, the ESP32-C6 (power, esp_hosted, its Bluetooth controller), the Tab5 Keyboard |
 | `components/fatfs/` | ESP-IDF 5.5.4's fatfs with `FF_FS_EXFAT` 1 (from esp32_basic): exFAT SD cards. Overrides ESP-IDF's for every project: update it with ESP-IDF |
+| `components/esp_lcd/` | ESP-IDF 5.5.4's esp_lcd (without test_apps), one change marked `esp32emu` in `rgb/esp_lcd_panel_rgb.c` (+ `emu_lcd_rgb_resyncs` in its header): see the lessons. Overrides ESP-IDF's for every project and both boards (a `reconfigure` picks it up): update it with ESP-IDF |
 | `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings (PSRAM, esp_hosted SDIO pins, NimBLE over VHCI, fonts, speaker on) |
 | `components/emu/json.c` | Small JSON builder for the web API |
 | `tools/emu_console.py` | Console client (run with the IDF venv's Python, `-I`); `profile ELF [N [TOP]]` runs `p` and names the hottest functions |
@@ -117,6 +118,19 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
   interrupts off) on core 0 caused artefacts and a shifted picture; it's
   read on core 1, on request, at most every 5 s. A flood of log output has a
   similar effect.
+- **ESP-IDF's RGB driver never got back in step** (5.5.4,
+  `CONFIG_LCD_RGB_RESTART_IN_VSYNC=y`): the DMA EOF count chooses the
+  bounce buffer each refill goes to, and that path never reset it, so one
+  lost refill interrupt (two EOFs in one ISR) left every later refill a
+  buffer out of step: the picture shifted up 10 panel lines (5-7 machine
+  lines) with artefacts, until a restart. Any stall over ~1 ms did it about
+  half the time (a flash write holds off the non-IRAM LCD interrupts; the
+  Mac's whole-picture rewrites, the ST's temperature reads). Turning the
+  option off isn't enough (it misses a lost VSYNC). Fixed in
+  `components/esp_lcd`: unless a frame ends in step, the next starts afresh
+  (count 0, both bounce buffers refilled), logged as "LCD output was out of
+  step". Test: console `x <ms>` holds off core 0's interrupts; from 2 ms on
+  each stall is put right at the next VSYNC (2026-10-17).
 - **Fewer framebuffer writes, fewer artefacts**: the presenter used to
   rewrite the whole 1 MB picture whenever anything changed; with a Mac
   (cursor, pointer) that was constant PSRAM traffic against the LCD's reads,

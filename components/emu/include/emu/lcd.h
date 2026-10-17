@@ -19,3 +19,9 @@ static inline void lcd_flush(int y0, int y1)
 {
 }
 #endif
+
+/* MaTouch: how often the RGB panel's output got out of step with the
+ * picture (refill interrupts lost to a flash write or a busy core 0) and
+ * was put right at the next VSYNC (components/esp_lcd); 0 on the Tab5
+ */
+uint32_t lcd_resyncs(void);

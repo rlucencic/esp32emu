@@ -261,11 +261,19 @@ static void stats_task(void *arg)
     int64_t last = esp_timer_get_time();
     uint32_t last_idle[2] = { ulTaskGetIdleRunTimeCounterForCore(0),
                               ulTaskGetIdleRunTimeCounterForCore(1) };
+    uint32_t last_resyncs = 0;
     for (int tick = 1;; tick++) {
         vTaskDelay(pdMS_TO_TICKS(1000));
         disks_poll();
         if (M->every_second) {
             M->every_second();
+        }
+
+        uint32_t resyncs = lcd_resyncs();
+        if (resyncs != last_resyncs) {
+            ESP_LOGW(TAG, "LCD output was out of step, put right at VSYNC (%lu times since start)",
+                     (unsigned long)resyncs);
+            last_resyncs = resyncs;
         }
 
         uint32_t frames = s_frames;

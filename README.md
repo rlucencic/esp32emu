@@ -23,6 +23,7 @@ the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 | `components/upd765` | The uPD765A floppy controller as the CPC and the Spectrum +3 wire it up, with DSK and extended DSK images |
 | `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console; on the Tab5 also the ESP32-C6 radio, the Tab5 Keyboard and battery charging |
 | `components/fatfs` | ESP-IDF 5.5.4's FAT file system with exFAT turned on (from esp32_basic), so SD cards formatted exFAT (64 GB and up) work too |
+| `components/esp_lcd` | ESP-IDF 5.5.4's LCD drivers with one fix in the RGB panel's (the MaTouch): after refill interrupts were held off (a flash write, a busy core), the picture could stay shifted by 10 lines with artefacts until a restart; now it's back in step at the next frame |
 | `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings, loaded after a project's own when it builds for `esp32p4` |
 | `tools/emu_console.py` | Console client: log, screenshots of the machine or the whole LCD, commands, a profile of the emulation (hottest functions) |
 
@@ -161,6 +162,7 @@ it charges the battery only when told to.
 ## Licence
 
 [MIT](LICENSE). Musashi is MIT licensed too. `components/fatfs` is ESP-IDF's
-(Apache 2.0) with ChaN's FatFs (BSD-style licence), exFAT turned on. LVGL
+(Apache 2.0) with ChaN's FatFs (BSD-style licence), exFAT turned on, and
+`components/esp_lcd` ESP-IDF's (Apache 2.0) with the RGB fix. LVGL
 (MIT), NimBLE, ESP-IDF, the Tab5 BSP and esp_hosted (Apache 2.0) are fetched
 at build time and keep their own licences.

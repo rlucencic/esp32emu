@@ -13,6 +13,7 @@
 #include "driver/usb_serial_jtag_vfs.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
+#include "esp_rom_sys.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "emu/board.h"
@@ -352,6 +353,18 @@ static void console_task(void *arg)
         case 'r':
             emu_request_reset();
             break;
+        case 'x': {
+            /* Hold off this core's (core 0's) interrupts, as a flash write
+             * does: the RGB panel loses refills and must be back in step
+             * at the next VSYNC (lcd_resyncs())
+             */
+            int ms = atoi(line + 1);
+            ms = ms < 1 ? 1 : ms > 100 ? 100 : ms;
+            portDISABLE_INTERRUPTS();
+            esp_rom_delay_us(ms * 1000);
+            portENABLE_INTERRUPTS();
+            break;
+        }
         case 'F': {
             int drive = -1, at = 0;
             if (sscanf(line + 1, " %d %n", &drive, &at) >= 1 && drive >= 0 &&
