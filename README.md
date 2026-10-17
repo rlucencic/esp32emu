@@ -91,7 +91,7 @@ panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
 
 | | |
 |---|---|
-| Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start, and any time by holding the top-right corner of the screen for 2 s; changing a choice there restarts the machine, unless the machine applies it at once (e.g. the ST's CPU speed) |
+| Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start, and any time by holding the top-right corner of the screen for 2 s; changing a choice there restarts the machine, unless the machine applies it at once (e.g. the ST's CPU speed on the Tab5) |
 | Disks | One folder of images on the SD card for the machine's drives; inserted disks are remembered in NVS. Blank disks of the sizes the machine offers |
 | Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks (a machine can add a script that turns other files into images in the browser, e.g. the Mac's StuffIt archives) |
 | Console | Native USB port (MaTouch: the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, plus the machine's own commands |
@@ -99,10 +99,11 @@ panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
 | Tab5 Keyboard | M5Stack's keyboard for the Tab5 (Ext.Port1), found at start-up; its keys arrive like a Bluetooth keyboard's |
 
 <p align="center">
-  <img src="docs/images/matouch-setup.png" width="44.4%" alt="The setup screen on the MaTouch's 1024×600 panel, here the Atari STE's: TOS, memory and CPU speed">
-  <img src="docs/images/tab5-setup.png" width="55.5%" alt="The same setup screen on the Tab5's 1280×720 panel">
+  <img src="docs/images/matouch-setup-st.png" width="44.4%" alt="The setup screen on the MaTouch's 1024×600 panel, here the Atari STE's: TOS and memory">
+  <img src="docs/images/tab5-setup.png" width="55.5%" alt="The same setup screen on the Tab5's 1280×720 panel, with the ST's CPU speed as well">
   <br><sub>The setup screen, here esp32ste's, on the MaTouch (1024×600) and the Tab5 (1280×720):
-  one layout, scaled to the panel; the machine adds its choice rows</sub>
+  one layout, scaled to the panel; the machine adds its choice rows (the ST's CPU speed
+  only on the Tab5, which has time to spare for it)</sub>
 </p>
 
 ## Web API

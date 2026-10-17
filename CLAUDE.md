@@ -80,7 +80,7 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
 - Setup screen choices: `get`/`set` (set saves). Changing one while running
   turns "Back to X" into "Restart X"; if the restart fails, the runtime sets
   the old choices back and starts again. A `live` choice (the ST's CPU
-  speed) changes the machine as it's set, no restart; `set()` may run on
+  speed, Tab5 only) changes the machine as it's set, no restart; `set()` may run on
   another task, so the machine picks the value up between frames. Three
   choice rows fit closer (`tight` in setup_ui.c).
 - Inputs arrive from other tasks: `hid_key(usage, pressed)` (modifiers as
@@ -223,8 +223,10 @@ text names the runtime's parts and the cores.
   (1024x514, the first buttons at y=112); three rows (closer): 104-180
   (1024x524). Tab5, three rows: 124-214 (1280x630). Taken before the
   machine starts, it says "Start X".
-- This repo's own: `docs/images/matouch-setup.png`, `tab5-setup.png` (the
-  ST's setup screen on each board).
+- This repo's own: `docs/images/matouch-setup-st.png` (two rows: the ST on
+  the MaTouch has no CPU choice), `tab5-setup.png` (three rows) — the ST's
+  setup screen on each board. `matouch-setup.png` (the MaTouch with a CPU
+  row) is gone.
 - The web page: never the live board's page (WiFi name, IP, SD card).
   Serve the real `web/index.html` (and the machine's `/machine.js`) from a
   small local node server that answers `/api/info` (copied from the
