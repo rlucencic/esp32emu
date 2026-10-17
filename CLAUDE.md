@@ -138,7 +138,11 @@ it). Topics on GitHub: emulator, esp-idf, esp32-s3, lvgl, m68k (z80 for the
 CPC and the Spectrum, 6502 for the Commodore), retrocomputing, makerfabs,
 matouch, plus the machine's own (atari-st, macintosh, amstrad-cpc,
 zx-spectrum, ...); each README has badges and
-screenshots, the About text lists the main features.
+screenshots, the About text lists the main features. esp32emu's own: all
+three CPUs (m68k, musashi, z80, 6502), upd765, floppy-controller, ble-hid,
+embedded and one per machine (atari-st, macintosh, amstrad-cpc,
+zx-spectrum, commodore-64): that is GitHub's limit of 20, so a new machine
+replaces a topic. Its About text names the runtime's parts and the cores.
 
 ## README screenshots
 
