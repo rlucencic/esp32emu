@@ -381,7 +381,7 @@ static esp_err_t drive_delete(httpd_req_t *req)
 static esp_err_t new_post(httpd_req_t *req)
 {
     char query[64], value[16];
-    uint32_t bytes = disks_config()->size_count ? disks_config()->sizes[0].bytes : 0;
+    uint32_t bytes = disks_default_size(-1);
     if (httpd_req_get_url_query_str(req, query, sizeof(query)) == ESP_OK &&
         httpd_query_key_value(query, "size", value, sizeof(value)) == ESP_OK) {
         bytes = strtoul(value, NULL, 10);

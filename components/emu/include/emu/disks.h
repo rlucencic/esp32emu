@@ -49,6 +49,13 @@ typedef struct {
      */
     bool (*accepts)(int drive, const char *name);
     bool (*takes_blank)(int drive);
+    /* Optional, for blank images of different kinds (the Spectrum's TR-DOS
+     * and +3 disks, tapes): the size made for a drive when none is chosen
+     * (drive -1: any; NULL: sizes[0]), and the extension of a blank image
+     * of that size (NULL: new_extension)
+     */
+    uint32_t (*default_size)(int drive);
+    const char *(*extension_for)(uint32_t bytes);
 } disks_config_t;
 
 /* Make the folder if needed; false without an SD card */
@@ -86,6 +93,9 @@ bool disks_in_use(const char *name);
 
 /* `name` was deleted or replaced */
 void disks_removed(const char *name);
+
+/* The blank disk size made for a drive (-1: any) when none is chosen */
+uint32_t disks_default_size(int drive);
 
 /* Blank disk <prefix>nnnn<ext> (next free number) of `bytes`, put into the
  * drive (drive < 0: just made); its name in `name`

@@ -731,7 +731,7 @@ static void new_clicked(lv_event_t *e)
     char name[32], text[96];
     set_disk_status("Making a new disk ...", COLOR_DIM);
     lv_refr_now(NULL);
-    uint32_t bytes = ui.disks->size_count ? ui.disks->sizes[0].bytes : 0;
+    uint32_t bytes = disks_default_size(d);
     if (disks_create(d, bytes, name, sizeof(name))) {
         snprintf(text, sizeof(text), "New empty disk %s is now in %s", name, ui.disks->drive_names[d]);
         set_disk_status(text, COLOR_OK);
@@ -769,6 +769,11 @@ static void build_disk_screens(void)
     };
     static const lv_event_cb_t cbs[3] = { insert_clicked, new_clicked, eject_clicked };
     static const int widths[3] = { 260, 300, 200 };
+    /* Four drives (the Spectrum's): the name and shorter buttons in one row */
+    static const char *const short_texts[3] = {
+        LV_SYMBOL_DOWNLOAD "  Insert", LV_SYMBOL_PLUS "  New", LV_SYMBOL_EJECT "  Eject",
+    };
+    static const int short_widths[3] = { 170, 140, 150 };
     /* Cards share the room between the status line and the Back button */
     int n = ui.disks->drives;
     int gap = 12;
@@ -776,6 +781,7 @@ static void build_disk_screens(void)
     if (card_h > 160) {
         card_h = 160;
     }
+    bool compact = card_h < 100;
     int button_h = card_h >= 150 ? 72 : 56;
     for (int d = 0; d < n; d++) {
         lv_obj_t *card = lv_obj_create(s);
@@ -787,17 +793,30 @@ static void build_disk_screens(void)
         lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 
         ui.drive_label[d] = lv_label_create(card);
-        lv_obj_set_width(ui.drive_label[d], lv_pct(100));
         lv_label_set_long_mode(ui.drive_label[d], LV_LABEL_LONG_DOT);
         lv_obj_set_style_text_font(ui.drive_label[d], &lv_font_montserrat_28, 0);
-        lv_obj_align(ui.drive_label[d], LV_ALIGN_TOP_LEFT, 0, 0);
+        if (compact) {
+            int buttons = short_widths[0] + short_widths[1] + short_widths[2] + 2 * 12;
+            lv_obj_set_width(ui.drive_label[d], 1024 - 2 * 32 - 2 * 10 - buttons - 16);
+            lv_obj_align(ui.drive_label[d], LV_ALIGN_LEFT_MID, 0, 0);
+        } else {
+            lv_obj_set_width(ui.drive_label[d], lv_pct(100));
+            lv_obj_align(ui.drive_label[d], LV_ALIGN_TOP_LEFT, 0, 0);
+        }
 
         int x = 0;
-        for (int b = 0; b < 3; b++) {
-            lv_obj_t *btn = make_button_for(card, texts[b], cbs[b], widths[b], (void *)(intptr_t)d);
+        for (int b = compact ? 2 : 0; compact ? b >= 0 : b < 3; b += compact ? -1 : 1) {
+            const char *text = compact ? short_texts[b] : texts[b];
+            int w = compact ? short_widths[b] : widths[b];
+            lv_obj_t *btn = make_button_for(card, text, cbs[b], w, (void *)(intptr_t)d);
             lv_obj_set_height(btn, button_h);
-            lv_obj_align(btn, LV_ALIGN_BOTTOM_LEFT, x, 0);
-            x += widths[b] + 16;
+            if (compact) {
+                lv_obj_align(btn, LV_ALIGN_RIGHT_MID, -x, 0);   /* from the right: Eject first */
+                x += w + 12;
+            } else {
+                lv_obj_align(btn, LV_ALIGN_BOTTOM_LEFT, x, 0);
+                x += w + 16;
+            }
             ui.drive_buttons[d][b] = btn;
         }
     }

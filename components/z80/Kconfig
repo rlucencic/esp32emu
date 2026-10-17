@@ -1,0 +1,26 @@
+menu "Z80 core"
+
+    choice Z80_TIMING
+        prompt "Instruction times"
+        default Z80_TIMING_TSTATES
+        help
+            What z80_step() counts in.
+
+        config Z80_TIMING_TSTATES
+            bool "T-states"
+        config Z80_TIMING_CPC
+            bool "Amstrad CPC microseconds"
+            help
+                The Gate Array stretches every memory and I/O access to a
+                1 us grid: each instruction takes a whole number of them.
+    endchoice
+
+    config Z80_CONTENTION
+        bool "Memory contention (ZX Spectrum)"
+        depends on Z80_TIMING_TSTATES
+        default n
+        help
+            Memory accesses to contended 16 KB banks wait as long as the
+            machine's table says for that moment (z80_contention).
+
+endmenu

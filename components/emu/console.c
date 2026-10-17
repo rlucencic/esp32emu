@@ -243,11 +243,10 @@ static void disk_command(void *arg)
 {
     const disk_cmd_t *c = arg;
     char made[32];
-    const disks_config_t *cfg = disks_config();
     if (c->name[0] == 0) {
         disks_eject(c->drive);
     } else if (strcmp(c->name, "+") == 0) {
-        disks_create(c->drive, cfg->size_count ? cfg->sizes[0].bytes : 0, made, sizeof(made));
+        disks_create(c->drive, disks_default_size(c->drive), made, sizeof(made));
     } else {
         disks_insert(c->drive, c->name);
     }

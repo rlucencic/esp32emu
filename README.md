@@ -2,21 +2,23 @@
 
 <p align="center">
   <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7".</b><br>
-  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic) and <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC).
+  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC) and <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3).
 </p>
 
 esp32emu is everything an emulator on this board needs apart from the machine
 itself: the display and touch panel, the SD card, WiFi with the clock from the
 internet, Bluetooth keyboards and mice, a setup screen, a web page for disk
-images, a serial console for testing, and a 68000 core for the machines that
-need one. A machine describes itself in one struct, and `emu_run()` does the
-rest.
+images, a serial console for testing, and the CPU cores and chips the
+machines share: a 68000, a Z80 and a uPD765 floppy controller. A machine
+describes itself in one struct, and `emu_run()` does the rest.
 
 ## Components
 
 | Component | What |
 |---|---|
 | `components/musashi` | The 68000 core: [Musashi](https://github.com/kstenerud/Musashi), evansm7's embedded fork, with static opcode tables (see its README) |
+| `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
+| `components/upd765` | The uPD765A floppy controller as the CPC and the Spectrum +3 wire it up, with DSK and extended DSK images |
 | `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console |
 | `tools/emu_console.py` | Console client: log, screenshots of the machine or the whole LCD, commands |
 
@@ -28,9 +30,9 @@ In the project's top-level `CMakeLists.txt`, before `project()`:
 set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/../esp32emu/components")
 ```
 
-Then `main` requires `emu`, and a 68000 machine's core requires `musashi`
-(the CPC brings its own Z80). The machine fills in an `emu_machine_t`
-(`components/emu/include/emu/emu.h`):
+Then `main` requires `emu`, and the machine's core requires `musashi` or
+`z80` (and `upd765` for DSK drives). The machine fills in an
+`emu_machine_t` (`components/emu/include/emu/emu.h`):
 
 ```c
 static const emu_machine_t machine = {

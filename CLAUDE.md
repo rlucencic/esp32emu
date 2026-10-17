@@ -1,19 +1,23 @@
 # esp32emu: the shared board runtime for the emulators
 
 ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
-(Macintosh Plus/SE/Classic) and `../esp32cpc` (Amstrad CPC and Plus) on the
-Makerfabs MaTouch ESP32-S3 7". It is a library: it isn't built on its own.
-Build and test through one of the projects (each has `EXTRA_COMPONENT_DIRS`
-pointing here). ESP-IDF v5.5.4, C. The CPC brings its own Z80 and doesn't
-use Musashi.
+(Macintosh Plus/SE/Classic), `../esp32cpc` (Amstrad CPC and Plus) and
+`../esp32zx` (ZX Spectrum 128K, +2, +3) on the Makerfabs MaTouch ESP32-S3
+7". It is a library: it isn't built on its own. Build and test through one
+of the projects (each has `EXTRA_COMPONENT_DIRS` pointing here). ESP-IDF
+v5.5.4, C. The 68000 machines use Musashi, the Z80 ones the Z80 core; the
+CPC and the +3 share the uPD765.
 
-Changes here affect all three emulators: build all of them after any change.
+Changes here affect all four emulators: build all of them after any change
+(only the components a project requires get built: MINIMAL_BUILD).
 
 ## Layout
 
 | Path | What |
 |---|---|
 | `components/musashi/` | 68000 core (Musashi, evansm7 fork) + `m68kconf.h` with the `m68k_host_*()` hooks; `test/` host tests (`make -C components/musashi/test`) |
+| `components/z80/` | Z80 core (from the CPC): T-states with optional ZX contention, or CPC microseconds (menuconfig "Z80 core"); `test/` zexdoc/zexall host test for both |
+| `components/upd765/` | uPD765A floppy controller with DSK/EDSK images (CPC, +3) |
 | `components/emu/include/emu/emu.h` | The machine interface (`emu_machine_t`) and runtime API |
 | `components/emu/emu.c` | Boot order, emulation task (core 1), presenter, stats, temperature, supervisor (touch: setup corner and machine touches), pausing |
 | `components/emu/setup_ui.c` | LVGL setup screen (status, WiFi, password, Bluetooth, pairing, drives, images) |

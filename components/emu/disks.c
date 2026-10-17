@@ -239,6 +239,14 @@ void disks_removed(const char *name)
  * NVS, so deleting the newest image doesn't bring its name back) or in the
  * folder
  */
+uint32_t disks_default_size(int drive)
+{
+    if (s_cfg.default_size) {
+        return s_cfg.default_size(drive);
+    }
+    return s_cfg.size_count ? s_cfg.sizes[0].bytes : 0;
+}
+
 bool disks_create(int drive, uint32_t bytes, char *name, size_t len)
 {
     if (!s_ready || s_cfg.create == NULL) {
@@ -267,7 +275,8 @@ bool disks_create(int drive, uint32_t bytes, char *name, size_t len)
         return false;
     }
 
-    snprintf(name, len, "%s%04u%s", s_cfg.new_prefix, last + 1, s_cfg.new_extension);
+    const char *ext = s_cfg.extension_for ? s_cfg.extension_for(bytes) : s_cfg.new_extension;
+    snprintf(name, len, "%s%04u%s", s_cfg.new_prefix, last + 1, ext);
     char path[sizeof(s_folder) + DISKS_NAME_LEN + 1];
     snprintf(path, sizeof(path), "%s/%s", s_folder, name);
     if (!s_cfg.create(path, bytes)) {
