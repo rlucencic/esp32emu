@@ -24,13 +24,18 @@
 #include "emu/speaker.h"
 #include "emu/touch.h"
 #include "emu_internal.h"
+#if CONFIG_IDF_TARGET_ESP32P4
+#include "tab5.h"
+#endif
 
 #define VIEW_H          BOARD_LCD_V_RES
 #define PRESENT_MS      40
 
-/* Long-press here (top-right corner) for the setup screen */
-#define SETUP_ZONE_X    (BOARD_LCD_H_RES - 100)
-#define SETUP_ZONE_Y    100
+/* Long-press here (top-right corner) for the setup screen: 100 pixels on
+ * the 1024 x 600 MaTouch, as much of the screen elsewhere
+ */
+#define SETUP_ZONE_X    (BOARD_LCD_H_RES - BOARD_LCD_H_RES * 100 / 1024)
+#define SETUP_ZONE_Y    (BOARD_LCD_V_RES * 100 / 600)
 #define SETUP_HOLD_MS   2000
 #define TOUCH_POLL_MS   20
 
@@ -87,6 +92,13 @@ void emu_set_message(const char *text)
 bool emu_started(void)
 {
     return s_started;
+}
+
+/* view_width is for 600 lines: as wide in proportion to this panel's height */
+int emu_view_width(void)
+{
+    int w = (M->view_width * VIEW_H / 600 + 1) & ~1;
+    return w > BOARD_LCD_H_RES ? BOARD_LCD_H_RES : w;
 }
 
 void emu_request_reset(void)
@@ -360,7 +372,7 @@ static uint32_t line_hash(const uint16_t *line, int width)
 static void present_task(void *arg)
 {
     uint16_t *fb = arg;
-    const int view_w = M->view_width;
+    const int view_w = emu_view_width();
     const int view_x = (BOARD_LCD_H_RES - view_w) / 2;
     const bool smooth = M->scale == EMU_SCALE_SMOOTH;
     uint16_t *src = heap_caps_malloc(1024 * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
@@ -414,6 +426,7 @@ static void present_task(void *arg)
 
         /* Scaled source rows, kept while consecutive output rows use them */
         int have[2] = { -1, -1 };
+        int first = VIEW_H, last = -1;      /* rows written */
         for (int r = 0; r < VIEW_H; r++) {
             int y = ytaps[r].pos, w = ytaps[r].w;
             if (!changed[y] && (!w || !changed[y + 1])) {
@@ -445,7 +458,10 @@ static void present_task(void *arg)
                 line = out;
             }
             memcpy(fb + r * BOARD_LCD_H_RES + view_x, line, view_w * sizeof(uint16_t));
+            first = r < first ? r : first;
+            last = r;
         }
+        lcd_flush(first, last + 1);
     }
 }
 
@@ -488,7 +504,7 @@ static void supervisor_task(void *arg)
     int64_t held_since = 0;
     bool forwarding = false;
     int last_x = 0, last_y = 0;
-    const int view_w = M->view_width;
+    const int view_w = emu_view_width();
     const int view_x = (BOARD_LCD_H_RES - view_w) / 2;
 
     for (;;) {
@@ -570,6 +586,9 @@ void emu_run(const emu_machine_t *machine)
     if (M->reserve_memory) {
         M->reserve_memory();
     }
+#if CONFIG_IDF_TARGET_ESP32P4
+    tab5_init();            /* the C6 boots meanwhile */
+#endif
 
     bool sd = sdcard_mount();
     s_info.sd_card = sd;
@@ -587,12 +606,18 @@ void emu_run(const emu_machine_t *machine)
     s_fb = lcd_init();
     if (s_fb != NULL) {
         memset(s_fb, 0, BOARD_LCD_H_RES * BOARD_LCD_V_RES * sizeof(uint16_t));
+        lcd_flush(0, BOARD_LCD_V_RES);
     }
     touch_init();
     emu_console_start(s_fb);
 
+#if CONFIG_IDF_TARGET_ESP32P4
+    bool radio = tab5_radio_start();    /* WiFi and Bluetooth are the C6's */
+#else
+    bool radio = true;
+#endif
 #if CONFIG_EMU_WIFI
-    bool net = net_init();  /* before BLE: WiFi needs the larger internal RAM blocks */
+    bool net = radio && net_init();     /* before BLE: WiFi needs the larger internal RAM blocks */
 #if CONFIG_EMU_WEB
     if (net) {
         emu_web_start();
@@ -600,11 +625,18 @@ void emu_run(const emu_machine_t *machine)
 #endif
 #endif
 #if CONFIG_EMU_BLE_HID
-    if (err == ESP_OK) {
+#if CONFIG_IDF_TARGET_ESP32P4
+    radio = radio && tab5_bt_start();
+#endif
+    if (err == ESP_OK && radio) {
         static const ble_hid_callbacks_t callbacks = { .key = hid_key, .mouse = hid_mouse };
         ble_hid_start(&callbacks);
     }
 #endif
+#if CONFIG_IDF_TARGET_ESP32P4
+    tab5_keyboard_start(hid_key);
+#endif
+    (void)radio;
     xTaskCreatePinnedToCore(stats_task, "stats", 3072, NULL, 2, NULL, 0);
     xTaskCreatePinnedToCore(temperature_task, "temperature", 2560, NULL, 11,
                             &s_temperature_task, 1);

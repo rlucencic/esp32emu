@@ -74,14 +74,16 @@ menu "Emulator board"
 
     config EMU_SPEAKER
         bool "Sound on the board speaker"
+        default y if IDF_TARGET_ESP32P4
         default n
         help
-            Play the machine's sound through the onboard MAX98357A
-            amplifier. Its I2S pins are shared with the native USB port
-            (GPIO19/20), so that port stops working once the machine starts:
-            the console (logs, tools/emu_console.py) moves to the
-            USB-to-UART port at 921600 baud, and flashing goes through that
-            port too.
+            Play the machine's sound through the board's speaker.
+            MaTouch: the onboard MAX98357A amplifier. Its I2S pins are
+            shared with the native USB port (GPIO19/20), so that port stops
+            working once the machine starts: the console (logs,
+            tools/emu_console.py) moves to the USB-to-UART port at 921600
+            baud, and flashing goes through that port too.
+            Tab5: the ES8388 codec and its amplifier; the USB port stays.
 
     config EMU_SPEAKER_VOLUME
         int "Speaker volume (%)"

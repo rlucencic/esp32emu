@@ -1,19 +1,64 @@
 /*
- * GT911 capacitive touch on I2C (as in wmbus_hub / esp32_basic). Raw
- * coordinates use Makerfabs' 1024x750 range and are scaled to the panel.
+ * Touch panel, in picture pixels (BOARD_LCD_H_RES x BOARD_LCD_V_RES).
+ * MaTouch: GT911 on I2C (as in wmbus_hub / esp32_basic); raw coordinates
+ * use Makerfabs' 1024x750 range and are scaled to the panel.
+ * Tab5: the BSP's GT911 or ST7123, in portrait panel pixels, turned to
+ * the landscape picture.
  */
-#include "driver/i2c_master.h"
 #include "esp_log.h"
 #include "esp_timer.h"
 #include "emu/board.h"
 #include "emu/touch.h"
+
+static const char *TAG = "touch";
+
+#if CONFIG_IDF_TARGET_ESP32P4
+
+#include "bsp/touch.h"
+#include "esp_lcd_touch.h"
+
+static esp_lcd_touch_handle_t s_tp;
+
+bool touch_init(void)
+{
+    if (bsp_touch_new(NULL, &s_tp) != ESP_OK) {
+        ESP_LOGW(TAG, "no touch panel");
+        s_tp = NULL;
+        return false;
+    }
+    return true;
+}
+
+static bool hw_read(int *x, int *y, bool *pressed)
+{
+    if (s_tp == NULL) {
+        return false;
+    }
+    *pressed = false;
+    if (esp_lcd_touch_read_data(s_tp) != ESP_OK) {
+        return true;
+    }
+    esp_lcd_touch_point_data_t p[1];
+    uint8_t n = 0;
+    if (esp_lcd_touch_get_data(s_tp, p, &n, 1) == ESP_OK && n > 0) {
+        /* panel (px, py) is picture (1279 - py, px), see board_tab5.h */
+        int px = p[0].x, py = p[0].y;
+        *x = BOARD_LCD_H_RES - 1 - (py < BOARD_PANEL_H ? py : BOARD_PANEL_H - 1);
+        *y = px < BOARD_PANEL_W ? px : BOARD_PANEL_W - 1;
+        *pressed = true;
+    }
+    return true;
+}
+
+#else
+
+#include "driver/i2c_master.h"
 
 #define GT911_ADDR_ALT      0x14
 #define GT911_REG_PRODUCT   0x8140
 #define GT911_REG_STATUS    0x814E
 #define GT911_REG_POINT1    0x814F
 
-static const char *TAG = "touch";
 static i2c_master_dev_handle_t s_dev;
 
 static esp_err_t gt911_read(uint16_t reg, uint8_t *data, size_t len)
@@ -76,24 +121,8 @@ static int scale(int raw, int raw_max, int size)
     return v < 0 ? 0 : v >= size ? size - 1 : v;
 }
 
-static volatile int64_t s_inject_until;
-static volatile int s_inject_x, s_inject_y;
-
-void touch_inject(int x, int y, int ms)
+static bool hw_read(int *x, int *y, bool *pressed)
 {
-    s_inject_x = x;
-    s_inject_y = y;
-    s_inject_until = esp_timer_get_time() + ms * 1000LL;
-}
-
-bool touch_read(int *x, int *y, bool *pressed)
-{
-    if (esp_timer_get_time() < s_inject_until) {
-        *x = s_inject_x;
-        *y = s_inject_y;
-        *pressed = true;
-        return true;
-    }
     if (s_dev == NULL) {
         return false;
     }
@@ -114,4 +143,27 @@ bool touch_read(int *x, int *y, bool *pressed)
         gt911_write8(GT911_REG_STATUS, 0);
     }
     return true;
+}
+
+#endif
+
+static volatile int64_t s_inject_until;
+static volatile int s_inject_x, s_inject_y;
+
+void touch_inject(int x, int y, int ms)
+{
+    s_inject_x = x;
+    s_inject_y = y;
+    s_inject_until = esp_timer_get_time() + ms * 1000LL;
+}
+
+bool touch_read(int *x, int *y, bool *pressed)
+{
+    if (esp_timer_get_time() < s_inject_until) {
+        *x = s_inject_x;
+        *y = s_inject_y;
+        *pressed = true;
+        return true;
+    }
+    return hw_read(x, y, pressed);
 }

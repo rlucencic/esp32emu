@@ -99,7 +99,7 @@
 <body>
 <main>
   <h1 id="title">Emulator</h1>
-  <p class="sub">The emulator on the MaTouch board, and the disk images on its SD card.</p>
+  <p class="sub">The emulator on the <span id="board-name">MaTouch</span> board, and the disk images on its SD card.</p>
 
   <div class="grid">
     <section class="card">
@@ -456,6 +456,7 @@ async function start() {
   document.title = info.name;
   $("title").textContent = info.name;
   $("short").textContent = info.short_name;
+  if (info.board) $("board-name").textContent = info.board;
   $("disks-title").textContent = info.disks.title || "Disk images";
   const exts = info.disks.extensions.map(e => e.replace(/^\./, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   imageRe = new RegExp("\\.(" + exts.join("|") + ")$", "i");

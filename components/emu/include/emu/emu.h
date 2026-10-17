@@ -45,7 +45,8 @@ typedef struct {
 typedef struct {
     const char *name;           /* "Atari STE": titles, web page, mDNS */
     const char *short_name;     /* "Atari": "Start Atari", "Reset Atari" */
-    int view_width;             /* picture width on the 1024 x 600 panel */
+    int view_width;             /* picture width at 600 lines high (the 1024 x 600 MaTouch);
+                                   other panels scale it to their height */
     emu_scale_t scale;
 
     /* Power-on, before anything else takes PSRAM */

@@ -3,14 +3,45 @@
 ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 (Macintosh Plus/SE/Classic), `../esp32cpc` (Amstrad CPC and Plus),
 `../esp32zx` (ZX Spectrum 128K, +2, +3) and `../esp32cbm` (Commodore 64 and
-128) on the Makerfabs MaTouch ESP32-S3 7". It is a library: it isn't built
-on its own. Build and test through one of the projects (each has
+128) on two boards: the Makerfabs MaTouch ESP32-S3 7" (target esp32s3, the
+default) and the M5Stack Tab5 (target esp32p4). It is a library: it isn't
+built on its own. Build and test through one of the projects (each has
 `EXTRA_COMPONENT_DIRS` pointing here). ESP-IDF v5.5.4, C. The 68000
 machines use Musashi, the Z80 ones the Z80 core, the Commodores the 6502
 core (the C128 the Z80 too); the CPC and the +3 share the uPD765.
 
-Changes here affect all five emulators: build all of them after any change
-(only the components a project requires get built: MINIMAL_BUILD).
+Changes here affect all five emulators on both boards: build all ten after
+any change (only the components a project requires get built: MINIMAL_BUILD).
+
+## The two boards
+
+- **MaTouch** (`/dev/cu.usbmodem1101`): `idf.py build`, `sdkconfig`, `build/`.
+- **Tab5** (`/dev/cu.usbmodem3101`, ESP32-P4 rev v1.0, ILI9881C + GT911
+  version): `idf.py -B build-tab5 -DIDF_TARGET=esp32p4
+  -DSDKCONFIG=$PWD/build-tab5/sdkconfig build` (and `-p PORT flash`); its
+  sdkconfig lives in the build folder, from the project's
+  `sdkconfig.defaults` then `boards/m5stack_tab5/sdkconfig.defaults` (the
+  projects' CMakeLists.txt). After changing either, delete
+  `build-tab5/sdkconfig` and `reconfigure`. Its components (BSP, esp_hosted,
+  esp_wifi_remote, ...) have their own lock file, `dependencies.lock.esp32p4`.
+- Both builds share the project's `managed_components/`: each target's solve
+  removes the other's, which then come back from the component manager's
+  cache, and that build compiles everything again (~2.5 min).
+- Both boards running the same project have the same mDNS name: one of them
+  becomes `<name>-2.local` (`/api/info` says which board: `"board"`).
+- The board code: `include/emu/board.h` picks `board_matouch7.h` or
+  `board_tab5.h`; `lcd.c` (RGB panel) or `lcd_tab5.c` (MIPI-DSI through the
+  BSP); `touch.c`, `sdcard.c`, `speaker.c` have both; `tab5.c` (charging, the
+  C6, esp_hosted) and `tab5_keyboard.c` only build for the Tab5.
+- `BOARD_LCD_H_RES` x `BOARD_LCD_V_RES` is the landscape picture everything
+  draws (presenter, setup screen, `L` dumps, touches): 1024x600 or 1280x720.
+  On the Tab5 `lcd_flush(y0, y1)` has the PPA turn those rows onto the
+  720x1280 portrait panel; landscape (x, y) is panel (y, 1279 - x), the
+  orientation esp32_basic uses with the Tab5 Keyboard below the screen. A
+  self-test at start checks it ("PPA rotation is not the expected one").
+- The setup screen is laid out for 1024x600: `SX()`/`SY()` scale it (exact
+  on the MaTouch), `FONT_BIG` is 34 px on the Tab5, the default font 28.
+  Machines' `view_width` is for 600 lines: `emu_view_width()` scales it.
 
 ## Layout
 
@@ -28,16 +59,20 @@ Changes here affect all five emulators: build all of them after any change
 | `components/emu/console.c` | Serial console (`include/emu/console.h` lists the commands), with `p`: a 20 kHz sampling profiler of core 1 |
 | `components/emu/ble_hid.c` | BLE HID host: pairing, reconnecting, reports -> HID usages |
 | `components/emu/net.c` | WiFi station + SNTP |
-| `components/emu/lcd.c`, `touch.c`, `sdcard.c`, `speaker.c` | Board drivers; pins in `include/emu/board.h` |
+| `components/emu/lcd.c`, `lcd_tab5.c`, `touch.c`, `sdcard.c`, `speaker.c` | Board drivers; `include/emu/board.h` picks the board's header |
+| `components/emu/tab5.c`, `tab5_keyboard.c` | Tab5: battery charging, the ESP32-C6 (power, esp_hosted, its Bluetooth controller), the Tab5 Keyboard |
+| `components/fatfs/` | ESP-IDF 5.5.4's fatfs with `FF_FS_EXFAT` 1 (from esp32_basic): exFAT SD cards. Overrides ESP-IDF's for every project: update it with ESP-IDF |
+| `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings (PSRAM, esp_hosted SDIO pins, NimBLE over VHCI, fonts, speaker on) |
 | `components/emu/json.c` | Small JSON builder for the web API |
 | `tools/emu_console.py` | Console client (run with the IDF venv's Python, `-I`); `profile ELF [N [TOP]]` runs `p` and names the hottest functions |
 
 ## How a machine plugs in
 
 - `emu_run(&machine)` from `app_main`. Order: NVS, `reserve_memory()` (the
-  machine's big PSRAM blocks first), SD card -> `storage(sd)`, disks restored,
-  LCD, touch, console, WiFi, web, BLE, stats/temperature tasks, setup screen,
-  `start()`; the setup screen comes back with `emu_set_message()` text when
+  machine's big PSRAM blocks first), (Tab5: charging, C6 power), SD card ->
+  `storage(sd)`, disks restored, LCD, touch, console, (Tab5: esp_hosted),
+  WiFi, web, (Tab5: the C6's Bluetooth controller), BLE, (Tab5 Keyboard),
+  stats/temperature tasks, setup screen, `start()`; the setup screen comes back with `emu_set_message()` text when
   `start()` fails (e.g. no ROM).
 - `start()` may be called again (setup screen choices changed, console):
   always with the emulation paused. If it can't get its memory any more,
@@ -67,7 +102,8 @@ Changes here affect all five emulators: build all of them after any change
 - Status: `status(j, EMU_STATUS_ROWS)` adds `emu_json_row()`s for the
   machine card, `status(j, EMU_STATUS_DRIVES)` adds `emu_json_drive()`s.
 - Presenter: `render_line()` at the machine's resolution, scaled to
-  `view_width` x 600 (centred) when `screen_signature()` changes;
+  `emu_view_width()` x the panel's height (centred) when
+  `screen_signature()` changes, then `lcd_flush()` of the rows it wrote;
   `EMU_SCALE_SMOOTH` filters (1-bit pictures at odd factors), `NEAREST` doesn't.
 
 ## Lessons (from the STE, where most of this code was written)
@@ -121,6 +157,32 @@ Changes here affect all five emulators: build all of them after any change
   made the Commodore's busy disk drive 25% faster, for 16 KB of internal RAM.
 - **No 64-bit division in hot paths**: it is a libgcc call (the
   Commodore's drive clock conversion did one per drive instruction).
+- **Tab5: esp_hosted pads every SDIO transfer to whole 512-byte blocks**, and
+  ESP-IDF's SDIO block write returns `ESP_ERR_INVALID_ARG` without a word
+  when the buffer isn't aligned to the cache line. Its pool is in PSRAM
+  (`ESP_HOSTED_MEMPOOL_PREFER_SPIRAM`: internal RAM is too small, it asserts
+  in `sdio_mempool_create` before `app_main`) aligned to 64 bytes, so the L2
+  cache line must be 64 bytes (`CACHE_L2_CACHE_LINE_64B`): with 128 every
+  other packet failed ("Failed to send data: 258", "Unrecoverable host sdio
+  state", a restart every ~8 s). esp32_basic runs with 128.
+- **Tab5: the SD card and the C6 share the SDMMC host.** A failed mount
+  deinitialises its slot, and the host with the last slot: esp_hosted has
+  started the host by then but not its slot. `sdcard.c` gives the mount a
+  `deinit_p` that does nothing.
+- **Tab5: power the C6 before esp_hosted connects** (BSP WiFi feature and
+  PI4IOE5V6408 0x44 pin 0, ~2 s to boot); esp_hosted's constructor tries at
+  boot, `esp_hosted_init()` connects later. Its Bluetooth controller is off
+  until `esp_hosted_bt_controller_init/enable` (esp32_basic, radio_c6.c).
+- **Tab5: WiFi credentials live on the C6** (esp_wifi_remote: the C6's NVS),
+  so a network another firmware joined is joined again.
+- **Tab5: the battery charges only with CHG_EN** (IO expander 0x44 pin 7)
+  high, which nothing else sets (esp32_basic).
+- **Tab5: pinned versions** (`idf_component.yml`): BSP 1.3.0, esp_hosted
+  2.12.9 (3.x changed its API), esp_wifi_remote ~1.6.4, esp_lvgl_port < 2.9
+  (2.9 needs a newer ESP-IDF), the set esp32_basic runs.
+- **Tab5: opening the port right after a flash or reset** can fail ("Device
+  not configured") while it re-enumerates, and the first seconds of the boot
+  log are lost: read the log again a moment later.
 - **A setup screen label above fixed-position widgets must stay one line**:
   the Disks page placed the drive cards for a one-line description, the
   Mac's longer one wrapped and its second line hid under the first card.
@@ -136,18 +198,21 @@ user pushes straight to `main`; commit messages end with the
 push all", that's all of them (esp32emu first: the others build against
 it). Topics on GitHub: emulator, esp-idf, esp32-s3, lvgl, m68k (z80 for the
 CPC and the Spectrum, 6502 for the Commodore), retrocomputing, makerfabs,
-matouch, plus the machine's own (atari-st, macintosh, amstrad-cpc,
-zx-spectrum, ...); each README has badges and
-screenshots, the About text lists the main features. esp32emu's own: all
-three CPUs (m68k, musashi, z80, 6502), upd765, floppy-controller, ble-hid,
-embedded and one per machine (atari-st, macintosh, amstrad-cpc,
-zx-spectrum, commodore-64): that is GitHub's limit of 20, so a new machine
-replaces a topic. Its About text names the runtime's parts and the cores.
+matouch, esp32-p4, m5stack, m5stack-tab5, risc-v, plus the machine's own
+(atari-st, macintosh, amstrad-cpc, zx-spectrum, ...); each README has badges
+and screenshots, the About text lists the main features. esp32emu's own:
+the CPUs (m68k, z80, 6502), upd765, both boards' and one per machine
+(atari-st, macintosh, amstrad-cpc, zx-spectrum, commodore-64). esp32emu,
+esp32mac, esp32cpc, esp32zx and esp32cbm are at GitHub's limit of 20: a new
+topic replaces one (for the Tab5: embedded, floppy-controller, musashi,
+ble-hid, floppy-disk, tape-emulation, cp-m, vic-ii and 1571 went). Its About
+text names the runtime's parts and the cores.
 
 ## README screenshots
 
 - The machine's screen: `emu_console.py PORT screenshot F.png` (its own
-  resolution); the whole panel: `lcd F.png` (1024x600).
+  resolution); the whole picture: `lcd F.png` (1024x600, the Tab5 1280x720:
+  the landscape picture, not the panel's own framebuffer).
 - The setup screen: hold the corner with `send "t 1010 12 2600"` (pauses
   the machine), tap buttons with `t x y`, capture with `lcd`. Its status
   lines show the WiFi name, IP and time: cut rows 104-190 out (PIL, in a

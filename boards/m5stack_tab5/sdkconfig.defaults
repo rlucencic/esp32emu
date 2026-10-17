@@ -1,0 +1,76 @@
+# M5Stack Tab5: ESP32-P4 (RISC-V, 2 cores), 16 MB flash, 32 MB PSRAM, 5"
+# 720x1280 MIPI-DSI panel, GT911/ST7123 touch, ES8388 codec, microSD, an
+# ESP32-C6 for WiFi and Bluetooth (esp_hosted over SDIO).
+#
+# Loaded after the project's own sdkconfig.defaults when building for the
+# esp32p4 target (see the projects' CMakeLists.txt), so these win over its
+# ESP32-S3 values. The esp_hosted, PSRAM and chip revision settings are the
+# ones esp32_basic runs on the Tab5.
+
+CONFIG_IDF_TARGET="esp32p4"
+
+# Tab5s have revision v1.x chips; ESP-IDF's default is v3.01 and later
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+
+# MIPI-DSI and 200 MHz PSRAM are experimental in ESP-IDF 5.5
+CONFIG_IDF_EXPERIMENTAL_FEATURES=y
+
+# Flash: 16 MB QIO, the projects' partition tables as they are
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+
+# PSRAM: 32 MB, code and read-only data run from it (flash writes don't
+# stall the cores)
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_200M=y
+CONFIG_SPIRAM_XIP_FROM_PSRAM=y
+CONFIG_SPIRAM_USE_MALLOC=y
+CONFIG_CACHE_L2_CACHE_256KB=y
+# 64-byte cache lines: esp_hosted pads every SDIO transfer to whole 512-byte
+# blocks, and a block transfer from PSRAM needs its buffer aligned to the
+# L2 line. Its buffers are aligned to 64: with 128-byte lines every other
+# packet failed ("Failed to send data: 258", then a restart)
+CONFIG_CACHE_L2_CACHE_LINE_64B=y
+
+# Console on the USB-C port (USB-Serial-JTAG)
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# Sound on the ES8388 codec: the USB port stays (unlike the MaTouch's)
+CONFIG_EMU_SPEAKER=y
+
+# The setup screen at 1280x720: larger fonts
+CONFIG_LV_FONT_MONTSERRAT_28=y
+CONFIG_LV_FONT_MONTSERRAT_34=y
+CONFIG_LV_FONT_DEFAULT_MONTSERRAT_28=y
+
+# ---- WiFi and Bluetooth: the ESP32-C6 over esp_hosted (SDIO) ----
+# WiFi through esp_wifi_remote (the esp_wifi API)
+CONFIG_ESP_WIFI_ENABLED=y
+
+# NimBLE runs here, the controller on the C6, reached over VHCI/SDIO
+CONFIG_BT_ENABLED=y
+CONFIG_BT_NIMBLE_ENABLED=y
+# CONFIG_BT_NIMBLE_TRANSPORT_UART is not set
+CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
+CONFIG_ESP_HOSTED_NIMBLE_HCI_VHCI=y
+CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=8192
+
+# esp_hosted's SDIO buffers in DMA-capable PSRAM: in internal RAM they don't
+# fit and it asserts at boot (reboot loop)
+CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
+
+# SDIO to the C6: slot 1, 4-bit, 40 MHz, its reset on GPIO15 (active high)
+CONFIG_ESP_HOSTED_SDIO_HOST_INTERFACE=y
+CONFIG_ESP_HOSTED_SDIO_SLOT_1=y
+CONFIG_ESP_HOSTED_SDIO_4_BIT_BUS=y
+CONFIG_ESP_HOSTED_SDIO_CLOCK_FREQ_KHZ=40000
+CONFIG_ESP_HOSTED_SDIO_RESET_ACTIVE_HIGH=y
+CONFIG_ESP_HOSTED_SDIO_GPIO_RESET_SLAVE=15
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_CMD_SLOT_1=13
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_CLK_SLOT_1=12
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D0_SLOT_1=11
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D1_4BIT_BUS_SLOT_1=10
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D2_4BIT_BUS_SLOT_1=9
+CONFIG_ESP_HOSTED_PRIV_SDIO_PIN_D3_4BIT_BUS_SLOT_1=8

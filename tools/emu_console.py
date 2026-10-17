@@ -115,22 +115,29 @@ def write_png(width, height, rgb565, out_png, repeat=1):
     print(f"{width}x{height} -> {out_png}")
 
 
-def find_nm():
-    """The ESP-IDF toolchain's nm for the ESP32-S3 (on PATH, or under ~/.espressif)"""
+def find_nm(elf):
+    """The ESP-IDF toolchain's nm for the ELF's CPU (on PATH, or under ~/.espressif):
+    Xtensa for the ESP32-S3 (MaTouch), RISC-V for the ESP32-P4 (Tab5)"""
+    with open(elf, "rb") as f:
+        machine = int.from_bytes(f.read(20)[18:20], "little")
+    if machine == 243:      # EM_RISCV
+        name, pattern = "riscv32-esp-elf-nm", "tools/riscv32-esp-elf/*/riscv32-esp-elf/bin/riscv32-esp-elf-nm"
+    else:
+        name, pattern = "xtensa-esp32s3-elf-nm", "tools/xtensa-esp-elf/*/xtensa-esp-elf/bin/xtensa-esp32s3-elf-nm"
     for d in os.environ.get("PATH", "").split(os.pathsep):
-        p = os.path.join(d, "xtensa-esp32s3-elf-nm")
+        p = os.path.join(d, name)
         if os.access(p, os.X_OK):
             return p
     tools = os.environ.get("IDF_TOOLS_PATH", os.path.expanduser("~/.espressif"))
-    found = sorted(glob.glob(os.path.join(tools, "tools/xtensa-esp-elf/*/xtensa-esp-elf/bin/xtensa-esp32s3-elf-nm")))
+    found = sorted(glob.glob(os.path.join(tools, pattern)), key=os.path.getmtime)   # newest last
     if not found:
-        sys.exit("no xtensa-esp32s3-elf-nm: run with the ESP-IDF environment")
+        sys.exit(f"no {name}: run with the ESP-IDF environment")
     return found[-1]
 
 
 def profile(port, elf, samples, top):
     syms = []
-    out = subprocess.run([find_nm(), "-S", "--defined-only", elf], capture_output=True, text=True).stdout
+    out = subprocess.run([find_nm(elf), "-S", "--defined-only", elf], capture_output=True, text=True).stdout
     for line in out.splitlines():
         f = line.split()
         if len(f) == 4 and f[2].lower() in "tw":

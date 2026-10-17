@@ -7,3 +7,36 @@ dependencies:
     version: "^1.8.0"
     rules:
       - if: "$CONFIG{EMU_WEB} == True"
+
+  # M5Stack Tab5 (esp32p4) only, the versions esp32_basic runs on hardware.
+  # The BSP: MIPI-DSI panel (ILI9881C / ST7123 / ST7121), GT911 / ST7123
+  # touch, SD card pins, ES8388 codec, IO expanders
+  espressif/m5stack_tab5:
+    version: "1.3.0"
+    require: private
+    rules:
+      - if: "target in [esp32p4]"
+  espressif/esp_lcd_touch:
+    version: "^1.2.1"
+    require: private
+    rules:
+      - if: "target in [esp32p4]"
+  # WiFi and Bluetooth are the ESP32-C6's, over SDIO. esp_hosted 3.x changed
+  # its settings and API: stay on 2.12.9
+  espressif/esp_hosted:
+    version: "2.12.9"
+    require: private
+    rules:
+      - if: "target in [esp32p4]"
+  espressif/esp_wifi_remote:
+    version: "~1.6.4"
+    require: private
+    rules:
+      - if: "target in [esp32p4]"
+  # Pulled in by the BSP (which asks for ^2): 2.9.0 renamed a MIPI-DSI
+  # callback for a newer ESP-IDF than 5.5.4
+  espressif/esp_lvgl_port:
+    version: ">=2.6.0,<2.9.0"
+    require: no
+    rules:
+      - if: "target in [esp32p4]"

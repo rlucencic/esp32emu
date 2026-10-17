@@ -1,7 +1,7 @@
 /*
  * Line console for tools/emu_console.py on the native USB port
  * (USB-Serial-JTAG), or on the USB-to-UART port when the speaker has taken
- * the native USB pins. Commands: see emu/console.h.
+ * the native USB pins (MaTouch). Commands: see emu/console.h.
  */
 #include <stdarg.h>
 #include <stdio.h>
@@ -25,7 +25,7 @@
 
 static const char *TAG = "console";
 
-#if CONFIG_EMU_SPEAKER
+#if CONFIG_EMU_SPEAKER && BOARD_SPEAKER_TAKES_USB
 
 /* UART0 (the board's USB-to-UART bridge) */
 static void console_write(const char *data, size_t len)
@@ -164,9 +164,9 @@ static void dump_screen(bool lcd)
         mode = (emu_screen_t){ BOARD_LCD_H_RES, BOARD_LCD_V_RES, 0 };
     } else {
         m->screen_mode(&mode);
-        /* Pixel shape on the panel: view_width / width wide, 600 / height tall */
-        repeat = (BOARD_LCD_V_RES * mode.width + m->view_width * mode.height / 2) /
-                 (m->view_width * mode.height);
+        /* Pixel shape on the panel: view width / width wide, panel height / height tall */
+        int view_w = emu_view_width();
+        repeat = (BOARD_LCD_V_RES * mode.width + view_w * mode.height / 2) / (view_w * mode.height);
         repeat = repeat < 1 ? 1 : repeat;
     }
     size_t row_bytes = mode.width * sizeof(uint16_t);
@@ -261,11 +261,17 @@ static void disk_command(void *arg)
 static uint32_t *s_prof;
 static volatile int s_prof_n, s_prof_want;
 
-/* The interrupted program counter (a level 1 interrupt: EPC1) */
+/* The interrupted program counter (Xtensa: a level 1 interrupt's EPC1;
+ * RISC-V: mepc)
+ */
 static bool IRAM_ATTR profile_tick(gptimer_handle_t t, const gptimer_alarm_event_data_t *e, void *ctx)
 {
     uint32_t pc;
+#if __XTENSA__
     __asm__ volatile("rsr.epc1 %0" : "=a"(pc));
+#else
+    __asm__ volatile("csrr %0, mepc" : "=r"(pc));
+#endif
     if (s_prof_n < s_prof_want) {
         s_prof[s_prof_n++] = pc;
     }

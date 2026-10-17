@@ -35,6 +35,7 @@
 #include "freertos/task.h"
 #include "mdns.h"
 #include "emu/ble_hid.h"
+#include "emu/board.h"
 #include "emu/disks.h"
 #include "emu/net.h"
 #include "emu/sdcard.h"
@@ -140,6 +141,7 @@ static esp_err_t info_get(httpd_req_t *req)
     emu_json_str(&j, "name", m->name);
     emu_json_str(&j, "short_name", m->short_name);
     emu_json_str(&j, "hostname", CONFIG_EMU_HOSTNAME);
+    emu_json_str(&j, "board", BOARD_SHORT_NAME);
     emu_json_bool(&j, "script", m->web_script != NULL);
     emu_json_object(&j, "disks");
     emu_json_str(&j, "title", d->title);

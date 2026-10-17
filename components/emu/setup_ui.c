@@ -27,6 +27,7 @@
 #include "emu/ble_hid.h"
 #include "emu/board.h"
 #include "emu/disks.h"
+#include "emu/lcd.h"
 #include "emu/net.h"
 #include "emu/touch.h"
 #include "emu_internal.h"
@@ -37,6 +38,16 @@
 #define OFFLINE_START_S     (CONFIG_EMU_AUTOSTART_SECONDS * 2)
 #endif
 #define MAX_LIST            16
+
+/* The layout is for the 1024 x 600 MaTouch; other panels scale it */
+#define SX(v)               ((v) * BOARD_LCD_H_RES / 1024)
+#define SY(v)               ((v) * BOARD_LCD_V_RES / 600)
+#define PAD                 SX(32)
+#if BOARD_LCD_V_RES >= 720
+#define FONT_BIG            lv_font_montserrat_34
+#else
+#define FONT_BIG            lv_font_montserrat_28
+#endif
 
 #define COLOR_BG            lv_color_hex(0x10141C)
 #define COLOR_CARD          lv_color_hex(0x1E2533)
@@ -87,6 +98,7 @@ static void flush(lv_display_t *disp, const lv_area_t *area, uint8_t *px)
     for (int y = area->y1; y <= area->y2; y++, src += w) {
         memcpy(ui.fb + y * BOARD_LCD_H_RES + area->x1, src, w * sizeof(uint16_t));
     }
+    lcd_flush(area->y1, area->y2 + 1);
     lv_display_flush_ready(disp);
 }
 
@@ -110,7 +122,7 @@ static lv_obj_t *make_screen(void)
     lv_obj_t *s = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(s, COLOR_BG, 0);
     lv_obj_set_style_text_color(s, COLOR_TEXT, 0);
-    lv_obj_set_style_pad_all(s, 32, 0);
+    lv_obj_set_style_pad_all(s, PAD, 0);
     return s;
 }
 
@@ -118,7 +130,7 @@ static lv_obj_t *make_button_for(lv_obj_t *parent, const char *text, lv_event_cb
                                  void *user_data)
 {
     lv_obj_t *b = lv_button_create(parent);
-    lv_obj_set_size(b, width, 72);
+    lv_obj_set_size(b, SX(width), SY(72));
     lv_obj_add_event_cb(b, cb, LV_EVENT_CLICKED, user_data);
     lv_obj_t *l = lv_label_create(b);
     lv_label_set_text(l, text);
@@ -135,7 +147,7 @@ static lv_obj_t *make_title(lv_obj_t *parent, const char *text)
 {
     lv_obj_t *t = lv_label_create(parent);
     lv_label_set_text(t, text);
-    lv_obj_set_style_text_font(t, &lv_font_montserrat_28, 0);
+    lv_obj_set_style_text_font(t, &FONT_BIG, 0);
     lv_obj_align(t, LV_ALIGN_TOP_LEFT, 0, 0);
     return t;
 }
@@ -143,8 +155,8 @@ static lv_obj_t *make_title(lv_obj_t *parent, const char *text)
 static lv_obj_t *make_list(lv_obj_t *parent, int y, int height)
 {
     lv_obj_t *l = lv_list_create(parent);
-    lv_obj_set_size(l, lv_pct(100), height);
-    lv_obj_align(l, LV_ALIGN_TOP_LEFT, 0, y);
+    lv_obj_set_size(l, lv_pct(100), SY(height));
+    lv_obj_align(l, LV_ALIGN_TOP_LEFT, 0, SY(y));
     lv_obj_set_style_bg_color(l, COLOR_CARD, 0);
     lv_obj_set_style_border_width(l, 0, 0);
     return l;
@@ -154,7 +166,7 @@ static lv_obj_t *make_list(lv_obj_t *parent, int y, int height)
 static lv_obj_t *add_row(lv_obj_t *list, const char *icon, const char *text)
 {
     lv_obj_t *b = lv_list_add_button(list, icon, text);
-    lv_obj_set_height(b, 64);
+    lv_obj_set_height(b, SY(64));
     lv_obj_set_style_bg_color(b, COLOR_ROW, 0);
     lv_obj_set_style_bg_color(b, COLOR_ROW_PRESSED, LV_STATE_PRESSED);
     lv_obj_set_style_text_color(b, COLOR_TEXT, 0);
@@ -168,7 +180,7 @@ static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *co
 {
     lv_obj_t *row = lv_obj_create(parent);
     lv_obj_remove_style_all(row);
-    lv_obj_set_size(row, lv_pct(100), 60);
+    lv_obj_set_size(row, lv_pct(100), SY(60));
     lv_obj_t *l = lv_label_create(row);
     lv_label_set_text(l, label);
     lv_obj_set_style_text_color(l, COLOR_TEXT, 0);
@@ -179,8 +191,8 @@ static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *co
     lv_buttonmatrix_set_button_ctrl_all(m, LV_BUTTONMATRIX_CTRL_CHECKABLE);
     lv_buttonmatrix_set_one_checked(m, true);
     lv_buttonmatrix_set_button_ctrl(m, checked, LV_BUTTONMATRIX_CTRL_CHECKED);
-    lv_obj_set_size(m, 560, 60);
-    lv_obj_align(m, LV_ALIGN_LEFT_MID, 160, 0);
+    lv_obj_set_size(m, SX(560), SY(60));
+    lv_obj_align(m, LV_ALIGN_LEFT_MID, SX(160), 0);
     lv_obj_set_style_bg_opa(m, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(m, 0, 0);
     lv_obj_set_style_pad_all(m, 0, 0);
@@ -252,13 +264,13 @@ static void build_status_screen(void)
     make_title(s, title);
 
     lv_obj_t *card = lv_obj_create(s);
-    lv_obj_set_size(card, lv_pct(100), 380);
-    lv_obj_align(card, LV_ALIGN_TOP_LEFT, 0, 56);
+    lv_obj_set_size(card, lv_pct(100), SY(380));
+    lv_obj_align(card, LV_ALIGN_TOP_LEFT, 0, SY(56));
     lv_obj_set_style_bg_color(card, COLOR_CARD, 0);
     lv_obj_set_style_border_width(card, 0, 0);
-    lv_obj_set_style_pad_all(card, 24, 0);
+    lv_obj_set_style_pad_all(card, SY(24), 0);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(card, 16, 0);
+    lv_obj_set_style_pad_row(card, SY(16), 0);
 
     ui.wifi_label = lv_label_create(card);
     ui.time_label = lv_label_create(card);
@@ -288,14 +300,14 @@ static void build_status_screen(void)
     lv_obj_set_style_bg_color(wifi_btn, COLOR_CARD, 0);
 #if CONFIG_EMU_BLE_HID
     lv_obj_t *bt_btn = make_button(s, LV_SYMBOL_BLUETOOTH "  Bluetooth", show_bluetooth, 240);
-    lv_obj_align(bt_btn, LV_ALIGN_BOTTOM_LEFT, 206, 0);
+    lv_obj_align(bt_btn, LV_ALIGN_BOTTOM_LEFT, SX(206), 0);
     lv_obj_set_style_bg_color(bt_btn, COLOR_CARD, 0);
 #endif
     if (ui.disks != NULL) {
         char text[40];
         snprintf(text, sizeof(text), LV_SYMBOL_SAVE "  %s", ui.disks->button);
         lv_obj_t *disk_btn = make_button(s, text, show_disks, 200);
-        lv_obj_align(disk_btn, LV_ALIGN_BOTTOM_LEFT, 462, 0);
+        lv_obj_align(disk_btn, LV_ALIGN_BOTTOM_LEFT, SX(462), 0);
         lv_obj_set_style_bg_color(disk_btn, COLOR_CARD, 0);
     }
 
@@ -308,14 +320,14 @@ static void build_status_screen(void)
         char text[40];
         snprintf(text, sizeof(text), LV_SYMBOL_REFRESH "  Reset %s", ui.m->short_name);
         lv_obj_t *reset = make_button(s, text, reset_clicked, 230);
-        lv_obj_set_height(reset, 48);
-        lv_obj_align(reset, LV_ALIGN_TOP_RIGHT, 0, -4);
+        lv_obj_set_height(reset, SY(48));
+        lv_obj_align(reset, LV_ALIGN_TOP_RIGHT, 0, -SY(4));
         lv_obj_set_style_bg_color(reset, COLOR_CARD, 0);
     }
 
     ui.countdown_label = lv_label_create(s);
     lv_obj_set_style_text_color(ui.countdown_label, COLOR_DIM, 0);
-    lv_obj_align(ui.countdown_label, LV_ALIGN_TOP_RIGHT, 0, 6);
+    lv_obj_align(ui.countdown_label, LV_ALIGN_TOP_RIGHT, 0, SY(6));
     lv_label_set_text(ui.countdown_label, "");
 }
 
@@ -424,7 +436,7 @@ static void build_list_screen(void)
     make_title(s, "Choose a network");
     ui.scan_label = lv_label_create(s);
     lv_obj_set_style_text_color(ui.scan_label, COLOR_DIM, 0);
-    lv_obj_align(ui.scan_label, LV_ALIGN_TOP_RIGHT, 0, 6);
+    lv_obj_align(ui.scan_label, LV_ALIGN_TOP_RIGHT, 0, SY(6));
     ui.list = make_list(s, 56, 340);
 
     lv_obj_t *back = make_button(s, LV_SYMBOL_LEFT "  Back", back_from_networks, 300);
@@ -477,10 +489,10 @@ static void build_pass_screen(void)
     lv_textarea_set_one_line(ui.pass_field, true);
     lv_textarea_set_placeholder_text(ui.pass_field, "password");
     lv_obj_set_width(ui.pass_field, lv_pct(100));
-    lv_obj_align(ui.pass_field, LV_ALIGN_TOP_LEFT, 0, 56);
+    lv_obj_align(ui.pass_field, LV_ALIGN_TOP_LEFT, 0, SY(56));
 
     lv_obj_t *kb = lv_keyboard_create(s);
-    lv_obj_set_size(kb, BOARD_LCD_H_RES - 64, 330);
+    lv_obj_set_size(kb, BOARD_LCD_H_RES - 2 * PAD, SY(330));
     lv_obj_align(kb, LV_ALIGN_BOTTOM_MID, 0, 0);
     lv_keyboard_set_textarea(kb, ui.pass_field);
     lv_obj_add_event_cb(kb, keyboard_event, LV_EVENT_ALL, NULL);
@@ -527,7 +539,7 @@ static void build_bt_screens(void)
     make_title(s, "Bluetooth keyboard and mouse");
     ui.bt_status = lv_label_create(s);
     lv_obj_set_style_text_color(ui.bt_status, COLOR_DIM, 0);
-    lv_obj_align(ui.bt_status, LV_ALIGN_TOP_LEFT, 0, 44);
+    lv_obj_align(ui.bt_status, LV_ALIGN_TOP_LEFT, 0, SY(44));
     ui.bt_list = make_list(s, 84, 320);
     lv_obj_t *back = make_button(s, LV_SYMBOL_LEFT "  Back", back_to_status, 300);
     lv_obj_align(back, LV_ALIGN_BOTTOM_LEFT, 0, 0);
@@ -539,7 +551,7 @@ static void build_bt_screens(void)
     make_title(s, "Pair a device");
     ui.pair_status = lv_label_create(s);
     lv_obj_set_style_text_color(ui.pair_status, COLOR_DIM, 0);
-    lv_obj_align(ui.pair_status, LV_ALIGN_TOP_LEFT, 0, 44);
+    lv_obj_align(ui.pair_status, LV_ALIGN_TOP_LEFT, 0, SY(44));
     ui.pair_list = make_list(s, 84, 320);
     lv_obj_t *done = make_button(s, LV_SYMBOL_LEFT "  Done", show_bluetooth, 300);
     lv_obj_align(done, LV_ALIGN_BOTTOM_LEFT, 0, 0);
@@ -578,7 +590,7 @@ static void update_bluetooth(void)
                      dev[i].connected ? "connected" : "not connected", battery);
             lv_obj_t *row = add_row(ui.bt_list, kind_symbol(dev[i].kind), text);
             lv_obj_t *f = lv_button_create(row);
-            lv_obj_set_size(f, 150, 48);
+            lv_obj_set_size(f, SX(150), SY(48));
             lv_obj_add_event_cb(f, forget_clicked, LV_EVENT_CLICKED, (void *)(intptr_t)i);
             lv_obj_t *l = lv_label_create(f);
             lv_label_set_text(l, LV_SYMBOL_TRASH "  Forget");
@@ -762,7 +774,7 @@ static void build_disk_screens(void)
     lv_label_set_long_mode(ui.disk_status, LV_LABEL_LONG_DOT);
     /* one line: the drive cards start right below it */
     lv_obj_set_height(ui.disk_status, lv_font_get_line_height(lv_obj_get_style_text_font(ui.disk_status, 0)));
-    lv_obj_align(ui.disk_status, LV_ALIGN_TOP_LEFT, 0, 44);
+    lv_obj_align(ui.disk_status, LV_ALIGN_TOP_LEFT, 0, SY(44));
 
     static const char *const texts[3] = {
         LV_SYMBOL_DOWNLOAD "  Insert disk", LV_SYMBOL_PLUS "  New empty disk", LV_SYMBOL_EJECT "  Eject",
@@ -774,7 +786,9 @@ static void build_disk_screens(void)
         LV_SYMBOL_DOWNLOAD "  Insert", LV_SYMBOL_PLUS "  New", LV_SYMBOL_EJECT "  Eject",
     };
     static const int short_widths[3] = { 170, 140, 150 };
-    /* Cards share the room between the status line and the Back button */
+    /* Cards share the room between the status line and the Back button
+     * (sizes for 600 lines)
+     */
     int n = ui.disks->drives;
     int gap = 12;
     int card_h = (356 - (n - 1) * gap) / n;
@@ -785,19 +799,19 @@ static void build_disk_screens(void)
     int button_h = card_h >= 150 ? 72 : 56;
     for (int d = 0; d < n; d++) {
         lv_obj_t *card = lv_obj_create(s);
-        lv_obj_set_size(card, lv_pct(100), card_h);
-        lv_obj_align(card, LV_ALIGN_TOP_LEFT, 0, 86 + d * (card_h + gap));
+        lv_obj_set_size(card, lv_pct(100), SY(card_h));
+        lv_obj_align(card, LV_ALIGN_TOP_LEFT, 0, SY(86 + d * (card_h + gap)));
         lv_obj_set_style_bg_color(card, COLOR_CARD, 0);
         lv_obj_set_style_border_width(card, 0, 0);
-        lv_obj_set_style_pad_all(card, card_h >= 150 ? 16 : 10, 0);
+        lv_obj_set_style_pad_all(card, SY(card_h >= 150 ? 16 : 10), 0);
         lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 
         ui.drive_label[d] = lv_label_create(card);
         lv_label_set_long_mode(ui.drive_label[d], LV_LABEL_LONG_DOT);
-        lv_obj_set_style_text_font(ui.drive_label[d], &lv_font_montserrat_28, 0);
+        lv_obj_set_style_text_font(ui.drive_label[d], &FONT_BIG, 0);
         if (compact) {
             int buttons = short_widths[0] + short_widths[1] + short_widths[2] + 2 * 12;
-            lv_obj_set_width(ui.drive_label[d], 1024 - 2 * 32 - 2 * 10 - buttons - 16);
+            lv_obj_set_width(ui.drive_label[d], BOARD_LCD_H_RES - 2 * PAD - 2 * SY(10) - SX(buttons + 16));
             lv_obj_align(ui.drive_label[d], LV_ALIGN_LEFT_MID, 0, 0);
         } else {
             lv_obj_set_width(ui.drive_label[d], lv_pct(100));
@@ -809,12 +823,12 @@ static void build_disk_screens(void)
             const char *text = compact ? short_texts[b] : texts[b];
             int w = compact ? short_widths[b] : widths[b];
             lv_obj_t *btn = make_button_for(card, text, cbs[b], w, (void *)(intptr_t)d);
-            lv_obj_set_height(btn, button_h);
+            lv_obj_set_height(btn, SY(button_h));
             if (compact) {
-                lv_obj_align(btn, LV_ALIGN_RIGHT_MID, -x, 0);   /* from the right: Eject first */
+                lv_obj_align(btn, LV_ALIGN_RIGHT_MID, -SX(x), 0);   /* from the right: Eject first */
                 x += w + 12;
             } else {
-                lv_obj_align(btn, LV_ALIGN_BOTTOM_LEFT, x, 0);
+                lv_obj_align(btn, LV_ALIGN_BOTTOM_LEFT, SX(x), 0);
                 x += w + 16;
             }
             ui.drive_buttons[d][b] = btn;
@@ -828,14 +842,14 @@ static void build_disk_screens(void)
     lv_label_set_text(web, "Add disks from a computer:\nhttp://" CONFIG_EMU_HOSTNAME ".local");
     lv_obj_set_style_text_color(web, COLOR_DIM, 0);
     lv_obj_set_style_text_align(web, LV_TEXT_ALIGN_RIGHT, 0);
-    lv_obj_align(web, LV_ALIGN_BOTTOM_RIGHT, 0, -6);
+    lv_obj_align(web, LV_ALIGN_BOTTOM_RIGHT, 0, -SY(6));
 #endif
 
     s = ui.images_screen = make_screen();
     ui.images_title = make_title(s, "");
     ui.images_count = lv_label_create(s);
     lv_obj_set_style_text_color(ui.images_count, COLOR_DIM, 0);
-    lv_obj_align(ui.images_count, LV_ALIGN_TOP_RIGHT, 0, 6);
+    lv_obj_align(ui.images_count, LV_ALIGN_TOP_RIGHT, 0, SY(6));
     ui.images_list = make_list(s, 56, 380);
     back = make_button(s, LV_SYMBOL_LEFT "  Back", show_disks, 300);
     lv_obj_align(back, LV_ALIGN_BOTTOM_LEFT, 0, 0);
@@ -905,4 +919,5 @@ void emu_ui_run(uint16_t *fb, bool running, emu_ui_result_t *result)
     lv_deinit();
     free(buf);
     memset(fb, 0, BOARD_LCD_H_RES * BOARD_LCD_V_RES * sizeof(uint16_t));
+    lcd_flush(0, BOARD_LCD_V_RES);
 }

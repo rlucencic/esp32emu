@@ -11,6 +11,7 @@
 const char *emu_drive_info(void);
 const char *emu_message(void);          /* why the machine didn't start, "" if it did */
 bool emu_started(void);
+int emu_view_width(void);               /* the machine's picture width on this panel */
 
 /* setup_ui.c */
 #define EMU_UI_MAX_CHOICES  6

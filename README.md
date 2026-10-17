@@ -1,16 +1,17 @@
 <h1 align="center">esp32emu</h1>
 
 <p align="center">
-  <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7".</b><br>
+  <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7" and the M5Stack Tab5 (ESP32-P4).</b><br>
   Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3) and <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128).
 </p>
 
-esp32emu is everything an emulator on this board needs apart from the machine
-itself: the display and touch panel, the SD card, WiFi with the clock from the
-internet, Bluetooth keyboards and mice, a setup screen, a web page for disk
-images, a serial console for testing, and the CPU cores and chips the
+esp32emu is everything an emulator on these boards needs apart from the
+machine itself: the display and touch panel, the SD card, WiFi with the clock
+from the internet, Bluetooth keyboards and mice, a setup screen, a web page for
+disk images, a serial console for testing, and the CPU cores and chips the
 machines share: a 68000, a Z80, a 6502 and a uPD765 floppy controller. A machine
-describes itself in one struct, and `emu_run()` does the rest.
+describes itself in one struct, and `emu_run()` does the rest, on either board:
+the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 
 ## Components
 
@@ -20,15 +21,38 @@ describes itself in one struct, and `emu_run()` does the rest.
 | `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds, optionally reading unmapped banks through the machine (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
 | `components/m6502` | The 6502 core (6510, 8502, disk drives): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing; `test/` runs Klaus Dormann's functional test on a desktop |
 | `components/upd765` | The uPD765A floppy controller as the CPC and the Spectrum +3 wire it up, with DSK and extended DSK images |
-| `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console |
+| `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console; on the Tab5 also the ESP32-C6 radio, the Tab5 Keyboard and battery charging |
+| `components/fatfs` | ESP-IDF 5.5.4's FAT file system with exFAT turned on (from esp32_basic), so SD cards formatted exFAT (64 GB and up) work too |
+| `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings, loaded after a project's own when it builds for `esp32p4` |
 | `tools/emu_console.py` | Console client: log, screenshots of the machine or the whole LCD, commands, a profile of the emulation (hottest functions) |
 
 ## Using it
 
-In the project's top-level `CMakeLists.txt`, before `project()`:
+In the project's top-level `CMakeLists.txt`:
 
 ```cmake
 set(EXTRA_COMPONENT_DIRS "${CMAKE_CURRENT_LIST_DIR}/../esp32emu/components")
+
+# The Tab5: the board's settings after this project's own
+if(IDF_TARGET STREQUAL "esp32p4" OR "$ENV{IDF_TARGET}" STREQUAL "esp32p4")
+    set(SDKCONFIG_DEFAULTS "${CMAKE_CURRENT_LIST_DIR}/sdkconfig.defaults"
+                           "${CMAKE_CURRENT_LIST_DIR}/../esp32emu/boards/m5stack_tab5/sdkconfig.defaults")
+endif()
+
+include($ENV{IDF_PATH}/tools/cmake/project.cmake)
+if(IDF_TARGET STREQUAL "esp32p4")
+    # its own components (the BSP, esp_hosted, ...): its own lock file
+    idf_build_set_property(DEPENDENCIES_LOCK "${CMAKE_CURRENT_LIST_DIR}/dependencies.lock.esp32p4")
+endif()
+project(...)
+```
+
+The MaTouch build is the default (`idf.py build`, its `sdkconfig` and
+`build/`); the Tab5's lives beside it:
+
+```sh
+idf.py -B build-tab5 -DIDF_TARGET=esp32p4 -DSDKCONFIG=build-tab5/sdkconfig build
+idf.py -B build-tab5 -DIDF_TARGET=esp32p4 -DSDKCONFIG=build-tab5/sdkconfig -p PORT flash
 ```
 
 Then `main` requires `emu`, and the machine's core requires `musashi`,
@@ -38,7 +62,7 @@ Then `main` requires `emu`, and the machine's core requires `musashi`,
 ```c
 static const emu_machine_t machine = {
     .name = "Macintosh", .short_name = "Mac",
-    .view_width = 898, .scale = EMU_SCALE_SMOOTH,     /* picture on the 1024x600 panel */
+    .view_width = 898, .scale = EMU_SCALE_SMOOTH,     /* picture width at 600 lines high */
     .reserve_memory = reserve_memory,                 /* big blocks first */
     .start = start, .reset = mac_reset, .run_frame = mac_run_frame,
     .screen_mode = screen_mode, .screen_signature = mac_screen_signature,
@@ -61,15 +85,18 @@ void app_main(void)
 
 `emu_run()` brings up the board, shows the setup screen, starts the machine,
 and runs it on core 1, one frame at a time, paced to its refresh rate (or to
-the speaker). Everything else runs on core 0.
+the speaker). Everything else runs on core 0. The picture is scaled to the
+panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
+`view_width` says for 600 lines.
 
 | | |
 |---|---|
 | Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start, and any time by holding the top-right corner of the screen for 2 s; changing a choice there restarts the machine |
 | Disks | One folder of images on the SD card for the machine's drives; inserted disks are remembered in NVS. Blank disks of the sizes the machine offers |
 | Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks (a machine can add a script that turns other files into images in the browser, e.g. the Mac's StuffIt archives) |
-| Console | Native USB port (or the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, plus the machine's own commands |
-| Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages |
+| Console | Native USB port (MaTouch: the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, plus the machine's own commands |
+| Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages. On the Tab5 the radio is its ESP32-C6, through esp_hosted |
+| Tab5 Keyboard | M5Stack's keyboard for the Tab5 (Ext.Port1), found at start-up; its keys arrive like a Bluetooth keyboard's |
 
 ## Web API
 
@@ -101,15 +128,31 @@ such as the network name):
 | Web page | on | |
 | Setup screen | on | Optionally starting the machine by itself after a countdown |
 | BLE keyboard and mouse | on | Mouse speed divider |
-| Sound on the speaker | off | Volume; moves the console to the UART port |
+| Sound on the speaker | MaTouch off, Tab5 on | Volume. MaTouch: moves the console to the UART port |
 
 ## Hardware
 
-Makerfabs MaTouch ESP32-S3 Parallel TFT with Touch 7" (ESP32-S3-WROOM-1-N16R8:
-16 MB flash, 8 MB octal PSRAM), 1024×600 RGB panel, GT911 touch, microSD,
-MAX98357A amplifier. Pins: `components/emu/include/emu/board.h`.
+| | Makerfabs MaTouch ESP32-S3 7" | M5Stack Tab5 |
+|---|---|---|
+| Chip | ESP32-S3 (Xtensa, 2 × 240 MHz) | ESP32-P4 (RISC-V, 2 × 360 MHz) |
+| Memory | 16 MB flash, 8 MB PSRAM | 16 MB flash, 32 MB PSRAM |
+| Screen | 7" 1024×600 RGB panel, GT911 touch | 5" 1280×720 MIPI-DSI panel (ILI9881C, ST7123 or ST7121), GT911 or ST7123 touch, held landscape |
+| Radio | built in | an ESP32-C6, over SDIO (esp_hosted) |
+| Sound | MAX98357A amplifier | ES8388 codec and amplifier |
+| Storage | microSD (1-bit) | microSD (4-bit) |
+| Keyboard | Bluetooth | Bluetooth, or the Tab5 Keyboard |
+| Pins | `components/emu/include/emu/board_matouch7.h` | Espressif's `m5stack_tab5` BSP, `board_tab5.h` |
+
+On the Tab5 the runtime draws a 1280×720 landscape picture and the P4's PPA
+turns the changed rows onto the portrait panel. The display, touch, SD card
+and codec come through Espressif's `m5stack_tab5` BSP; the radio, keyboard
+and charging code follow M5Stack Tab5 projects that run on the hardware
+(esp32_basic, wmbus_hub). The Tab5's IP2326 charger is switched on at start:
+it charges the battery only when told to.
 
 ## Licence
 
-[MIT](LICENSE). Musashi is MIT licensed too. LVGL (MIT), NimBLE and ESP-IDF
-(Apache 2.0) are fetched at build time and keep their own licences.
+[MIT](LICENSE). Musashi is MIT licensed too. `components/fatfs` is ESP-IDF's
+(Apache 2.0) with ChaN's FatFs (BSD-style licence), exFAT turned on. LVGL
+(MIT), NimBLE, ESP-IDF, the Tab5 BSP and esp_hosted (Apache 2.0) are fetched
+at build time and keep their own licences.
