@@ -1119,6 +1119,11 @@ unsigned int m68k_get_virq(unsigned int level)
  * pointers, then the current CPU type's cycle counts), e.g. in memory
  * faster than where the built-in ones are. Call after m68k_set_cpu_type().
  */
+void m68k_set_fpu(int on)
+{
+	m68ki_cpu.has_fpu = on != 0;
+}
+
 void m68k_use_table_copies(void *buf)
 {
 	void (**jump)(void) = buf;

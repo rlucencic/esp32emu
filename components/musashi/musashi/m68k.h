@@ -355,6 +355,11 @@ void m68k_pulse_halt(void);
 /* Run from copies of the opcode tables in buf (0x50000 bytes) */
 void m68k_use_table_copies(void *buf);
 
+/* A 68881 floating-point coprocessor beside the CPU (the 68030 and up
+ * always have Musashi's FPU): its instructions run instead of trapping
+ */
+void m68k_set_fpu(int on);
+
 
 /* Trigger a bus error exception */
 void m68k_pulse_bus_error(void);

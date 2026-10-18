@@ -23,7 +23,7 @@ static void m68k_op_1111(void)
 
 static void m68k_op_040fpu0_32(void)
 {
-	if(CPU_TYPE_IS_030_PLUS(CPU_TYPE))
+	if(CPU_TYPE_IS_030_PLUS(CPU_TYPE) || m68ki_cpu.has_fpu)
 	{
 		m68040_fpu_op0();
 		return;
@@ -34,7 +34,7 @@ static void m68k_op_040fpu0_32(void)
 
 static void m68k_op_040fpu1_32(void)
 {
-	if(CPU_TYPE_IS_030_PLUS(CPU_TYPE))
+	if(CPU_TYPE_IS_030_PLUS(CPU_TYPE) || m68ki_cpu.has_fpu)
 	{
 		m68040_fpu_op1();
 		return;

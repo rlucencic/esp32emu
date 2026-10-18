@@ -982,6 +982,7 @@ typedef struct
 	int    has_pmmu;     /* Indicates if a PMMU available (yes on 030, 040, no on EC030) */
 	int    pmmu_enabled; /* Indicates if the PMMU is enabled */
 	int    fpu_just_reset; /* Indicates the FPU was just reset */
+	int    has_fpu;        /* a 68881 beside a 68000-68020 (m68k_set_fpu) */
 	uint reset_cycles;
 
 	/* Clocks required for instructions / exceptions */

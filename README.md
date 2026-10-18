@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7" and the M5Stack Tab5 (ESP32-P4).</b><br>
-  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128), <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE), <a href="https://github.com/rlucencic/esp32msx">esp32msx</a> (MSX1, MSX2), <a href="https://github.com/rlucencic/esp32gs">esp32gs</a> (Apple IIGS) and <a href="https://github.com/rlucencic/esp32mac2">esp32mac2</a> (Macintosh LC, Tab5 only).
+  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128), <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE), <a href="https://github.com/rlucencic/esp32msx">esp32msx</a> (MSX1, MSX2), <a href="https://github.com/rlucencic/esp32gs">esp32gs</a> (Apple IIGS) and <a href="https://github.com/rlucencic/esp32mac2">esp32mac2</a> (Macintosh LC and II, Tab5 only).
 </p>
 
 esp32emu is everything an emulator on these boards needs apart from the
@@ -17,7 +17,7 @@ the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 
 | Component | What |
 |---|---|
-| `components/musashi` | The 68000 core: [Musashi](https://github.com/kstenerud/Musashi), evansm7's embedded fork, with static opcode tables (see its README); a 68020 with `CONFIG_M68K_68020` |
+| `components/musashi` | The 68000 core: [Musashi](https://github.com/kstenerud/Musashi), evansm7's embedded fork, with static opcode tables (see its README); a 68020 with `CONFIG_M68K_68020`, and its FPU as a 68881 |
 | `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds, optionally reading unmapped banks through the machine, or with the MSX's memory (eight 8 KB banks and the subslot register at `$FFFF`) (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
 | `components/m6502` | The 6502 core (6510, 8502, disk drives, the Atari's 6502C): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing (the VIC-II's, or the Atari's ANTIC, whose DMA cycles on a line it skips from a table by itself); `test/` runs Klaus Dormann's functional test on a desktop |
 | `components/w65816` | The 65C816 core (the Apple IIGS): emulation and native mode, all 256 opcodes, decimal mode in both widths, memory through tables of 256-byte pages with the machine's callbacks for the rest, vectors from a bank of the machine's choosing; `test/` runs the SingleStepTests 65816 suite (5 million tests, bus cycles included) on a desktop |

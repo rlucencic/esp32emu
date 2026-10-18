@@ -3,14 +3,46 @@
 #include <stdarg.h>
 #include "m68kcpu.h"
 
-extern void exit(int);
-
+/* Something this FPU doesn't do: logged (the first few times), and the
+ * instruction does what it does. (Upstream called exit(), which on a
+ * board restarts it.)
+ */
 static void fatalerror(const char *format, ...) {
+      static int logged;
       va_list ap;
+      if (logged >= 8)
+            return;
+      logged++;
       va_start(ap,format);
       vfprintf(stderr,format,ap);  // JFF: fixed. Was using fprintf and arguments were wrong
       va_end(ap);
-      exit(1);
+}
+
+/* The 68881's transcendental functions, by the host's libm in double
+ * precision (the 68040, which Musashi's FPU is, has them in software)
+ */
+static double fpu_transcendental(int opmode, double x)
+{
+	switch (opmode)
+	{
+		case 0x02: return sinh(x);			// FSINH
+		case 0x06: return log1p(x);			// FLOGNP1
+		case 0x08: return expm1(x);			// FETOXM1
+		case 0x09: return tanh(x);			// FTANH
+		case 0x0a: return atan(x);			// FATAN
+		case 0x0c: return asin(x);			// FASIN
+		case 0x0d: return atanh(x);			// FATANH
+		case 0x0f: return tan(x);			// FTAN
+		case 0x10: return exp(x);			// FETOX
+		case 0x11: return exp2(x);			// FTWOTOX
+		case 0x12: return pow(10.0, x);		// FTENTOX
+		case 0x14: return log(x);			// FLOGN
+		case 0x15: return log10(x);			// FLOG10
+		case 0x16: return log2(x);			// FLOG2
+		case 0x19: return cosh(x);			// FCOSH
+		case 0x1c: return acos(x);			// FACOS
+		default:   return x;
+	}
 }
 
 #define FPCC_N			0x08000000
@@ -1446,6 +1478,38 @@ static void fpgen_rm_reg(uint16 w2)
 			REG_FP[opmode&7] = double_to_fx80(cos(ds));
 	    	SET_CONDITION_CODES(REG_FP[dst]); // JFF
 			USE_CYCLES(400);
+			break;
+		}
+		case 0x02: case 0x06: case 0x08: case 0x09: case 0x0a: case 0x0c:
+		case 0x0d: case 0x0f: case 0x10: case 0x11: case 0x12: case 0x14:
+		case 0x15: case 0x16: case 0x19: case 0x1c:
+			REG_FP[dst] = double_to_fx80(fpu_transcendental(opmode, fx80_to_double(source)));
+			SET_CONDITION_CODES(REG_FP[dst]);
+			USE_CYCLES(400);
+			break;
+		case 0x1f:		// FGETMAN: the mantissa, exponent 0 (1 <= |x| < 2)
+		{
+			REG_FP[dst] = source;
+			if ((source.high & 0x7fff) != 0x7fff && source.low != 0)
+				REG_FP[dst].high = (source.high & 0x8000) | 0x3fff;
+			SET_CONDITION_CODES(REG_FP[dst]);
+			USE_CYCLES(6);
+			break;
+		}
+		case 0x26:		// FSCALE: dst * 2^int(source)
+		{
+			sint32 n = floatx80_to_int32_round_to_zero(source);
+			sint32 e = (REG_FP[dst].high & 0x7fff);
+			if (e != 0 && e != 0x7fff && REG_FP[dst].low != 0)
+			{
+				e += n;
+				if (e <= 0 || e >= 0x7fff)
+					REG_FP[dst] = double_to_fx80(ldexp(fx80_to_double(REG_FP[dst]), n));
+				else
+					REG_FP[dst].high = (REG_FP[dst].high & 0x8000) | e;
+			}
+			SET_CONDITION_CODES(REG_FP[dst]);
+			USE_CYCLES(41);
 			break;
 		}
 		case 0x1e:		// FGETEXP

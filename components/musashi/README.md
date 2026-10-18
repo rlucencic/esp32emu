@@ -2,9 +2,10 @@
 
 [Musashi](https://github.com/kstenerud/Musashi) (MIT licence, see `musashi/readme.txt`)
 configured as a plain 68000, shared by the Atari STE (`../esp32ste`) and
-Macintosh (`../esp32mac`) emulators, or as a 68020 for the Macintosh LC
-(`../esp32mac2`): `CONFIG_M68K_68020` (this component's Kconfig, set in the
-project's `sdkconfig.defaults`), `-DM68K_68020` in host builds.
+Macintosh (`../esp32mac`) emulators, or as a 68020 for the Macintosh LC and
+II (`../esp32mac2`): `CONFIG_M68K_68020` (this component's Kconfig, set in
+the project's `sdkconfig.defaults`), `-DM68K_68020` in host builds. The
+Mac II's 68881 is Musashi's FPU, switched on with `m68k_set_fpu()`.
 
 ## Source
 
@@ -43,6 +44,13 @@ options on top of upstream; pico-mac uses it to run a Mac on an RP2040:
 - `m68k_set_cpu_type()` (in `m68kcpu.c`): the fork's
   `assert(cpu_type == M68K_FIXED_CPU_TYPE)` compared the public CPU type
   with the internal bit mask (true by chance for the 68000 only); removed.
+- The FPU (`m68kfpu.c`, MAME's 68040 FPU): `m68k_set_fpu(on)` (a
+  `has_fpu` flag in the CPU state) runs it beside a 68000-68020 too
+  (`m68k_in.c`'s two FPU opcode handlers, regenerated); the 68881's
+  transcendental functions (FSINH ... FACOS, which the 68040 leaves to
+  software) through libm in double precision, and FGETMAN, FSCALE.
+  `fatalerror()` logs the first few times instead of calling `exit()`
+  (which on a board restarts it).
 
 - `M68K_HALT_CALLBACK()` (in `m68kcpu.h`, both double-fault halts): tells
   the machine that the CPU halted (`m68k_host_halted()`), so the emulation

@@ -6,11 +6,11 @@ ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 128), `../esp32xl` (Atari 800XL and 130XE), `../esp32msx` (MSX1, MSX2) and
 `../esp32gs` (Apple IIGS) on two boards: the Makerfabs
 MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
-(target esp32p4); and `../esp32mac2` (Macintosh LC, a 68020: the Tab5
-only). It is a library: it isn't built on its own. Build and
+(target esp32p4); and `../esp32mac2` (Macintosh LC and II, a 68020 and
+the II's 68881: the Tab5 only). It is a library: it isn't built on its own. Build and
 test through one of the projects (each has `EXTRA_COMPONENT_DIRS` pointing
-here). ESP-IDF v5.5.4, C. The 68000 machines use Musashi (the LC as a
-68020: `CONFIG_M68K_68020`), the Z80 ones the
+here). ESP-IDF v5.5.4, C. The 68000 machines use Musashi (the LC and II
+as a 68020: `CONFIG_M68K_68020`, with `m68k_set_fpu()`), the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
 Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core; the
 CPC and the +3 share the uPD765.
