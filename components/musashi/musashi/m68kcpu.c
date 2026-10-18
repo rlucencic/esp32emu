@@ -813,9 +813,10 @@ void m68k_set_instr_hook_callback(void  (*callback)(unsigned int pc))
 /* Set the CPU type. */
 void m68k_set_cpu_type(unsigned int cpu_type)
 {
-#ifdef M68K_FIXED_CPU_TYPE
-	assert(cpu_type == M68K_FIXED_CPU_TYPE);
-#endif
+	/* (The fork asserted cpu_type == M68K_FIXED_CPU_TYPE here, comparing
+	 * the public type with the internal bit mask: true by chance for the
+	 * 68000 only. The caller asks for the type it was built for.)
+	 */
 	switch(cpu_type)
 	{
 		case M68K_CPU_TYPE_68000:

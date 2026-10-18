@@ -1,0 +1,11 @@
+menu "68000 core (Musashi)"
+
+    config M68K_68020
+        bool "68020 instead of the 68000"
+        default n
+        help
+            The machine's CPU, fixed at compile time: a plain 68000 (Atari
+            ST, compact Macintosh) or a 68020 (Macintosh LC and II). The
+            project's sdkconfig.defaults sets it.
+
+endmenu

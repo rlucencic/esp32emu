@@ -7,6 +7,12 @@
 #include "m68k.h"
 #include "emudbg.h"
 
+#ifdef M68K_68020
+#define DASM_CPU    M68K_CPU_TYPE_68020
+#else
+#define DASM_CPU    M68K_CPU_TYPE_68000
+#endif
+
 const uint8_t *volatile m68k_dbg_map;
 static emudbg_cpu_t *s_cpu;
 
@@ -77,7 +83,7 @@ static int disassemble(emudbg_cpu_t *cpu, uint32_t addr, char *buf, int len)
 {
     (void)cpu;
     char text[128];
-    int n = (int)m68k_disassemble(text, addr & 0xFFFFFF, M68K_CPU_TYPE_68000);
+    int n = (int)m68k_disassemble(text, addr & 0xFFFFFF, DASM_CPU);
     int k = 0;
     for (; text[k] && k < len - 1; k++) {
         buf[k] = text[k];

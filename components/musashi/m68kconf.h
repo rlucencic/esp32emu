@@ -17,14 +17,35 @@
 
 #define M68K_COMPILE_FOR_MAME       OPT_OFF
 
-/* ---- CPU model: plain 68000 only, selected at compile time ---- */
+/* ---- CPU model, selected at compile time: a plain 68000, or a 68020 for
+ * the machines that ask for one (CONFIG_M68K_68020 in the project's
+ * sdkconfig, -DM68K_68020 in host builds: the Macintosh LC and II)
+ */
+#ifdef ESP_PLATFORM
+#include "sdkconfig.h"
+#endif
+#if defined(CONFIG_M68K_68020) && !defined(M68K_68020)
+#define M68K_68020
+#endif
+
+#ifdef M68K_68020
+/* Musashi's CPU_TYPE_IS_010_LESS() and friends are only right with the
+ * models below it on too (with just the 020, the 68000's address errors
+ * stayed in); with the type fixed they fold to constants all the same
+ */
+#define M68K_EMULATE_010            OPT_ON
+#define M68K_EMULATE_EC020          OPT_ON
+#define M68K_EMULATE_020            OPT_ON
+#define M68K_FIXED_CPU_TYPE         CPU_TYPE_020
+#else
 #define M68K_EMULATE_010            OPT_OFF
 #define M68K_EMULATE_EC020          OPT_OFF
 #define M68K_EMULATE_020            OPT_OFF
+#define M68K_FIXED_CPU_TYPE         CPU_TYPE_000
+#endif
 #define M68K_EMULATE_030            OPT_OFF
 #define M68K_EMULATE_040            OPT_OFF
 #define M68K_EMULATE_PMMU           OPT_OFF
-#define M68K_FIXED_CPU_TYPE         CPU_TYPE_000
 
 /* ---- Bus ---- */
 #define M68K_SEPARATE_READS         OPT_OFF
