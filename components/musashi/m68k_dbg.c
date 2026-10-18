@@ -7,7 +7,9 @@
 #include "m68k.h"
 #include "emudbg.h"
 
-#ifdef M68K_68020
+#if defined(M68K_68030)
+#define DASM_CPU    M68K_CPU_TYPE_68030
+#elif defined(M68K_68020)
 #define DASM_CPU    M68K_CPU_TYPE_68020
 #else
 #define DASM_CPU    M68K_CPU_TYPE_68000

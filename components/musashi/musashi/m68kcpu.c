@@ -1179,7 +1179,7 @@ void m68k_bus_error(unsigned int address, int write)
 void m68k_pulse_reset(void)
 {
 	/* Disable the PMMU on reset */
-	m68ki_cpu.pmmu_enabled = 0;
+	pmmu_reset();
 
 	/* Clear all stop levels and eat up all remaining cycles */
 	CPU_STOPPED = 0;

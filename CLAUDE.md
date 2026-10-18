@@ -7,10 +7,12 @@ ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 `../esp32gs` (Apple IIGS) on two boards: the Makerfabs
 MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
 (target esp32p4); and `../esp32mac2` (Macintosh LC and II, a 68020 and
-the II's 68881: the Tab5 only). It is a library: it isn't built on its own. Build and
+the II's 68881) and `../esp32mac3` (Macintosh LC II and LC III, a 68030
+with its MMU), the Tab5 only. It is a library: it isn't built on its own. Build and
 test through one of the projects (each has `EXTRA_COMPONENT_DIRS` pointing
 here). ESP-IDF v5.5.4, C. The 68000 machines use Musashi (the LC and II
-as a 68020: `CONFIG_M68K_68020`, with `m68k_set_fpu()`), the Z80 ones the
+as a 68020: `CONFIG_M68K_68020`, with `m68k_set_fpu()`; the LC II and LC
+III as a 68030: `CONFIG_M68K_68030`), the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
 Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core; the
 CPC and the +3 share the uPD765.
@@ -308,7 +310,7 @@ MINIMAL_BUILD).
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, and `esp32emu-vscode` (the debugger's VS Code
+`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, and `esp32emu-vscode` (the debugger's VS Code
 extension, TypeScript: `npm test`, `npm run test:host` against the demo
 machine, `npm run test:vscode` inside VS Code). The
 user pushes straight to `main`; commit messages end with the

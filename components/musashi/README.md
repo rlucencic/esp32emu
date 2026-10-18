@@ -2,10 +2,13 @@
 
 [Musashi](https://github.com/kstenerud/Musashi) (MIT licence, see `musashi/readme.txt`)
 configured as a plain 68000, shared by the Atari STE (`../esp32ste`) and
-Macintosh (`../esp32mac`) emulators, or as a 68020 for the Macintosh LC and
-II (`../esp32mac2`): `CONFIG_M68K_68020` (this component's Kconfig, set in
-the project's `sdkconfig.defaults`), `-DM68K_68020` in host builds. The
-Mac II's 68881 is Musashi's FPU, switched on with `m68k_set_fpu()`.
+Macintosh (`../esp32mac`) emulators, as a 68020 for the Macintosh LC and II
+(`../esp32mac2`), or as a 68030 with its MMU for the Macintosh LC II and LC
+III (`../esp32mac3`): the `M68K_CPU` choice in this component's Kconfig
+(`CONFIG_M68K_68020` or `CONFIG_M68K_68030` in the project's
+`sdkconfig.defaults`), `-DM68K_68020` or `-DM68K_68030` in host builds. The
+Mac II's 68881 is Musashi's FPU, switched on with `m68k_set_fpu()`; the
+68030 always has it.
 
 ## Source
 
@@ -64,6 +67,23 @@ options on top of upstream; pico-mac uses it to run a Mac on an RP2040:
   tables are copied to PSRAM at start; reading them from flash cost about
   25% of the emulation speed.
 
+- The 68030's MMU (`m68kmmu.h`, rewritten from the MC68030 User's Manual
+  with MAME's `m68kmmu.h` to check against; the fork's walked the tables on
+  every access, had no transparent translation, read the 030's PMOVE
+  TT0/TT1 as SRP/CRP and called `exit()` on anything else): TT0/TT1, TC
+  (IS, TIA-TID, PS, SRE, FCL), short and long descriptors, early
+  termination, indirect descriptors, U and M written back, a direct-mapped
+  ATC of 256 pages; PMOVE (all three formats, FD respected: TC, SRP and CRP
+  flush the ATC without it, TT0/TT1 never do), PFLUSH, PLOAD (fills the
+  ATC), PTEST (MMUSR, An). Faults are logged and the access goes through
+  untranslated: no MMU exceptions, so no virtual memory. Accesses pass
+  their function code and direction (`pmmu_translate_addr(addr, fc,
+  write)`), a reset turns translation off. **The instructions after a
+  PMOVE that changes translation keep the old mapping** up to the end of
+  their 16-byte cache line (the first fetch elsewhere ends it, a run of
+  PMOVEs keeps the first mapping): Apple's ROMs switch with `pmove
+  (a3),tc; jmp (a5)`, where the `jmp` was fetched before and its address
+  means something else under the new tables.
 - The disassembler's opcode table (`m68kdasm.c`, 256 KB) is allocated
   when it's first used instead of being static: the firmware disassembles
   for the debugger only, and 256 KB of static RAM doesn't fit next to the
