@@ -5,6 +5,7 @@
  */
 #include <string.h>
 #include "freertos/FreeRTOS.h"
+#include "freertos/idf_additions.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
 #include "esp_heap_caps.h"
@@ -165,10 +166,19 @@ static void server_task(void *arg)
     }
 }
 
+/* The server's stack in PSRAM, 12 KB: internal RAM is scarce on the S3 (with
+ * 4 KB of it here the Commodore's setup screen task didn't fit any more),
+ * and a command may go deep: Musashi's disassembler builds its table on
+ * this stack the first time (a copy of its opcode list; 4 KB overflowed).
+ * The task never touches the flash, which a PSRAM stack wouldn't allow.
+ */
+#define SERVER_STACK    12288
+
 bool emudbg_serve(int port)
 {
     init();
-    return xTaskCreatePinnedToCore(server_task, "emudbg", 4096, (void *)(intptr_t)port, 3, NULL, 0) == pdPASS;
+    return xTaskCreatePinnedToCoreWithCaps(server_task, "emudbg", SERVER_STACK, (void *)(intptr_t)port, 3,
+                                           NULL, 0, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS;
 }
 
 #endif

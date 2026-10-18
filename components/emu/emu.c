@@ -312,6 +312,10 @@ static void stats_task(void *arg)
         }
         last_frames = frames;
         last = now;
+#if CONFIG_EMU_WIFI && CONFIG_EMUDBG
+        /* A debugger's requests don't wait for the radio to wake */
+        net_low_latency(emudbg_connected());
+#endif
     }
 }
 
@@ -701,8 +705,12 @@ void emu_run(const emu_machine_t *machine)
 #endif
     xTaskCreatePinnedToCore(emulation_task, "emulation", 8192, NULL, 10, NULL, 1);
     s_started = true;
-    if (s_fb != NULL) {
-        xTaskCreatePinnedToCore(supervisor_task, "supervisor", 16384, NULL, 4, NULL, 0);
+    if (s_fb != NULL &&
+        xTaskCreatePinnedToCore(supervisor_task, "supervisor", 16384, NULL, 4, NULL, 0) != pdPASS) {
+        /* No setup screen corner, no touches: say so (it failed silently once) */
+        ESP_LOGE(TAG, "no supervisor task: internal RAM %u free, largest block %u",
+                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     }
 
     ESP_LOGI(TAG, "Free internal: %u bytes, PSRAM: %u bytes",

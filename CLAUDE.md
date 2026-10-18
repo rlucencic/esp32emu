@@ -257,7 +257,23 @@ MINIMAL_BUILD).
 - **The debugger costs a pointer test per instruction** (`dbg_map`, NULL
   without a client; the 65C816's in its outer loop only, one instruction a
   turn while it has a map). On the computer the cores ran as fast with it
-  as without; not yet measured on the boards (2026-10-18).
+  as without. On the boards (2026-10-18, `CONFIG_EMUDBG` on against off,
+  the same work): the C128 booting CP/M from a busy 1571 on the MaTouch
+  74.6% against 74.9% of real time (within the runs' spread), the XL at
+  DOS core 1 63.0% against 61.5%, the IIGS at the Finder 79.2% against
+  79.1%, the ST on the Tab5 at 8 and 16 MHz and Fastest the same.
+- **The debugger's server task has its stack in PSRAM** (12 KB): with 4 KB
+  of internal RAM the S3 had no 16 KB block left for the supervisor in the
+  Commodore's build: its creation failed without a word, and the setup
+  corner and touches were dead (now logged as an error). And the first
+  68000 `disasm` overflowed 4 KB (Musashi builds its table with a copy of
+  its opcode list on the stack): the board rebooted. The task never
+  touches the flash, which a PSRAM stack wouldn't allow.
+- **WiFi modem sleep adds ~100 ms to every request** that comes after a
+  pause (the radio wakes at the access point's beacons; the Tab5's C6 up
+  to 650 ms): a debugger's steps felt it. While a client is connected the
+  stats task turns it off (`net_low_latency()`); pings 2-3 ms instead of
+  ~50-230 ms.
 - **A debugger stop blocks the emulation task inside the CPU core**, between
   two instructions, so no machine's `run_frame()` had to learn to stop
   halfway. Everything that pauses the emulation (`emu_paused()`: the setup
@@ -279,7 +295,7 @@ MINIMAL_BUILD).
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`, `esp32xl`, and `esp32emu-vscode` (the debugger's VS Code
+`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, and `esp32emu-vscode` (the debugger's VS Code
 extension, TypeScript: `npm test`, `npm run test:host` against the demo
 machine, `npm run test:vscode` inside VS Code). The
 user pushes straight to `main`; commit messages end with the

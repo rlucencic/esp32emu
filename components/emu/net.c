@@ -231,6 +231,15 @@ void net_connect(const char *ssid, const char *password)
     esp_wifi_connect();
 }
 
+void net_low_latency(bool on)
+{
+    static bool s_low_latency;
+    if (on != s_low_latency && esp_wifi_set_ps(on ? WIFI_PS_NONE : WIFI_PS_MIN_MODEM) == ESP_OK) {
+        s_low_latency = on;
+        ESP_LOGI(TAG, "WiFi modem sleep %s", on ? "off" : "on");
+    }
+}
+
 net_time_t net_time_source(void)
 {
     if (s_time_synced) {

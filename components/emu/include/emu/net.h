@@ -38,6 +38,12 @@ void net_resume(void);
 /* Connect to a network and save it for next time */
 void net_connect(const char *ssid, const char *password);
 
+/* WiFi modem sleep off (on: true) or back on. Asleep, the radio wakes at
+ * the access point's beacons: a request waits ~100 ms for the board (the
+ * Tab5's C6 more), which a debugger's steps feel
+ */
+void net_low_latency(bool on);
+
 /* Where the clock came from: the board's own clock at boot (the Tab5's
  * RTC), then the internet (which also sets the board's clock)
  */
