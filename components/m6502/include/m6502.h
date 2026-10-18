@@ -95,6 +95,12 @@ struct m6502 {
     uint8_t poll_i;                 /* the I flag that polling used (m6502_repoll()) */
     uint64_t poll_cycle;            /* the cycle interrupts were polled at (the last but one) */
     uint64_t hijack_cycle;          /* BRK/IRQ: an NMI by then takes over its vector */
+    /* The debugger (emudbg.h): before an instruction whose address has its
+     * bit set in dbg_map, m6502_run() calls emudbg_hit() with dbg (NULL:
+     * never). Set by emudbg_arch_6502; m6502_init() clears them.
+     */
+    const uint8_t *volatile dbg_map;
+    void *dbg;
 };
 
 void m6502_init(m6502_t *cpu, const m6502_bus_t *bus);

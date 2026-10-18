@@ -78,6 +78,12 @@ struct w65816 {
     uint8_t **rd, **wr;             /* 65536 page pointers by addr >> 8 (the machine's tables) */
     w65816_bus_t bus;
     uint64_t cycles;                /* since power-on */
+    /* The debugger (emudbg.h): before an instruction in a page whose bit
+     * is set in dbg_map (by 256-byte page), w65816_run() calls
+     * emudbg_hit() with dbg (NULL: never). Set by emudbg_arch_65c816.
+     */
+    const uint8_t *volatile dbg_map;
+    void *dbg;
     /* The core's own */
     uint64_t run_base;              /* cycles when w65816_run() started */
     int32_t run_budget;             /* its cycles */

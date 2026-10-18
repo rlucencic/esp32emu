@@ -4,7 +4,7 @@
 #   build/diff [seeds]                       (w65816_run() against w65816_step() on random code)
 #   build/speed                              (instructions per second)
 BUILD   := build
-CFLAGS  := -O2 -g -Wall -Wextra -Wno-unused-parameter -I../include
+CFLAGS  := -O2 -g -Wall -Wextra -Wno-unused-parameter -I../include -I../../emudbg/include -DEMUDBG_OFF
 SRCS    := ../w65816.c ../w65816_dis.c
 
 all: $(BUILD)/ssts $(BUILD)/irq $(BUILD)/diff $(BUILD)/speed

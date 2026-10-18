@@ -4,7 +4,7 @@
 #   build/z80_test_rs  <...>                                     (T-states, read callbacks)
 #   build/z80_test_msx <...>                                     (8 KB banks, $FFFF through callbacks)
 BUILD   := build
-CFLAGS  := -O2 -g -Wall -Wextra -I../include
+CFLAGS  := -O2 -g -Wall -Wextra -I../include -I../../emudbg/include -DEMUDBG_OFF
 
 all: $(BUILD)/z80_test $(BUILD)/z80_test_cpc $(BUILD)/z80_test_rs $(BUILD)/z80_test_msx
 

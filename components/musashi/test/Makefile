@@ -1,7 +1,7 @@
 # Host build of the component with the emulator's m68kconf.h
 COMPONENT := ..
 BUILD     := build
-CFLAGS    := -O2 -I$(COMPONENT) -I$(COMPONENT)/musashi -I$(COMPONENT)/generated
+CFLAGS    := -O2 -I$(COMPONENT) -I$(COMPONENT)/musashi -I$(COMPONENT)/generated -I$(COMPONENT)/../emudbg/include -DEMUDBG_OFF
 SRCS      := $(COMPONENT)/musashi/m68kcpu.c $(COMPONENT)/musashi/m68kdasm.c \
              $(COMPONENT)/musashi/softfloat/softfloat.c $(COMPONENT)/generated/m68kops.c
 OBJS      := $(patsubst $(COMPONENT)/%.c,$(BUILD)/%.o,$(SRCS))

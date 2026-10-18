@@ -5,8 +5,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "z80.h"
+#include "emudbg.h"
 
 z80_t z80;
+const uint8_t *volatile z80_dbg_map;
 uint8_t *z80_rd[Z80_BANKS];
 uint8_t *z80_wr[Z80_BANKS];
 #if Z80_MSX
@@ -960,10 +962,20 @@ static inline int execute(void)
     }
 }
 
+#if EMUDBG_ENABLED
+void z80_dbg_hit(void);         /* z80_dbg.c */
+#endif
+
 int Z80_HOT z80_step(void)
 {
 #ifdef Z80_HOST_HOOK
     z80_host_hook();
+#endif
+#if EMUDBG_ENABLED
+    const uint8_t *map = z80_dbg_map;
+    if (__builtin_expect(map != NULL, 0) && !z80.halted && emudbg_map16(map, z80.pc.w)) {
+        z80_dbg_hit();
+    }
 #endif
     z80.wait = 0;
 #if Z80_CONTENTION

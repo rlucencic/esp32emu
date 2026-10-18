@@ -24,6 +24,7 @@
 #include "emu/speaker.h"
 #include "emu/touch.h"
 #include "emu_internal.h"
+#include "emudbg.h"
 #if CONFIG_IDF_TARGET_ESP32P4
 #include "tab5.h"
 #endif
@@ -130,9 +131,11 @@ static void emulation_task(void *arg)
         if (s_reset_requested) {
             s_reset_requested = false;
             M->reset();
+            emudbg_rearm();
         }
         M->run_frame();
         s_frames++;
+        emudbg_frame_end();
 
 #if CONFIG_EMU_SPEAKER
         /* The speaker's I2S clock sets the pace: stay ~2 frames ahead of it */
@@ -160,6 +163,7 @@ static void pause(void)
 {
     s_present_on = false;
     s_pause_request = true;
+    emudbg_suspend();           /* out of a debugger stop: on to the frame's end */
     while (!s_paused) {
         vTaskDelay(pdMS_TO_TICKS(10));
     }
@@ -169,6 +173,7 @@ static void resume(void)
 {
     s_present_on = true;
     s_pause_request = false;
+    emudbg_resume();
 }
 
 bool emu_paused(void (*fn)(void *arg), void *arg)
@@ -209,6 +214,9 @@ void emu_info(emu_info_t *info)
     info->state = !s_started ? EMU_SETUP : s_paused ? EMU_PAUSED : EMU_RUNNING;
     if (info->state == EMU_RUNNING && M->halted && M->halted()) {
         info->state = EMU_HALTED;
+    }
+    if (info->state == EMU_RUNNING && emudbg_stopped()) {
+        info->state = EMU_STOPPED;
     }
     info->session_s = s_started ? (esp_timer_get_time() - s_session_start) / 1000000 : 0;
 }
@@ -629,6 +637,11 @@ void emu_run(const emu_machine_t *machine)
 #if CONFIG_EMU_WEB
     if (net) {
         emu_web_start();
+    }
+#endif
+#if CONFIG_EMUDBG
+    if (net) {
+        emudbg_serve(CONFIG_EMUDBG_PORT);
     }
 #endif
 #endif

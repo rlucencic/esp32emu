@@ -50,9 +50,16 @@ options on top of upstream; pico-mac uses it to run a Mac on an RP2040:
   tables are copied to PSRAM at start; reading them from flash cost about
   25% of the emulation speed.
 
-`m68kconf.h` turns on `M68K_INSTRUCTION_HOOK` only when built with
-`-DM68K_INSTRUCTION_HOOK=2`. The machines' host harnesses use this for their
-trace options.
+- The disassembler's opcode table (`m68kdasm.c`, 256 KB) is allocated
+  when it's first used instead of being static: the firmware disassembles
+  for the debugger only, and 256 KB of static RAM doesn't fit next to the
+  rest (it goes to PSRAM).
+
+`m68kconf.h` turns on `M68K_INSTRUCTION_HOOK` for the debugger (emudbg.h):
+before each instruction it tests a pointer, `m68k_dbg_map`, and calls
+`m68k_dbg_hit()` (`m68k_dbg.c`) in pages with a breakpoint. Built with
+`-DM68K_INSTRUCTION_HOOK=2`, the hook also calls the machine's
+`m68k_host_instruction()`: the host harnesses' trace options.
 
 ## Layout
 
@@ -76,6 +83,9 @@ The machine provides the memory callbacks declared in `m68k.h`:
 - `m68k_host_halted()`: a double bus/address fault halted the CPU
 - `m68k_host_exception(vector)`: every exception, after its frame is pushed
 - `m68k_host_instruction(pc)`: only with `-DM68K_INSTRUCTION_HOOK=2`
+
+For the debugger, `m68k_dbg.c` is the 68000's `emudbg_arch_68000`; the
+machine gives it side-effect-free peek and poke functions.
 
 It must also set:
 

@@ -2,7 +2,7 @@
 #   build/functional <6502_functional_test.bin>   (Klaus Dormann's test)
 #   build/opcodes                                 (every opcode once: cycles, JAMs)
 BUILD   := build
-CFLAGS  := -O2 -g -Wall -Wextra -Wno-unused-parameter -I../include
+CFLAGS  := -O2 -g -Wall -Wextra -Wno-unused-parameter -I../include -I../../emudbg/include -DEMUDBG_OFF
 
 all: $(BUILD)/functional $(BUILD)/opcodes
 

@@ -58,6 +58,7 @@ MINIMAL_BUILD).
 | `components/w65816/` | 65C816 core (the IIGS): `rd`/`wr` tables of 65,536 page pointers, NULL to the bus callbacks (which may add `penalty` cycles and call `w65816_end_run()`); `vector_bank` (the IIGS reads vectors from its ROM, bank $FF); the code page cached as a pointer (`refill()`); helpers left to the compiler and `-Os` (forced inline it was 72 KB, twice the S3's instruction cache: ~850 cycles an instruction); `test/`: SingleStepTests (`ssts`), interrupts (`irq`), run against step (`diff`), `speed` |
 | `components/m6502/` | 6502 core (from the Commodore): every bus cycle, all 256 opcodes, several CPUs at once, `m6502_run()` to the machine's next event; stalls from `stall_from` (reads only, or writes too with `stall_writes`: the Atari's HALT), and for the Atari's ANTIC tables of a line's busy and free cycles (`dma_free`, `dma_busy`, `dma_base`, `dma_len`, `dma_stop`) that it skips by itself, calling `bus.stall()` only past them or at `dma_stop` (WSYNC); `linker.lf` keeps its jump table in internal RAM; `test/` Klaus Dormann's functional test and an opcode cycle table (`make -C components/m6502/test`) |
 | `components/upd765/` | uPD765A floppy controller with DSK/EDSK images (CPC, +3) |
+| `components/emudbg/` | The debugger for programs in the machines (`docs/debugger.md`, the VS Code extension `../esp32emu-vscode`): `emudbg.c` the protocol, breakpoints and steps (platform independent), `emudbg_freertos.c` the board's TCP server (port 6502, core 0), `emudbg_posix.c` the host builds' (`<M>_DEBUG=<port>`, `emudbg_host_run()`); `test/`: `dbg_test` (the commands and steps against the 6502 and Z80 cores) and `demo`, a bare 6502 or Z80 with RAM serving the debugger (the extension's tests run against it). The cores' adapters: `m6502_dbg.c`, `z80_dbg.c`, `w65816_dbg.c`, `musashi/m68k_dbg.c` |
 | `components/emu/include/emu/emu.h` | The machine interface (`emu_machine_t`) and runtime API |
 | `components/emu/emu.c` | Boot order, emulation task (core 1), presenter, stats, temperature, supervisor (touch: setup corner and machine touches), pausing |
 | `components/emu/setup_ui.c` | LVGL setup screen (status, WiFi, password, Bluetooth, pairing, drives, images) |
@@ -124,6 +125,18 @@ MINIMAL_BUILD).
   `emu_view_width()` x the panel's height (centred) when
   `screen_signature()` changes, then `lcd_flush()` of the rows it wrote;
   `EMU_SCALE_SMOOTH` filters (1-bit pictures at odd factors), `NEAREST` doesn't.
+
+- Debugger (`emudbg.h`): the machine core (not `main/`, so the host build
+  has it too) fills an `emudbg_machine_t` with its CPUs (`emudbg_cpu_t`: a
+  name, the core's adapter `emudbg_arch_6502`/`_z80`/`_65c816`/`_68000`,
+  the core's state, peek/poke when the core can't see memory by itself:
+  the 68000s, the C128's Z80, the IIGS's shadowed RAM), `where()` (frame,
+  line, cycle), `reset`, `screen`/`render_line`, `type`, and calls
+  `emudbg_set_machine()` at the end of every init: a start clears the
+  cores' maps and the CPUs may differ (C64 or C128, drives). The runtime
+  calls `emudbg_frame_end()` after each frame, `emudbg_rearm()` after a
+  reset, `emudbg_suspend()`/`emudbg_resume()` around pauses. The host
+  harness ends its setup with `emudbg_host_run("<M>_DEBUG", frame, hz)`.
 
 ## Lessons (from the STE, where most of this code was written)
 
@@ -241,12 +254,34 @@ MINIMAL_BUILD).
   the Disks page placed the drive cards for a one-line description, the
   Mac's longer one wrapped and its second line hid under the first card.
   The label has a one-line height now (`LV_LABEL_LONG_DOT` truncates).
+- **The debugger costs a pointer test per instruction** (`dbg_map`, NULL
+  without a client; the 65C816's in its outer loop only, one instruction a
+  turn while it has a map). On the computer the cores ran as fast with it
+  as without; not yet measured on the boards (2026-10-18).
+- **A debugger stop blocks the emulation task inside the CPU core**, between
+  two instructions, so no machine's `run_frame()` had to learn to stop
+  halfway. Everything that pauses the emulation (`emu_paused()`: the setup
+  screen, disk changes from the web page) first lets a stopped machine go
+  on to the end of its frame (`emudbg_suspend()`), or it would wait forever.
+- **Steps run through interrupts and count returns by the stack**, not by
+  the address after the call: calls with inline parameters (ProDOS MLI,
+  the C128's PRIMM, GS/OS, the Mac's A-traps) return further on. An
+  interrupt handler's start is taken from the vectors when the step
+  begins (the Z80's RST $38 is also IM 1's entry: told apart by where it
+  returns).
+- **Musashi's disassembler has a 256 KB table**: static, it overflowed
+  the S3's DRAM by 74 KB once the debugger used the disassembler (before,
+  `--gc-sections` dropped it). It is allocated on first use now (PSRAM).
+- **The Commodores type as a PC keyboard**: lowercase letters are the
+  C64's capitals; "RUN" typed as capitals comes out shifted (graphics).
 
 ## Repositories
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`, `esp32xl`. The
+`esp32cbm`, `esp32xl`, and `esp32emu-vscode` (the debugger's VS Code
+extension, TypeScript: `npm test`, `npm run test:host` against the demo
+machine, `npm run test:vscode` inside VS Code). The
 user pushes straight to `main`; commit messages end with the
 `Co-Authored-By` line the session gives. When the user says "commit and
 push all", that's all of them (esp32emu first: the others build against

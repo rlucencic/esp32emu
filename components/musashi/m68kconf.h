@@ -81,12 +81,37 @@ void m68k_host_halted(void);
 void m68k_host_exception(unsigned int vector);
 #define M68K_MONITOR_PC             OPT_OFF
 #define M68K_SET_PC_CALLBACK(A)     your_pc_changed_handler_function(A)
-/* Host debug builds turn this on with -DM68K_INSTRUCTION_HOOK=2 */
-#ifndef M68K_INSTRUCTION_HOOK
-#define M68K_INSTRUCTION_HOOK       OPT_OFF
+
+/* Before every instruction: the debugger (emudbg.h) looks at m68k_dbg_map,
+ * a bit per 256-byte page (NULL: no debugger), and stops in pages with a
+ * breakpoint (m68k_dbg.c). Host debug builds trace too, with
+ * -DM68K_INSTRUCTION_HOOK=2 and their m68k_host_instruction().
+ */
+#include <stdint.h>
+#include "emudbg.h"
+extern const uint8_t *volatile m68k_dbg_map;
+void m68k_dbg_hit(unsigned int pc);
+static inline void m68k_dbg_instruction(unsigned int pc)
+{
+#if EMUDBG_ENABLED
+    const uint8_t *map = m68k_dbg_map;
+    if (__builtin_expect(map != 0, 0) && emudbg_map24(map, pc)) {
+        m68k_dbg_hit(pc);
+    }
+#else
+    (void)pc;
 #endif
-#define M68K_INSTRUCTION_CALLBACK(pc) m68k_host_instruction(pc)
+}
 void m68k_host_instruction(unsigned int pc);
+#if defined(M68K_INSTRUCTION_HOOK)
+#define M68K_INSTRUCTION_CALLBACK(pc) do { m68k_host_instruction(pc); m68k_dbg_instruction(pc); } while (0)
+#elif EMUDBG_ENABLED
+#define M68K_INSTRUCTION_HOOK       OPT_SPECIFY_HANDLER
+#define M68K_INSTRUCTION_CALLBACK(pc) m68k_dbg_instruction(pc)
+#else
+#define M68K_INSTRUCTION_HOOK       OPT_OFF
+#define M68K_INSTRUCTION_CALLBACK(pc)
+#endif
 
 #define M68K_LOG_ENABLE             OPT_OFF
 #define M68K_LOG_1010_1111          OPT_OFF

@@ -22,6 +22,7 @@
 #pragma once
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #ifdef ESP_PLATFORM
@@ -122,6 +123,12 @@ static inline uint8_t z80_peek(uint16_t a)
 #endif
     return z80_rd[a >> Z80_BANK_SHIFT][a & Z80_BANK_MASK];
 }
+
+/* The debugger (emudbg.h): z80_step() calls emudbg_hit() before an
+ * instruction whose address has its bit set in z80_dbg_map (NULL: never;
+ * set by emudbg_arch_z80)
+ */
+extern const uint8_t *volatile z80_dbg_map;
 
 /* ---- Running ---- */
 

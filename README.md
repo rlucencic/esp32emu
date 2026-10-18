@@ -22,6 +22,7 @@ the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 | `components/m6502` | The 6502 core (6510, 8502, disk drives, the Atari's 6502C): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing (the VIC-II's, or the Atari's ANTIC, whose DMA cycles on a line it skips from a table by itself); `test/` runs Klaus Dormann's functional test on a desktop |
 | `components/w65816` | The 65C816 core (the Apple IIGS): emulation and native mode, all 256 opcodes, decimal mode in both widths, memory through tables of 256-byte pages with the machine's callbacks for the rest, vectors from a bank of the machine's choosing; `test/` runs the SingleStepTests 65816 suite (5 million tests, bus cycles included) on a desktop |
 | `components/upd765` | The uPD765A floppy controller as the CPC and the Spectrum +3 wire it up, with DSK and extended DSK images |
+| `components/emudbg` | The debugger for the programs in the machines: breakpoints, steps, registers, memory, disassembly and the screen of every emulated CPU over TCP, for the [VS Code extension](https://github.com/rlucencic/esp32emu-vscode) (protocol: [`docs/debugger.md`](docs/debugger.md)); also in the machines' desktop builds |
 | `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console; on the Tab5 also the ESP32-C6 radio, the Tab5 Keyboard, battery charging and the real-time clock |
 | `components/fatfs` | ESP-IDF 5.5.4's FAT file system with exFAT turned on (from esp32_basic), so SD cards formatted exFAT (64 GB and up) work too |
 | `components/esp_lcd` | ESP-IDF 5.5.4's LCD drivers with one fix in the RGB panel's (the MaTouch): after refill interrupts were held off (a flash write, a busy core), the picture could stay shifted by 10 lines with artefacts until a restart; now it's back in step at the next frame |
@@ -99,6 +100,7 @@ panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
 | Console | Native USB port (MaTouch: the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, plus the machine's own commands |
 | Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages. On the Tab5 the radio is its ESP32-C6, through esp_hosted |
 | Tab5 Keyboard | M5Stack's keyboard for the Tab5 (Ext.Port1), found at start-up; its keys arrive like a Bluetooth keyboard's |
+| Debugger | TCP port 6502, announced over mDNS: debug the program the machine runs from VS Code ([esp32emu-vscode](https://github.com/rlucencic/esp32emu-vscode)), with source lines, breakpoints, steps, registers, memory and the screen. Every CPU of the machine stops between two instructions; without a client the cores test one pointer per instruction |
 
 <p align="center">
   <img src="docs/images/matouch-setup-xl.png" width="49%" alt="The setup screen on the MaTouch's 1024×600 panel, here the Atari XL's: model, TV and BASIC, and the WiFi, Bluetooth, Disks and Start buttons">
@@ -144,6 +146,7 @@ such as the network name):
 | Setup screen | on | Optionally starting the machine by itself after a countdown |
 | BLE keyboard and mouse | on | Mouse speed divider |
 | Sound on the speaker | MaTouch off, Tab5 on | Volume. MaTouch: moves the console to the UART port |
+| Debugger (menu **Debugger**) | on | TCP port (6502) |
 
 ## Hardware
 

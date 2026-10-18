@@ -229,7 +229,7 @@ static void print_info(void)
             m->console_info(line, sizeof(line));
         }
     }
-    static const char *const states[] = { "setup", "running", "paused", "halted" };
+    static const char *const states[] = { "setup", "running", "paused", "halted", "stopped" };
     emu_console_printf("EMUINFO %s %s mode %dx%d %d Hz signature %08lx %s\n", m->short_name,
                        states[info.state], mode.width, mode.height, mode.hz,
                        emu_started() ? (unsigned long)m->screen_signature() : 0ul, line);

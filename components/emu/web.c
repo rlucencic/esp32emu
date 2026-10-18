@@ -241,7 +241,7 @@ static esp_err_t status_get(httpd_req_t *req)
     emu_info_t info;
     emu_measure_temperature();
     emu_info(&info);
-    static const char *const states[] = { "setup", "running", "paused", "halted" };
+    static const char *const states[] = { "setup", "running", "paused", "halted", "stopped" };
 
     /* The machine */
     emu_json_object(&j, "machine");
@@ -709,6 +709,12 @@ void emu_web_start(void)
         mdns_instance_name_set(emu_machine()->name);
         snprintf(service, sizeof(service), "%s disks", emu_machine()->name);
         mdns_service_add(service, "_http", "_tcp", 80, NULL, 0);
+#if CONFIG_EMUDBG
+        /* The debugger (emudbg.h), for the VS Code extension to find */
+        mdns_txt_item_t txt[] = { { "machine", emu_machine()->name } };
+        snprintf(service, sizeof(service), "%s debugger", emu_machine()->name);
+        mdns_service_add(service, "_esp32emu", "_tcp", CONFIG_EMUDBG_PORT, txt, 1);
+#endif
     }
     ESP_LOGI(TAG, "web page on http://%s.local", CONFIG_EMU_HOSTNAME);
 }

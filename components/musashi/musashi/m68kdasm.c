@@ -208,7 +208,10 @@ typedef struct
 /* ======================================================================== */
 
 /* Opcode handler jump table */
-static void (*g_instruction_table[0x10000])(void);
+/* esp32emu: allocated when first used, not 256 KB of static RAM (on the
+ * board it goes to PSRAM; the firmware only disassembles for the debugger)
+ */
+static void (**g_instruction_table)(void);
 /* Flag if disassembler initialized */
 static int  g_initialized = 0;
 
@@ -3688,6 +3691,11 @@ static void build_opcode_table(void)
 	opcode_struct* ostruct;
 	opcode_struct opcode_info[ARRAY_LENGTH(g_opcode_info)];
 
+	if(g_instruction_table == NULL)
+		g_instruction_table = calloc(0x10000, sizeof(*g_instruction_table));
+	if(g_instruction_table == NULL)
+		return;
+
 	memcpy(opcode_info, g_opcode_info, sizeof(g_opcode_info));
 	qsort((void *)opcode_info, ARRAY_LENGTH(opcode_info)-1, sizeof(opcode_info[0]), compare_nof_true_bits);
 
@@ -3731,7 +3739,12 @@ unsigned int m68k_disassemble(char* str_buff, unsigned int pc, unsigned int cpu_
 	if(!g_initialized)
 	{
 		build_opcode_table();
-		g_initialized = 1;
+		g_initialized = g_instruction_table != NULL;
+	}
+	if(!g_initialized)
+	{
+		sprintf(str_buff, "dc.w    $%04x", m68k_read_disassembler_16(pc & 0xffffff));
+		return 2;
 	}
 	switch(cpu_type)
 	{
@@ -3823,8 +3836,10 @@ unsigned int m68k_is_valid_instruction(unsigned int instruction, unsigned int cp
 	if(!g_initialized)
 	{
 		build_opcode_table();
-		g_initialized = 1;
+		g_initialized = g_instruction_table != NULL;
 	}
+	if(!g_initialized)
+		return 0;
 
 	instruction &= 0xffff;
 	if(g_instruction_table[instruction] == d68000_illegal)

@@ -113,6 +113,7 @@ typedef enum {
     EMU_RUNNING,
     EMU_PAUSED,                 /* setup screen while the machine waits */
     EMU_HALTED,                 /* the CPU stopped until a reset */
+    EMU_STOPPED,                /* the debugger stopped it (emudbg.h) */
 } emu_state_t;
 
 typedef struct {

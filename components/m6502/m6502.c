@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "m6502.h"
+#include "emudbg.h"
 
 #define C_  M6502_C
 #define Z_  M6502_Z
@@ -527,6 +528,21 @@ void m6502_run(m6502_t *c)
 #ifdef M6502_HOST_HOOK
         store(c, r);
         m6502_host_hook(c);
+#endif
+#if EMUDBG_ENABLED
+        const uint8_t *map = c->dbg_map;
+        if (__builtin_expect(map != NULL, 0) && emudbg_map16(map, r->pc)) {
+            /* The debugger may stop here and change the registers */
+            c->poll_i = i_before;
+            c->poll_cycle = r->base + (int64_t)poll;
+            c->irq_seen = irq_seen;
+            store(c, r);
+            emudbg_hit(c->dbg, c->pc);
+            load(c, r);
+            i_before = c->poll_i;
+            irq_seen = c->irq_seen;
+            poll = poll_relative(c, r);
+        }
 #endif
         if (__builtin_expect(c->jammed || c->nmi_pending || irq_seen, 0)) {
             if (c->jammed) {

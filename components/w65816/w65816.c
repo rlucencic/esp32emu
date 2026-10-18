@@ -30,6 +30,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "w65816.h"
+#include "emudbg.h"
 
 #define C_  W65816_C
 #define Z_  W65816_Z
@@ -844,6 +845,22 @@ int w65816_run(w65816_t *c, int cycles)
         if (r->left <= 0) {
             break;
         }
+#if EMUDBG_ENABLED
+        /* While the debugger looks (breakpoints, steps), one instruction
+         * at a time and back here: the instruction loop stays as it is
+         */
+        const uint8_t *map = c->dbg_map;
+        if (__builtin_expect(map != NULL, 0)) {
+            uint32_t pc = r->pbr | get_pc(c, r);
+            if (emudbg_map24(map, pc)) {
+                store(c, r);
+                emudbg_hit(c->dbg, pc);
+                load(c, r);
+            }
+            c->run_held += r->left - 1;
+            r->left = 1;
+        }
+#endif
         do {
             uint8_t op = fetch(c, r);
             switch (op) {
