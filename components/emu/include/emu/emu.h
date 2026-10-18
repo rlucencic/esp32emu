@@ -35,6 +35,7 @@ typedef enum {
 /* A row of choices on the setup screen: "System   [TOS 1.62] [TOS 2.06]".
  * Changing one while the machine runs makes "Start" a "Restart", unless
  * it's `live`: set() changes the running machine itself (between frames).
+ * A row whose buttons another choice decides: the machine's choice_names().
  */
 typedef struct {
     const char *label;
@@ -80,6 +81,11 @@ typedef struct {
     /* Setup screen */
     const emu_choice_t *choices;
     int choice_count;
+    /* Rows whose buttons another choice decides (the MSX's memory by its
+     * model): row i's buttons now, or NULL for its own names. The rows
+     * follow whenever a choice changes. NULL: none do.
+     */
+    const char *const *(*choice_names)(int i);
 
     /* Disk images on the SD card for the machine's drives (NULL: none) */
     const disks_config_t *disks;

@@ -94,9 +94,15 @@ MINIMAL_BUILD).
   the old choices back and starts again. A `live` choice (the ST's CPU
   speed, Tab5 only) changes the machine as it's set, no restart; `set()` may run on
   another task, so the machine picks the value up between frames. Three
-  choice rows fit closer (`tight` in setup_ui.c). The buttons share 560
-  pixels; a row with a single button (the IIGS's memory on the MaTouch,
-  shown but not choosable) gets one button's width in a row of four (140).
+  choice rows fit closer (`tight` in setup_ui.c), four closer still
+  (`tighter`: 46-pixel rows). The buttons share 560 pixels; a row with a
+  single button (the IIGS's memory on the MaTouch, shown but not choosable)
+  gets one button's width in a row of four (140). A row whose buttons
+  another choice decides (the MSX's memory: one 64 KB button for an MSX1,
+  the mapper sizes for an MSX2) comes from the machine's `choice_names(i)`
+  (NULL: the row's own names); the rows follow whenever a choice changes.
+  It's a machine field, not an `emu_choice_t` one: the projects fill their
+  choice rows positionally, and a new field there warns (-Wextra).
 - Sound: the speaker's task counts the frames it had to make up when the
   machine was late (`speaker_missing_frames()`: dropouts heard as
   artefacts); the IIGS shows it with `i`.
@@ -325,7 +331,8 @@ and the cores.
   with `lcd`. Its status lines show the WiFi name, IP and time: cut them out
   (PIL, in a scratch venv). MaTouch, up to two choice rows: rows 104-190
   (1024x514, the first buttons at y=112); three rows (closer): 104-180
-  (1024x524). Tab5, three rows: 124-214 (1280x630). Taken before the
+  (1024x524); four rows: 104-170 (1024x534). Tab5, three rows: 124-214
+  (1280x630). Taken before the
   machine starts, it says "Start" (while it's paused "Back").
 - This repo's own: `docs/images/matouch-setup-xl.png` (1024x524) and
   `tab5-setup-xl.png` (1280x630), the Atari XL's setup screen on each board

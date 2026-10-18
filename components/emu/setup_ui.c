@@ -64,6 +64,8 @@ static struct {
     uint16_t *fb;
     bool running;                   /* the machine is paused behind this screen */
     int before[EMU_UI_MAX_CHOICES]; /* its choices when the screen opened */
+    lv_obj_t *choice_rows[EMU_UI_MAX_CHOICES];  /* their button matrices */
+    int choice_height;
     bool done;
     bool reset;                     /* [Reset] pressed */
     bool countdown_cancelled;
@@ -174,6 +176,24 @@ static lv_obj_t *add_row(lv_obj_t *list, const char *icon, const char *text)
     return b;
 }
 
+/* A row's buttons, one checked. They share 560 pixels; a row with a single
+ * one (the IIGS's memory on the MaTouch) gets a button's width in a row of
+ * four
+ */
+static void set_choice_buttons(lv_obj_t *m, const char *const *names, int checked, int height)
+{
+    lv_buttonmatrix_set_map(m, (const char **)names);
+    lv_buttonmatrix_set_button_ctrl_all(m, LV_BUTTONMATRIX_CTRL_CHECKABLE);
+    lv_buttonmatrix_clear_button_ctrl_all(m, LV_BUTTONMATRIX_CTRL_CHECKED);
+    lv_buttonmatrix_set_one_checked(m, true);
+    lv_buttonmatrix_set_button_ctrl(m, checked, LV_BUTTONMATRIX_CTRL_CHECKED);
+    int buttons = 0;
+    while (names[buttons][0] != '\0') {
+        buttons++;
+    }
+    lv_obj_set_size(m, SX(buttons == 1 ? 140 : 560), SY(height));
+}
+
 /* A row "label  [a][b][c]" with one choice checked */
 static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *const *names,
                              int checked, int height, lv_event_cb_t cb, void *user_data)
@@ -187,18 +207,7 @@ static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *co
     lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
 
     lv_obj_t *m = lv_buttonmatrix_create(row);
-    lv_buttonmatrix_set_map(m, (const char **)names);
-    lv_buttonmatrix_set_button_ctrl_all(m, LV_BUTTONMATRIX_CTRL_CHECKABLE);
-    lv_buttonmatrix_set_one_checked(m, true);
-    lv_buttonmatrix_set_button_ctrl(m, checked, LV_BUTTONMATRIX_CTRL_CHECKED);
-    /* The buttons share 560 pixels; a row with a single one (the IIGS's
-     * memory on the MaTouch) gets a button's width in a row of four
-     */
-    int buttons = 0;
-    while (names[buttons][0] != '\0') {
-        buttons++;
-    }
-    lv_obj_set_size(m, SX(buttons == 1 ? 140 : 560), SY(height));
+    set_choice_buttons(m, names, checked, height);
     lv_obj_align(m, LV_ALIGN_LEFT_MID, SX(160), 0);
     lv_obj_set_style_bg_opa(m, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(m, 0, 0);
@@ -248,12 +257,26 @@ static void update_start_label(void)
     lv_label_set_text_fmt(ui.start_label, "%s  %s", symbol, verb);
 }
 
+/* Row i's buttons: the machine's for now, or the row's own */
+static const char *const *choice_names(int i)
+{
+    const char *const *names = ui.m->choice_names ? ui.m->choice_names(i) : NULL;
+    return names ? names : ui.m->choices[i].names;
+}
+
 static void choice_changed(lv_event_t *e)
 {
     const emu_choice_t *c = lv_event_get_user_data(e);
     uint32_t i = lv_buttonmatrix_get_selected_button(lv_event_get_target(e));
     if (i != LV_BUTTONMATRIX_BUTTON_NONE) {
         c->set(i);
+        /* Rows whose buttons depend on the choices follow */
+        for (int k = 0; ui.m->choice_names && k < ui.m->choice_count && k < EMU_UI_MAX_CHOICES; k++) {
+            if (ui.m->choice_names(k) && ui.choice_rows[k]) {
+                set_choice_buttons(ui.choice_rows[k], choice_names(k), ui.m->choices[k].get(),
+                                   ui.choice_height);
+            }
+        }
         update_start_label();
     }
 }
@@ -276,18 +299,22 @@ static void build_status_screen(void)
     lv_obj_align(card, LV_ALIGN_TOP_LEFT, 0, SY(56));
     lv_obj_set_style_bg_color(card, COLOR_CARD, 0);
     lv_obj_set_style_border_width(card, 0, 0);
-    /* Three rows of choices (and the lines around them) only fit closer */
-    bool tight = ui.m->choice_count >= 3;
-    lv_obj_set_style_pad_all(card, SY(24), 0);
+    /* Three rows of choices (and the lines around them) only fit closer,
+     * four closer still
+     */
+    bool tight = ui.m->choice_count >= 3, tighter = ui.m->choice_count >= 4;
+    lv_obj_set_style_pad_all(card, SY(tighter ? 18 : 24), 0);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(card, SY(tight ? 10 : 16), 0);
+    lv_obj_set_style_pad_row(card, SY(tighter ? 6 : tight ? 10 : 16), 0);
 
     ui.wifi_label = lv_label_create(card);
     ui.time_label = lv_label_create(card);
 
+    ui.choice_height = tighter ? 46 : tight ? 54 : 60;
     for (int i = 0; i < ui.m->choice_count && i < EMU_UI_MAX_CHOICES; i++) {
         const emu_choice_t *c = &ui.m->choices[i];
-        make_choice(card, c->label, c->names, c->get(), tight ? 54 : 60, choice_changed, (void *)c);
+        ui.choice_rows[i] = make_choice(card, c->label, choice_names(i), c->get(), ui.choice_height,
+                                        choice_changed, (void *)c);
     }
 
     ui.message_label = lv_label_create(card);
