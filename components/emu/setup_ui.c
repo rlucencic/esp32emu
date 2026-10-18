@@ -191,7 +191,14 @@ static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *co
     lv_buttonmatrix_set_button_ctrl_all(m, LV_BUTTONMATRIX_CTRL_CHECKABLE);
     lv_buttonmatrix_set_one_checked(m, true);
     lv_buttonmatrix_set_button_ctrl(m, checked, LV_BUTTONMATRIX_CTRL_CHECKED);
-    lv_obj_set_size(m, SX(560), SY(height));
+    /* The buttons share 560 pixels; a row with a single one (the IIGS's
+     * memory on the MaTouch) gets a button's width in a row of four
+     */
+    int buttons = 0;
+    while (names[buttons][0] != '\0') {
+        buttons++;
+    }
+    lv_obj_set_size(m, SX(buttons == 1 ? 140 : 560), SY(height));
     lv_obj_align(m, LV_ALIGN_LEFT_MID, SX(160), 0);
     lv_obj_set_style_bg_opa(m, LV_OPA_TRANSP, 0);
     lv_obj_set_style_border_width(m, 0, 0);

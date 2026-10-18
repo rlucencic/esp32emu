@@ -7,8 +7,11 @@
 #include "z80.h"
 
 z80_t z80;
-uint8_t *z80_rd[4];
-uint8_t *z80_wr[4];
+uint8_t *z80_rd[Z80_BANKS];
+uint8_t *z80_wr[Z80_BANKS];
+#if Z80_MSX
+uint8_t z80_ffff_special;
+#endif
 
 static z80_bus_t s_bus;
 
@@ -221,13 +224,17 @@ static inline void contend(uint16_t a, int cycles)
 static inline uint8_t mem(uint16_t a)
 {
 #if Z80_READ_SPECIAL
-    const uint8_t *p = z80_rd[a >> 14];
+    const uint8_t *p = z80_rd[a >> Z80_BANK_SHIFT];
+#if Z80_MSX
+    if (__builtin_expect(p == NULL || (a == 0xFFFF && z80_ffff_special), 0)) {
+#else
     if (__builtin_expect(p == NULL, 0)) {
+#endif
         return s_bus.read_special(a);
     }
-    return p[a & 0x3FFF];
+    return p[a & Z80_BANK_MASK];
 #else
-    return z80_rd[a >> 14][a & 0x3FFF];
+    return z80_rd[a >> Z80_BANK_SHIFT][a & Z80_BANK_MASK];
 #endif
 }
 
@@ -240,9 +247,14 @@ static inline uint8_t rd(uint16_t a)
 static inline void wr(uint16_t a, uint8_t v)
 {
     contend(a, 3);
-    uint8_t *p = z80_wr[a >> 14];
+    uint8_t *p = z80_wr[a >> Z80_BANK_SHIFT];
+#if Z80_MSX
+    if (__builtin_expect(a == 0xFFFF && z80_ffff_special, 0)) {
+        p = NULL;
+    }
+#endif
     if (p) {
-        p[a & 0x3FFF] = v;
+        p[a & Z80_BANK_MASK] = v;
     } else if (s_bus.write_special) {
         s_bus.write_special(a, v);
     }

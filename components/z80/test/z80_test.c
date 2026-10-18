@@ -12,6 +12,18 @@
 
 static uint8_t s_mem[65536];
 
+#if Z80_MSX
+static uint8_t special_read(uint16_t a)
+{
+    return s_mem[a];
+}
+
+static void special_write(uint16_t a, uint8_t v)
+{
+    s_mem[a] = v;
+}
+#endif
+
 int main(int argc, char **argv)
 {
     if (argc < 2) {
@@ -25,10 +37,16 @@ int main(int argc, char **argv)
     }
     fread(s_mem + 0x100, 1, 0xFE00, f);
     fclose(f);
-    for (int i = 0; i < 4; i++) {
-        z80_rd[i] = z80_wr[i] = s_mem + i * 0x4000;
+    for (int i = 0; i < Z80_BANKS; i++) {
+        z80_rd[i] = z80_wr[i] = s_mem + i * (Z80_BANK_MASK + 1);
     }
+#if Z80_MSX
+    /* $FFFF through the machine, as an MSX's expanded slot has it */
+    z80_set_bus(&(z80_bus_t){ .read_special = special_read, .write_special = special_write });
+    z80_ffff_special = 1;
+#else
     z80_set_bus(&(z80_bus_t){ 0 });
+#endif
     z80_reset();
     z80.pc.w = 0x100;
     z80.sp.w = 0xF000;

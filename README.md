@@ -2,14 +2,14 @@
 
 <p align="center">
   <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7" and the M5Stack Tab5 (ESP32-P4).</b><br>
-  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128) and <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE).
+  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128), <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE), <a href="https://github.com/rlucencic/esp32msx">esp32msx</a> (MSX1, MSX2) and <a href="https://github.com/rlucencic/esp32gs">esp32gs</a> (Apple IIGS).
 </p>
 
 esp32emu is everything an emulator on these boards needs apart from the
 machine itself: the display and touch panel, the SD card, WiFi with the clock
 from the internet, Bluetooth keyboards and mice, a setup screen, a web page for
 disk images, a serial console for testing, and the CPU cores and chips the
-machines share: a 68000, a Z80, a 6502 and a uPD765 floppy controller. A machine
+machines share: a 68000, a Z80, a 6502, a 65C816 and a uPD765 floppy controller. A machine
 describes itself in one struct, and `emu_run()` does the rest, on either board:
 the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 
@@ -18,8 +18,9 @@ the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 | Component | What |
 |---|---|
 | `components/musashi` | The 68000 core: [Musashi](https://github.com/kstenerud/Musashi), evansm7's embedded fork, with static opcode tables (see its README) |
-| `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds, optionally reading unmapped banks through the machine (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
+| `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds, optionally reading unmapped banks through the machine, or with the MSX's memory (eight 8 KB banks and the subslot register at `$FFFF`) (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
 | `components/m6502` | The 6502 core (6510, 8502, disk drives, the Atari's 6502C): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing (the VIC-II's, or the Atari's ANTIC, whose DMA cycles on a line it skips from a table by itself); `test/` runs Klaus Dormann's functional test on a desktop |
+| `components/w65816` | The 65C816 core (the Apple IIGS): emulation and native mode, all 256 opcodes, decimal mode in both widths, memory through tables of 256-byte pages with the machine's callbacks for the rest, vectors from a bank of the machine's choosing; `test/` runs the SingleStepTests 65816 suite (5 million tests, bus cycles included) on a desktop |
 | `components/upd765` | The uPD765A floppy controller as the CPC and the Spectrum +3 wire it up, with DSK and extended DSK images |
 | `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console; on the Tab5 also the ESP32-C6 radio, the Tab5 Keyboard, battery charging and the real-time clock |
 | `components/fatfs` | ESP-IDF 5.5.4's FAT file system with exFAT turned on (from esp32_basic), so SD cards formatted exFAT (64 GB and up) work too |
@@ -57,7 +58,7 @@ idf.py -B build-tab5 -DIDF_TARGET=esp32p4 -DSDKCONFIG=build-tab5/sdkconfig -p PO
 ```
 
 Then `main` requires `emu`, and the machine's core requires `musashi`,
-`z80` or `m6502` (and `upd765` for DSK drives). The machine fills in an
+`z80`, `m6502` or `w65816` (and `upd765` for DSK drives). The machine fills in an
 `emu_machine_t` (`components/emu/include/emu/emu.h`):
 
 ```c

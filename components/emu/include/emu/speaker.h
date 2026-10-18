@@ -13,3 +13,8 @@ typedef int (*speaker_render_t)(int16_t *dst, int frames);
  * native USB port goes away. Tab5: the ES8388 codec.
  */
 bool speaker_start(int rate, speaker_render_t render, int volume);
+
+/* Frames the speaker had to make up so far (the machine was late: an
+ * underrun, heard as a small dropout)
+ */
+uint32_t speaker_missing_frames(void);

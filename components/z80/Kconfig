@@ -22,9 +22,20 @@ menu "Z80 core"
             A NULL read bank goes to the bus's read_special() (the
             Commodore 128's MMU maps by the page). Costs a test per read.
 
+    config Z80_MSX
+        bool "MSX memory: 8 KB banks and the slot register at $FFFF"
+        default n
+        select Z80_READ_SPECIAL
+        help
+            Eight 8 KB banks instead of four of 16 KB (MSX cartridges and
+            disk interfaces map 8 KB at a time), and while z80_ffff_special
+            is set, reads and writes of $FFFF (an expanded slot's
+            secondary slot register) go to the bus's read_special() and
+            write_special(). Costs a compare per access.
+
     config Z80_CONTENTION
         bool "Memory contention (ZX Spectrum)"
-        depends on Z80_TIMING_TSTATES
+        depends on Z80_TIMING_TSTATES && !Z80_MSX
         default n
         help
             Memory accesses to contended 16 KB banks wait as long as the

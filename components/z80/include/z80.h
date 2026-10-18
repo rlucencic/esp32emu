@@ -44,6 +44,17 @@
 #define Z80_CONTENTION 0
 #endif
 
+/* Memory banks: four of 16 KB, or with CONFIG_Z80_MSX eight of 8 KB */
+#ifdef CONFIG_Z80_MSX
+#define Z80_MSX         1
+#define Z80_BANK_SHIFT  13
+#else
+#define Z80_MSX         0
+#define Z80_BANK_SHIFT  14
+#endif
+#define Z80_BANKS       (65536 >> Z80_BANK_SHIFT)
+#define Z80_BANK_MASK   ((1 << Z80_BANK_SHIFT) - 1)
+
 typedef union {
     uint16_t w;
     struct {
@@ -71,12 +82,17 @@ extern z80_t z80;
 
 /* ---- The machine's side ---- */
 
-/* 16 KB banks as the CPU sees them; a NULL write bank goes to the bus's
- * write_special(), a NULL read bank (CONFIG_Z80_READ_SPECIAL) to
- * read_special()
+/* Banks as the CPU sees them (16 KB, or 8 KB with CONFIG_Z80_MSX); a NULL
+ * write bank goes to the bus's write_special(), a NULL read bank
+ * (CONFIG_Z80_READ_SPECIAL) to read_special()
  */
-extern uint8_t *z80_rd[4];
-extern uint8_t *z80_wr[4];
+extern uint8_t *z80_rd[Z80_BANKS];
+extern uint8_t *z80_wr[Z80_BANKS];
+
+#if Z80_MSX
+/* Set: $FFFF is the machine's (an expanded slot in page 3) */
+extern uint8_t z80_ffff_special;
+#endif
 
 typedef struct {
     /* I/O at time `at` of the current instruction (us or T-states) */
@@ -100,11 +116,11 @@ extern uint8_t z80_contended[4];
 static inline uint8_t z80_peek(uint16_t a)
 {
 #if Z80_READ_SPECIAL
-    if (z80_rd[a >> 14] == NULL) {
+    if (z80_rd[a >> Z80_BANK_SHIFT] == NULL) {
         return 0xFF;
     }
 #endif
-    return z80_rd[a >> 14][a & 0x3FFF];
+    return z80_rd[a >> Z80_BANK_SHIFT][a & Z80_BANK_MASK];
 }
 
 /* ---- Running ---- */

@@ -3,16 +3,19 @@
 ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 (Macintosh Plus/SE/Classic), `../esp32cpc` (Amstrad CPC and Plus),
 `../esp32zx` (ZX Spectrum 128K, +2, +3), `../esp32cbm` (Commodore 64 and
-128) and `../esp32xl` (Atari 800XL and 130XE) on two boards: the Makerfabs
+128), `../esp32xl` (Atari 800XL and 130XE), `../esp32msx` (MSX1, MSX2) and
+`../esp32gs` (Apple IIGS) on two boards: the Makerfabs
 MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
 (target esp32p4). It is a library: it isn't built on its own. Build and
 test through one of the projects (each has `EXTRA_COMPONENT_DIRS` pointing
 here). ESP-IDF v5.5.4, C. The 68000 machines use Musashi, the Z80 ones the
-Z80 core, the Commodores and the Atari XL the 6502 core (the C128 the Z80
-too); the CPC and the +3 share the uPD765.
+Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
+Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core; the
+CPC and the +3 share the uPD765.
 
-Changes here affect all six emulators on both boards: build all twelve after
-any change (only the components a project requires get built: MINIMAL_BUILD).
+Changes here affect all eight emulators on both boards: build all sixteen
+after any change (only the components a project requires get built:
+MINIMAL_BUILD).
 
 ## The two boards
 
@@ -51,7 +54,8 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
 | Path | What |
 |---|---|
 | `components/musashi/` | 68000 core (Musashi, evansm7 fork) + `m68kconf.h` with the `m68k_host_*()` hooks; `test/` host tests (`make -C components/musashi/test`) |
-| `components/z80/` | Z80 core (from the CPC): T-states with optional ZX contention, or CPC microseconds (menuconfig "Z80 core"); `Z80_READ_SPECIAL` sends reads of NULL banks to the bus (the C128's MMU); `test/` zexdoc/zexall host test for each build |
+| `components/z80/` | Z80 core (from the CPC): T-states with optional ZX contention, or CPC microseconds (menuconfig "Z80 core"); `Z80_READ_SPECIAL` sends reads of NULL banks to the bus (the C128's MMU); `Z80_MSX`: eight 8 KB banks (`Z80_BANK_SHIFT` 13) and accesses to `$FFFF` to `read_special`/`write_special` while `z80_ffff_special` is set (an expanded slot's subslot register); `test/` zexdoc/zexall host test for each build (`z80_test_msx` too) |
+| `components/w65816/` | 65C816 core (the IIGS): `rd`/`wr` tables of 65,536 page pointers, NULL to the bus callbacks (which may add `penalty` cycles and call `w65816_end_run()`); `vector_bank` (the IIGS reads vectors from its ROM, bank $FF); the code page cached as a pointer (`refill()`); helpers left to the compiler and `-Os` (forced inline it was 72 KB, twice the S3's instruction cache: ~850 cycles an instruction); `test/`: SingleStepTests (`ssts`), interrupts (`irq`), run against step (`diff`), `speed` |
 | `components/m6502/` | 6502 core (from the Commodore): every bus cycle, all 256 opcodes, several CPUs at once, `m6502_run()` to the machine's next event; stalls from `stall_from` (reads only, or writes too with `stall_writes`: the Atari's HALT), and for the Atari's ANTIC tables of a line's busy and free cycles (`dma_free`, `dma_busy`, `dma_base`, `dma_len`, `dma_stop`) that it skips by itself, calling `bus.stall()` only past them or at `dma_stop` (WSYNC); `linker.lf` keeps its jump table in internal RAM; `test/` Klaus Dormann's functional test and an opcode cycle table (`make -C components/m6502/test`) |
 | `components/upd765/` | uPD765A floppy controller with DSK/EDSK images (CPC, +3) |
 | `components/emu/include/emu/emu.h` | The machine interface (`emu_machine_t`) and runtime API |
@@ -89,7 +93,12 @@ any change (only the components a project requires get built: MINIMAL_BUILD).
   the old choices back and starts again. A `live` choice (the ST's CPU
   speed, Tab5 only) changes the machine as it's set, no restart; `set()` may run on
   another task, so the machine picks the value up between frames. Three
-  choice rows fit closer (`tight` in setup_ui.c).
+  choice rows fit closer (`tight` in setup_ui.c). The buttons share 560
+  pixels; a row with a single button (the IIGS's memory on the MaTouch,
+  shown but not choosable) gets one button's width in a row of four (140).
+- Sound: the speaker's task counts the frames it had to make up when the
+  machine was late (`speaker_missing_frames()`: dropouts heard as
+  artefacts); the IIGS shows it with `i`.
 - Inputs arrive from other tasks: `hid_key(usage, pressed)` (modifiers as
   usages $E0-$E7, each side separately), `hid_mouse(dx, dy, buttons)`,
   `touch(x, y, pressed)` in machine screen pixels (only if the machine sets

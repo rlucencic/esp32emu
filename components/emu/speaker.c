@@ -27,6 +27,7 @@
 static const char *TAG = "speaker";
 static speaker_render_t s_render;
 static int32_t s_volume;
+static volatile uint32_t s_missing;     /* frames the machine didn't have in time */
 
 #if CONFIG_IDF_TARGET_ESP32P4
 
@@ -103,6 +104,9 @@ static void speaker_task(void *arg)
 
     for (;;) {
         int n = s_render(buf, CHUNK_FRAMES);
+        if (n < CHUNK_FRAMES) {
+            s_missing += CHUNK_FRAMES - n;
+        }
         /* Underrun: hold the last sample rather than click to zero */
         for (int i = n; i < CHUNK_FRAMES; i++) {
             buf[i * 2] = n ? buf[(n - 1) * 2] : 0;
@@ -113,6 +117,11 @@ static void speaker_task(void *arg)
         }
         output_write(buf, sizeof(buf));
     }
+}
+
+uint32_t speaker_missing_frames(void)
+{
+    return s_missing;
 }
 
 bool speaker_start(int rate, speaker_render_t render, int volume)
