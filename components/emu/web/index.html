@@ -30,6 +30,7 @@
   #log li { padding: 4px 0; color: var(--dim); }
   #log li.ok { color: var(--ok); }
   #log li.bad { color: var(--bad); }
+  #log .bar { max-width: 420px; }
   h2 {
     display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap;
     font-size: 18px; font-weight: 600; margin: 32px 0 12px;
@@ -241,15 +242,47 @@ async function refresh() {
   }
 }
 
+/* A PUT that reports how much of the body has gone: onProgress(sent).
+ * (fetch() can't tell about an upload's progress; XMLHttpRequest can.) */
+function put(url, body, onProgress) {
+  return new Promise((resolve, reject) => {
+    const x = new XMLHttpRequest();
+    x.open("PUT", url);
+    x.upload.onprogress = e => onProgress(e.loaded);
+    x.onload = () => x.status >= 200 && x.status < 300 ? resolve(x.responseText)
+                                                        : reject(new Error(x.responseText || "HTTP " + x.status));
+    x.onerror = () => reject(new Error("the board does not answer"));
+    x.send(body);
+  });
+}
+
 async function upload(name, data) {
   const bytes = data.byteLength ?? data.size;
   if (info.disks.max_upload && bytes > info.disks.max_upload) {
     log(name + ": too big (" + size(bytes) + ", at most " + size(info.disks.max_upload) + ")", "bad");
     return;
   }
-  const line = log("Sending " + name + " …");
+  /* The line: how far, how fast, how long still; then the board saves it */
+  const line = log("");
+  const text = document.createElement("span");
+  const progress = document.createElement("div");
+  const fill = document.createElement("i");
+  progress.className = "bar";
+  progress.append(fill);
+  line.append(text, progress);
+  const t0 = performance.now();
+  const show = sent => {
+    const secs = (performance.now() - t0) / 1000;
+    const rate = secs >= 1 && sent > 0 ? sent / secs : 0;
+    fill.style.width = (bytes ? Math.min(100, sent * 100 / bytes) : 100) + "%";
+    text.textContent = sent < bytes
+      ? `Sending ${name}: ${Math.floor(sent * 100 / bytes)}% (${size(sent)} of ${size(bytes)}` +
+        (rate ? `, ${size(rate)}/s, ${duration(Math.ceil((bytes - sent) / rate))} left)` : ")")
+      : `Sending ${name}: all ${size(bytes)} sent, the board is writing it to the SD card …`;
+  };
+  show(0);
   try {
-    await request("PUT", "/disks/" + encodeURIComponent(name), data);
+    await put("/disks/" + encodeURIComponent(name), data, show);
     line.textContent = name + " is on the board (" + size(bytes) + ")";
     line.className = "ok";
   } catch (e) {

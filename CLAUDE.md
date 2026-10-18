@@ -125,6 +125,11 @@ MINIMAL_BUILD).
   bytes, {isImage, log})})`, which returns `[{name, data}]` images: files
   with those extensions (also inside ZIP files) are converted in the browser,
   then uploaded as usual. The Mac uses it for StuffIt/BinHex archives.
+- Uploads from the page go through `XMLHttpRequest` (`put()` in index.html):
+  `fetch()` can't report an upload's progress. The log line shows the
+  percentage, rate and time left over a bar, then "writing it to the SD
+  card" until the board answers (the Tab5 takes the whole file into PSRAM
+  first). A 20 MB image to the Tab5: 0.5-1.9 MB/s.
 - Status: `status(j, EMU_STATUS_ROWS)` adds `emu_json_row()`s for the
   machine card, `status(j, EMU_STATUS_DRIVES)` adds `emu_json_drive()`s.
 - Presenter: `render_line()` at the machine's resolution, scaled to
