@@ -4,3 +4,4 @@ __pycache__/
 components/z80/test/build/
 components/m6502/test/build/
 components/w65816/test/build/
+components/emudbg/test/build/
