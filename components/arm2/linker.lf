@@ -1,0 +1,7 @@
+# The core's switch tables and its condition table in internal RAM, as the
+# 6502's and 6809's: from flash, through a data cache that the video keeps
+# flushing, the dispatch would cost a tenth of the emulation
+[mapping:arm2]
+archive: libarm2.a
+entries:
+    arm2 (noflash_data)

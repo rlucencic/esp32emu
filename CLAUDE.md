@@ -8,15 +8,15 @@ ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 a 6809 or 6309) on two boards: the Makerfabs
 MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
 (target esp32p4); and `../esp32mac2` (Macintosh LC and II, a 68020 and
-the II's 68881) and `../esp32mac3` (Macintosh LC II and LC III, a 68030
-with its MMU), the Tab5 only. It is a library: it isn't built on its own. Build and
+the II's 68881), `../esp32mac3` (Macintosh LC II and LC III, a 68030
+with its MMU) and `../esp32arc` (Acorn Archimedes, an ARM2), the Tab5 only. It is a library: it isn't built on its own. Build and
 test through one of the projects (each has `EXTRA_COMPONENT_DIRS` pointing
 here). ESP-IDF v5.5.4, C. The 68000 machines use Musashi (the LC and II
 as a 68020: `CONFIG_M68K_68020`, with `m68k_set_fpu()`; the LC II and LC
 III as a 68030: `CONFIG_M68K_68030`), the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
-Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core; the
-CPC and the +3 share the uPD765.
+Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core, the
+Archimedes the ARM2 core; the CPC and the +3 share the uPD765.
 
 Changes here affect all eight emulators on both boards: build all sixteen
 after any change (only the components a project requires get built:
@@ -68,8 +68,9 @@ MINIMAL_BUILD).
 | `components/w65816/` | 65C816 core (the IIGS): `rd`/`wr` tables of 65,536 page pointers, NULL to the bus callbacks (which may add `penalty` cycles and call `w65816_end_run()`); `vector_bank` (the IIGS reads vectors from its ROM, bank $FF); the code page cached as a pointer (`refill()`); helpers left to the compiler and `-Os` (forced inline it was 72 KB, twice the S3's instruction cache: ~850 cycles an instruction); `test/`: SingleStepTests (`ssts`), interrupts (`irq`), run against step (`diff`), `speed` |
 | `components/m6502/` | 6502 core (from the Commodore): every bus cycle, all 256 opcodes, several CPUs at once, `m6502_run()` to the machine's next event; stalls from `stall_from` (reads only, or writes too with `stall_writes`: the Atari's HALT), and for the Atari's ANTIC tables of a line's busy and free cycles (`dma_free`, `dma_busy`, `dma_base`, `dma_len`, `dma_stop`) that it skips by itself, calling `bus.stall()` only past them or at `dma_stop` (WSYNC); `linker.lf` keeps its jump table in internal RAM; `test/` Klaus Dormann's functional test and an opcode cycle table (`make -C components/m6502/test`) |
 | `components/m6809/` | 6809 and 6309 core (the CoCo): instruction level with each instruction's documented cycles (the 6809's, the 6309's in emulation or native mode), all of the 6309 (E F W Q V MD, native mode stacking W, FIRQ with FM, TFM, the bit and register-register instructions, DIVD/DIVQ/MULD, the traps at `$FFF0`), the 6809's undocumented opcodes as commonly described; memory through 256-byte `rd`/`wr` pages (NULL: the bus callbacks), IRQ/FIRQ levels, NMI edges (armed once S is loaded), HALT, CWAI/SYNC; `M6809_HOST_HOOK` for host tracing; `linker.lf` keeps its jump tables in internal RAM; disassembler and debugger adapter; `test/`: table-driven cases and every opcode's cycles and length against the data sheet (`make -C components/m6809/test test`) |
+| `components/arm2/` | ARM2 core (the Archimedes): ARMv2 with the 26-bit PC/PSR in R15, the four modes' banked registers, exceptions and aborts, LDM/STM with ^, LDRT/STRT, rotated unaligned LDR (not LDM), SWP for an ARM250/ARM3 (`swp`), coprocessor instructions to the machine; memory through a table of 4 KB pages (host address + access bits: user/privileged read/write, slow, watched), the rest to the bus callbacks (which may abort, add wait states to `left`, call `arm2_end_run()`: the run then ends with the ticks it used); time in memory-clock ticks (S 1, N 2, I 1; `slow_s`/`slow_n` for ROM). `arm2_run()` is a threaded interpreter: one 4096-entry label table on bits 31-20 (the AL row a handler per data processing opcode and operand form, LDR/STR by size and offset, LDM/STM, B/BL; the other conditions through `cond_mask`, kept as the flags change; NV skipped), the PC, ticks and the fast page (`run_t.page`: the PC's, or ~0 while an interrupt is pending or the debugger is on) in registers, written back around callbacks; `ARM2_HOST_HOOK` for host tracing; `linker.lf` keeps its tables in internal RAM (the label table is 16 KB); disassembler (RISC OS style) and debugger adapter (`arch` "arm2", 26-bit addresses mapped by page); `test/`: `cases` (190), `diff.py` against Unicorn, `bench` (`make -C components/arm2/test test`; host MIPS don't predict the Tab5, see esp32arc's lessons) |
 | `components/upd765/` | uPD765A floppy controller with DSK/EDSK images (CPC, +3) |
-| `components/emudbg/` | The debugger for programs in the machines (`docs/debugger.md`, the VS Code extension `../esp32emu-vscode`): `emudbg.c` the protocol, breakpoints and steps (platform independent), `emudbg_freertos.c` the board's TCP server (port 6502, core 0), `emudbg_posix.c` the host builds' (`<M>_DEBUG=<port>`, `emudbg_host_run()`); `test/`: `dbg_test` (the commands and steps against the 6502 and Z80 cores) and `demo`, a bare 6502 or Z80 with RAM serving the debugger (the extension's tests run against it). The cores' adapters: `m6502_dbg.c`, `z80_dbg.c`, `w65816_dbg.c`, `m6809/m6809_dbg.c`, `musashi/m68k_dbg.c` |
+| `components/emudbg/` | The debugger for programs in the machines (`docs/debugger.md`, the VS Code extension `../esp32emu-vscode`): `emudbg.c` the protocol, breakpoints and steps (platform independent), `emudbg_freertos.c` the board's TCP server (port 6502, core 0), `emudbg_posix.c` the host builds' (`<M>_DEBUG=<port>`, `emudbg_host_run()`); `test/`: `dbg_test` (the commands and steps against the 6502 and Z80 cores) and `demo`, a bare 6502 or Z80 with RAM serving the debugger (the extension's tests run against it). The cores' adapters: `m6502_dbg.c`, `z80_dbg.c`, `w65816_dbg.c`, `m6809/m6809_dbg.c`, `musashi/m68k_dbg.c`, `arm2/arm2_dbg.c` |
 | `components/emu/include/emu/emu.h` | The machine interface (`emu_machine_t`) and runtime API |
 | `components/emu/emu.c` | Boot order, emulation task (core 1), presenter, stats, temperature, supervisor (touch: setup corner and machine touches), pausing |
 | `components/emu/setup_ui.c` | LVGL setup screen (status, WiFi, password, Bluetooth, pairing, drives, images) |
@@ -162,7 +163,7 @@ MINIMAL_BUILD).
 
 - Debugger (`emudbg.h`): the machine core (not `main/`, so the host build
   has it too) fills an `emudbg_machine_t` with its CPUs (`emudbg_cpu_t`: a
-  name, the core's adapter `emudbg_arch_6502`/`_z80`/`_65c816`/`_68000`/`_6809`,
+  name, the core's adapter `emudbg_arch_6502`/`_z80`/`_65c816`/`_68000`/`_6809`/`_arm2`,
   the core's state, peek/poke when the core can't see memory by itself:
   the 68000s, the C128's Z80, the IIGS's shadowed RAM), `where()` (frame,
   line, cycle), `reset`, `screen`/`render_line`, `type`, and calls
@@ -329,7 +330,7 @@ MINIMAL_BUILD).
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, and `esp32emu-vscode` (the debugger's VS Code
+`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, `esp32arc`, and `esp32emu-vscode` (the debugger's VS Code
 extension, TypeScript: `npm test`, `npm run test:host` against the demo
 machine, `npm run test:vscode` inside VS Code). The
 user pushes straight to `main`; commit messages end with the

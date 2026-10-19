@@ -2,14 +2,14 @@
 
 <p align="center">
   <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7" and the M5Stack Tab5 (ESP32-P4).</b><br>
-  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128), <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE), <a href="https://github.com/rlucencic/esp32msx">esp32msx</a> (MSX1, MSX2), <a href="https://github.com/rlucencic/esp32gs">esp32gs</a> (Apple IIGS), <a href="https://github.com/rlucencic/esp32coco">esp32coco</a> (Tandy Color Computer 2, 3), <a href="https://github.com/rlucencic/esp32mac2">esp32mac2</a> (Macintosh LC and II, Tab5 only) and <a href="https://github.com/rlucencic/esp32mac3">esp32mac3</a> (Macintosh LC II and LC III, Tab5 only).
+  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128), <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE), <a href="https://github.com/rlucencic/esp32msx">esp32msx</a> (MSX1, MSX2), <a href="https://github.com/rlucencic/esp32gs">esp32gs</a> (Apple IIGS), <a href="https://github.com/rlucencic/esp32coco">esp32coco</a> (Tandy Color Computer 2, 3), <a href="https://github.com/rlucencic/esp32mac2">esp32mac2</a> (Macintosh LC and II, Tab5 only), <a href="https://github.com/rlucencic/esp32mac3">esp32mac3</a> (Macintosh LC II and LC III, Tab5 only) and <a href="https://github.com/rlucencic/esp32arc">esp32arc</a> (Acorn Archimedes, Tab5 only).
 </p>
 
 esp32emu is everything an emulator on these boards needs apart from the
 machine itself: the display and touch panel, the SD card, WiFi with the clock
 from the internet, Bluetooth keyboards and mice, a setup screen, a web page for
 disk images, a serial console for testing, and the CPU cores and chips the
-machines share: a 68000 (or 68020), a Z80, a 6502, a 65C816 and a uPD765 floppy controller. A machine
+machines share: a 68000 (or 68020), a Z80, a 6502, a 65C816, a 6809, an ARM2 and a uPD765 floppy controller. A machine
 describes itself in one struct, and `emu_run()` does the rest, on either board:
 the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 
@@ -22,6 +22,7 @@ the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 | `components/m6502` | The 6502 core (6510, 8502, disk drives, the Atari's 6502C): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing (the VIC-II's, or the Atari's ANTIC, whose DMA cycles on a line it skips from a table by itself); `test/` runs Klaus Dormann's functional test on a desktop |
 | `components/w65816` | The 65C816 core (the Apple IIGS): emulation and native mode, all 256 opcodes, decimal mode in both widths, memory through tables of 256-byte pages with the machine's callbacks for the rest, vectors from a bank of the machine's choosing; `test/` runs the SingleStepTests 65816 suite (5 million tests, bus cycles included) on a desktop |
 | `components/m6809` | The 6809 and 6309 core (the CoCo): each instruction's documented cycles, all of the 6309 (its registers, native mode, the new instructions, its traps), memory through tables of 256-byte pages with the machine's callbacks for the rest, HALT for disk controllers; `test/` checks table-driven cases and every opcode's cycles and length against the data sheet on a desktop |
+| `components/arm2` | The ARM2 core (the Acorn Archimedes): the 26-bit ARM with its modes, banked registers, exceptions and aborts, timed in the machine's memory cycles, memory through a table of 4 KB pages with the machine's callbacks for the rest; a threaded interpreter keeping its state in registers; `test/` checks hand-written cases and random instructions against [Unicorn](https://www.unicorn-engine.org) on a desktop |
 | `components/upd765` | The uPD765A floppy controller as the CPC and the Spectrum +3 wire it up, with DSK and extended DSK images |
 | `components/emudbg` | The debugger for the programs in the machines: breakpoints, steps, registers, memory, disassembly and the screen of every emulated CPU over TCP, for the [VS Code extension](https://github.com/rlucencic/esp32emu-vscode) (protocol: [`docs/debugger.md`](docs/debugger.md)); also in the machines' desktop builds |
 | `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console; on the Tab5 also the ESP32-C6 radio, USB keyboards and mice, the Tab5 Keyboard, battery charging and the real-time clock |
@@ -60,7 +61,7 @@ idf.py -B build-tab5 -DIDF_TARGET=esp32p4 -DSDKCONFIG=build-tab5/sdkconfig -p PO
 ```
 
 Then `main` requires `emu`, and the machine's core requires `musashi`,
-`z80`, `m6502`, `w65816` or `m6809` (and `upd765` for DSK drives). The machine fills in an
+`z80`, `m6502`, `w65816`, `m6809` or `arm2` (and `upd765` for DSK drives). The machine fills in an
 `emu_machine_t` (`components/emu/include/emu/emu.h`):
 
 ```c

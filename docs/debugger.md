@@ -42,12 +42,12 @@ and written at any time.
 
 | Command | Answer | |
 |---|---|---|
-| `hello` | `protocol`, `machine`, `state`, `frame`, `cpus`, `stop` | `cpus`: `[{"name":"6502","arch":"6502","addr_bits":16,"regs":[{"name":"PC","bits":16,"flags":1},...]}]`. Register flags: 1 the program counter, 2 the stack pointer, 4 a status register (`flag_names`, one letter per bit, MSB first, `-` unused), 8 read only. `arch`: `6502`, `65c816`, `z80`, `68000` |
+| `hello` | `protocol`, `machine`, `state`, `frame`, `cpus`, `stop` | `cpus`: `[{"name":"6502","arch":"6502","addr_bits":16,"regs":[{"name":"PC","bits":16,"flags":1},...]}]`. Register flags: 1 the program counter, 2 the stack pointer, 4 a status register (`flag_names`, one letter per bit, MSB first, `-` unused), 8 read only. `arch`: `6502`, `65c816`, `z80`, `68000`, `6809`, `arm2` (`addr_bits` 26; the PSR is its own register, the PC without it) |
 | `state` | `state`, `frame`, `stop` | `state`: `none` (no machine: the setup screen before the start), `running`, `stopped`, `paused` (the setup screen). `stop`: `{"reason","cpu","pc"}` while stopped |
 | `pause` | | Stops at the next instruction of any CPU. If none runs for 3 frames (WAI, STOP, HALT with interrupts off), it stops between frames instead |
 | `continue` | | |
 | `step <cpu>` | | One instruction of that CPU. An interrupt that comes first runs through: the stop is never inside a handler that the step didn't call |
-| `next <cpu>` | | `step`, but over a call (`JSR` `JSL` `CALL` `RST` `BSR` `TRAP`, line A/F): it stops once a return takes the stack back to where it was. Calls with their parameters inline (ProDOS MLI, `PRIMM`, GS/OS) work |
+| `next <cpu>` | | `step`, but over a call (`JSR` `JSL` `CALL` `RST` `BSR` `TRAP`, line A/F, `BL` `SWI`): it stops once a return takes the stack back to where it was. Calls with their parameters inline (ProDOS MLI, `PRIMM`, GS/OS) work |
 | `out <cpu>` | | Runs until a return takes the stack above where it is now |
 | `frames <n>` | | Runs n frames and stops between frames (reason `frames`). Useful after a reset, to let the machine start up |
 | `reset [stop]` | | A cold reset at the end of the frame; with `stop` the machine stops at the first instruction |

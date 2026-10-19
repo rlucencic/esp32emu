@@ -64,10 +64,10 @@ typedef enum {
     EMUDBG_INSN_RETURN,                 /* RTS, RTL, RTI, RET, RETI, RTE: step out stops after one */
 } emudbg_insn_t;
 
-/* A CPU core's side (m6502_dbg.c, z80_dbg.c, w65816_dbg.c, m68k_dbg.c) */
+/* A CPU core's side (m6502_dbg.c, z80_dbg.c, w65816_dbg.c, m68k_dbg.c, arm2_dbg.c) */
 typedef struct {
-    const char *arch;                   /* "6502", "65c816", "z80", "68000" */
-    uint8_t addr_bits;                  /* 16 or 24 */
+    const char *arch;                   /* "6502", "65c816", "z80", "68000", "6809", "arm2" */
+    uint8_t addr_bits;                  /* 16, 24 or 26 (the ARM2: maps by page, as 24) */
     const emudbg_reg_t *regs;
     int reg_count;
     uint32_t (*get_reg)(emudbg_cpu_t *cpu, int reg);
@@ -184,6 +184,7 @@ extern const emudbg_arch_t emudbg_arch_6809;   /* m6809: core = m6809_t * (6809 
 extern const emudbg_arch_t emudbg_arch_65c816; /* w65816: core = w65816_t * */
 extern const emudbg_arch_t emudbg_arch_z80;    /* z80 (one, global) */
 extern const emudbg_arch_t emudbg_arch_68000;  /* musashi (one, global): the machine gives peek and poke */
+extern const emudbg_arch_t emudbg_arch_arm2;   /* arm2: core = arm2_t * */
 
 /* Before the instruction at pc (the core's registers are in its state):
  * may block until the debugger lets the machine go on, and may have
