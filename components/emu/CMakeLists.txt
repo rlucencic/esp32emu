@@ -8,7 +8,10 @@ if(IDF_TARGET STREQUAL "esp32p4")
     list(APPEND srcs "lcd_tab5.c" "tab5.c" "tab5_keyboard.c")
     set(board_requires espressif__m5stack_tab5 espressif__esp_lcd_touch espressif__esp_io_expander
                        espressif__esp_codec_dev espressif__esp_hosted espressif__esp_wifi_remote
-                       esp_driver_ppa esp_mm)
+                       espressif__usb_host_hid esp_driver_ppa esp_mm)
+    if(CONFIG_EMU_USB_HID)
+        list(APPEND srcs "usb_hid.c")
+    endif()
 else()
     list(APPEND srcs "lcd.c")
 endif()

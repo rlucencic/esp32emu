@@ -30,3 +30,9 @@ void emu_ui_run(uint16_t *fb, bool running, emu_ui_result_t *result);
 /* console.c, web.c */
 void emu_console_start(uint16_t *lcd_fb);
 void emu_web_start(void);
+
+/* usb_hid.c (the Tab5): USB keyboards and mice, the same callbacks as
+ * Bluetooth's; the number connected now
+ */
+bool usb_hid_start(void (*key)(uint8_t usage, bool pressed), void (*mouse)(int dx, int dy, uint8_t buttons));
+int usb_hid_connected(void);

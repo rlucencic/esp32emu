@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7" and the M5Stack Tab5 (ESP32-P4).</b><br>
-  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128), <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE), <a href="https://github.com/rlucencic/esp32msx">esp32msx</a> (MSX1, MSX2), <a href="https://github.com/rlucencic/esp32gs">esp32gs</a> (Apple IIGS), <a href="https://github.com/rlucencic/esp32mac2">esp32mac2</a> (Macintosh LC and II, Tab5 only) and <a href="https://github.com/rlucencic/esp32mac3">esp32mac3</a> (Macintosh LC II and LC III, Tab5 only).
+  Used by <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128), <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE), <a href="https://github.com/rlucencic/esp32msx">esp32msx</a> (MSX1, MSX2), <a href="https://github.com/rlucencic/esp32gs">esp32gs</a> (Apple IIGS), <a href="https://github.com/rlucencic/esp32coco">esp32coco</a> (Tandy Color Computer 2, 3), <a href="https://github.com/rlucencic/esp32mac2">esp32mac2</a> (Macintosh LC and II, Tab5 only) and <a href="https://github.com/rlucencic/esp32mac3">esp32mac3</a> (Macintosh LC II and LC III, Tab5 only).
 </p>
 
 esp32emu is everything an emulator on these boards needs apart from the
@@ -21,9 +21,10 @@ the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 | `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds, optionally reading unmapped banks through the machine, or with the MSX's memory (eight 8 KB banks and the subslot register at `$FFFF`) (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
 | `components/m6502` | The 6502 core (6510, 8502, disk drives, the Atari's 6502C): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing (the VIC-II's, or the Atari's ANTIC, whose DMA cycles on a line it skips from a table by itself); `test/` runs Klaus Dormann's functional test on a desktop |
 | `components/w65816` | The 65C816 core (the Apple IIGS): emulation and native mode, all 256 opcodes, decimal mode in both widths, memory through tables of 256-byte pages with the machine's callbacks for the rest, vectors from a bank of the machine's choosing; `test/` runs the SingleStepTests 65816 suite (5 million tests, bus cycles included) on a desktop |
+| `components/m6809` | The 6809 and 6309 core (the CoCo): each instruction's documented cycles, all of the 6309 (its registers, native mode, the new instructions, its traps), memory through tables of 256-byte pages with the machine's callbacks for the rest, HALT for disk controllers; `test/` checks table-driven cases and every opcode's cycles and length against the data sheet on a desktop |
 | `components/upd765` | The uPD765A floppy controller as the CPC and the Spectrum +3 wire it up, with DSK and extended DSK images |
 | `components/emudbg` | The debugger for the programs in the machines: breakpoints, steps, registers, memory, disassembly and the screen of every emulated CPU over TCP, for the [VS Code extension](https://github.com/rlucencic/esp32emu-vscode) (protocol: [`docs/debugger.md`](docs/debugger.md)); also in the machines' desktop builds |
-| `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console; on the Tab5 also the ESP32-C6 radio, the Tab5 Keyboard, battery charging and the real-time clock |
+| `components/emu` | The runtime: tasks and pacing, LCD presenter, touch, SD card, WiFi + NTP, BLE HID host, LVGL setup screen, web server, disk image manager, serial console; on the Tab5 also the ESP32-C6 radio, USB keyboards and mice, the Tab5 Keyboard, battery charging and the real-time clock |
 | `components/fatfs` | ESP-IDF 5.5.4's FAT file system with exFAT turned on (from esp32_basic), so SD cards formatted exFAT (64 GB and up) work too |
 | `components/esp_lcd` | ESP-IDF 5.5.4's LCD drivers with one fix in the RGB panel's (the MaTouch): after refill interrupts were held off (a flash write, a busy core), the picture could stay shifted by 10 lines with artefacts until a restart; now it's back in step at the next frame |
 | `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings, loaded after a project's own when it builds for `esp32p4` |
@@ -59,7 +60,7 @@ idf.py -B build-tab5 -DIDF_TARGET=esp32p4 -DSDKCONFIG=build-tab5/sdkconfig -p PO
 ```
 
 Then `main` requires `emu`, and the machine's core requires `musashi`,
-`z80`, `m6502` or `w65816` (and `upd765` for DSK drives). The machine fills in an
+`z80`, `m6502`, `w65816` or `m6809` (and `upd765` for DSK drives). The machine fills in an
 `emu_machine_t` (`components/emu/include/emu/emu.h`):
 
 ```c
@@ -99,6 +100,7 @@ panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
 | Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, with a progress bar: how far, how fast, how long still; ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks (a machine can add a script that turns other files into images in the browser, e.g. the Mac's StuffIt archives) |
 | Console | Native USB port (MaTouch: the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, plus the machine's own commands |
 | Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages. On the Tab5 the radio is its ESP32-C6, through esp_hosted |
+| USB keyboard and mouse | Tab5: on its USB-A port (boot protocol), plugged in at any time; keys and motion arrive like a Bluetooth keyboard's and mouse's |
 | Tab5 Keyboard | M5Stack's keyboard for the Tab5 (Ext.Port1), found at start-up; its keys arrive like a Bluetooth keyboard's |
 | Debugger | TCP port 6502, announced over mDNS: debug the program the machine runs from VS Code ([esp32emu-vscode](https://github.com/rlucencic/esp32emu-vscode)), with source lines, breakpoints, steps, registers, memory and the screen. Every CPU of the machine stops between two instructions; without a client the cores test one pointer per instruction |
 
@@ -158,7 +160,7 @@ such as the network name):
 | Radio | built in | an ESP32-C6, over SDIO (esp_hosted) |
 | Sound | MAX98357A amplifier | ES8388 codec and amplifier |
 | Storage | microSD (1-bit) | microSD (4-bit) |
-| Keyboard | Bluetooth | Bluetooth, or the Tab5 Keyboard |
+| Keyboard | Bluetooth | Bluetooth, USB, or the Tab5 Keyboard |
 | Pins | `components/emu/include/emu/board_matouch7.h` | Espressif's `m5stack_tab5` BSP, `board_tab5.h` |
 
 On the Tab5 the runtime draws a 1280×720 landscape picture and the P4's PPA

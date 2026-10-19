@@ -45,8 +45,10 @@
 #define PAD                 SX(32)
 #if BOARD_LCD_V_RES >= 720
 #define FONT_BIG            lv_font_montserrat_34
+#define FONT_NOTE           lv_font_montserrat_24
 #else
 #define FONT_BIG            lv_font_montserrat_28
+#define FONT_NOTE           lv_font_montserrat_14
 #endif
 
 #define COLOR_BG            lv_color_hex(0x10141C)
@@ -176,6 +178,47 @@ static lv_obj_t *add_row(lv_obj_t *list, const char *icon, const char *text)
     return b;
 }
 
+/* A button named "first\nsecond" shows the second line smaller, as a note
+ * under the first (the Macs' colours under their monitors): the matrix's
+ * label for both lines makes way for one label each, around its centre
+ */
+static void choice_draw_task(lv_event_t *e)
+{
+    lv_draw_task_t *t = lv_event_get_draw_task(e);
+    lv_draw_label_dsc_t *ld = lv_draw_task_get_label_dsc(t);
+    if (ld == NULL || ld->base.part != LV_PART_ITEMS || ld->text == NULL) {
+        return;
+    }
+    const char *nl = strchr(ld->text, '\n');
+    if (nl == NULL) {
+        return;
+    }
+    char first[64];
+    snprintf(first, sizeof(first), "%.*s", (int)(nl - ld->text), ld->text);
+    lv_draw_label_dsc_t line[2] = { *ld, *ld };
+    line[0].text = first;
+    line[1].text = nl + 1;
+    line[1].font = &FONT_NOTE;
+    line[1].opa = ld->opa * 3 / 4;
+    ld->opa = LV_OPA_TRANSP;
+
+    lv_area_t a;
+    lv_draw_task_get_area(t, &a);
+    int32_t cx = (a.x1 + a.x2) / 2;
+    int32_t y = (a.y1 + a.y2 + 1) / 2 -
+                (lv_font_get_line_height(line[0].font) + lv_font_get_line_height(line[1].font)) / 2;
+    for (int i = 0; i < 2; i++) {
+        lv_point_t size;
+        lv_text_get_size(&size, line[i].text, line[i].font, line[i].letter_space, 0, LV_COORD_MAX,
+                         LV_TEXT_FLAG_NONE);
+        lv_area_t at = { cx - size.x / 2, y, cx - size.x / 2 + size.x, y + size.y - 1 };
+        line[i].text_local = 1;
+        line[i].align = LV_TEXT_ALIGN_CENTER;
+        lv_draw_label(ld->base.layer, &line[i], &at);
+        y += size.y;
+    }
+}
+
 /* A row's buttons, one checked. They share 560 pixels; a row with a single
  * one (the IIGS's memory on the MaTouch) gets a button's width in a row of
  * four
@@ -213,6 +256,8 @@ static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *co
     lv_obj_set_style_border_width(m, 0, 0);
     lv_obj_set_style_pad_all(m, 0, 0);
     lv_obj_add_event_cb(m, cb, LV_EVENT_VALUE_CHANGED, user_data);
+    lv_obj_add_flag(m, LV_OBJ_FLAG_SEND_DRAW_TASK_EVENTS);
+    lv_obj_add_event_cb(m, choice_draw_task, LV_EVENT_DRAW_TASK_ADDED, NULL);
     return m;
 }
 
@@ -816,7 +861,9 @@ static void build_disk_screens(void)
     };
     static const lv_event_cb_t cbs[3] = { insert_clicked, new_clicked, eject_clicked };
     static const int widths[3] = { 260, 300, 200 };
-    /* Four drives (the Spectrum's): the name and shorter buttons in one row */
+    /* Four drives (the Spectrum's): the name and shorter buttons in one row;
+     * five (the CoCo's) closer still
+     */
     static const char *const short_texts[3] = {
         LV_SYMBOL_DOWNLOAD "  Insert", LV_SYMBOL_PLUS "  New", LV_SYMBOL_EJECT "  Eject",
     };
@@ -825,20 +872,21 @@ static void build_disk_screens(void)
      * (sizes for 600 lines)
      */
     int n = ui.disks->drives;
-    int gap = 12;
+    int gap = n >= 5 ? 8 : 12;
     int card_h = (356 - (n - 1) * gap) / n;
     if (card_h > 160) {
         card_h = 160;
     }
     bool compact = card_h < 100;
-    int button_h = card_h >= 150 ? 72 : 56;
+    int pad = card_h >= 150 ? 16 : n >= 5 ? 6 : 10;
+    int button_h = card_h >= 150 ? 72 : n >= 5 ? card_h - 2 * pad - 4 : 56;
     for (int d = 0; d < n; d++) {
         lv_obj_t *card = lv_obj_create(s);
         lv_obj_set_size(card, lv_pct(100), SY(card_h));
         lv_obj_align(card, LV_ALIGN_TOP_LEFT, 0, SY(86 + d * (card_h + gap)));
         lv_obj_set_style_bg_color(card, COLOR_CARD, 0);
         lv_obj_set_style_border_width(card, 0, 0);
-        lv_obj_set_style_pad_all(card, SY(card_h >= 150 ? 16 : 10), 0);
+        lv_obj_set_style_pad_all(card, SY(pad), 0);
         lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 
         ui.drive_label[d] = lv_label_create(card);
@@ -846,7 +894,7 @@ static void build_disk_screens(void)
         lv_obj_set_style_text_font(ui.drive_label[d], &FONT_BIG, 0);
         if (compact) {
             int buttons = short_widths[0] + short_widths[1] + short_widths[2] + 2 * 12;
-            lv_obj_set_width(ui.drive_label[d], BOARD_LCD_H_RES - 2 * PAD - 2 * SY(10) - SX(buttons + 16));
+            lv_obj_set_width(ui.drive_label[d], BOARD_LCD_H_RES - 2 * PAD - 2 * SY(pad) - SX(buttons + 16));
             lv_obj_align(ui.drive_label[d], LV_ALIGN_LEFT_MID, 0, 0);
         } else {
             lv_obj_set_width(ui.drive_label[d], lv_pct(100));

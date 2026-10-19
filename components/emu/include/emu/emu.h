@@ -39,7 +39,8 @@ typedef enum {
  */
 typedef struct {
     const char *label;
-    const char *const *names;   /* button labels, ends with "" */
+    const char *const *names;   /* button labels, ends with ""; "a\nb": b smaller
+                                   under a ("640 x 480\nup to 256 colours") */
     int (*get)(void);
     void (*set)(int index);     /* also saves it */
     bool live;                  /* takes effect without a restart */

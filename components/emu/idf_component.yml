@@ -16,6 +16,12 @@ dependencies:
     require: private
     rules:
       - if: "target in [esp32p4]"
+  # USB keyboards and mice on its USB-A port (usb_hid.c)
+  espressif/usb_host_hid:
+    version: "~1.2.1"
+    require: private
+    rules:
+      - if: "target in [esp32p4]"
   espressif/esp_lcd_touch:
     version: "^1.2.1"
     require: private

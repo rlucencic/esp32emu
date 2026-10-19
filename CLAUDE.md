@@ -3,8 +3,9 @@
 ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 (Macintosh Plus/SE/Classic), `../esp32cpc` (Amstrad CPC and Plus),
 `../esp32zx` (ZX Spectrum 128K, +2, +3), `../esp32cbm` (Commodore 64 and
-128), `../esp32xl` (Atari 800XL and 130XE), `../esp32msx` (MSX1, MSX2) and
-`../esp32gs` (Apple IIGS) on two boards: the Makerfabs
+128), `../esp32xl` (Atari 800XL and 130XE), `../esp32msx` (MSX1, MSX2),
+`../esp32gs` (Apple IIGS) and `../esp32coco` (Tandy Color Computer 2 and 3,
+a 6809 or 6309) on two boards: the Makerfabs
 MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
 (target esp32p4); and `../esp32mac2` (Macintosh LC and II, a 68020 and
 the II's 68881) and `../esp32mac3` (Macintosh LC II and LC III, a 68030
@@ -42,7 +43,12 @@ MINIMAL_BUILD).
 - The board code: `include/emu/board.h` picks `board_matouch7.h` or
   `board_tab5.h`; `lcd.c` (RGB panel) or `lcd_tab5.c` (MIPI-DSI through the
   BSP); `touch.c`, `sdcard.c`, `speaker.c` have both; `tab5.c` (charging, the
-  C6, esp_hosted, the RTC) and `tab5_keyboard.c` only build for the Tab5.
+  C6, esp_hosted, the RTC), `tab5_keyboard.c` and `usb_hid.c` (USB keyboards
+  and mice on its USB-A port: the BSP's USB host, espressif/usb_host_hid in
+  boot protocol, the same callbacks as Bluetooth's; menuconfig
+  `EMU_USB_HID`) only build for the Tab5. The HID driver uses the managed
+  `espressif/usb` the BSP brings (on ESP-IDF 5.5 it stands in for the
+  IDF's `usb`); the USB-C console (USB-Serial-JTAG) keeps working.
 - `BOARD_LCD_H_RES` x `BOARD_LCD_V_RES` is the landscape picture everything
   draws (presenter, setup screen, `L` dumps, touches): 1024x600 or 1280x720.
   On the Tab5 `lcd_flush(y0, y1)` has the PPA turn those rows onto the
@@ -61,8 +67,9 @@ MINIMAL_BUILD).
 | `components/z80/` | Z80 core (from the CPC): T-states with optional ZX contention, or CPC microseconds (menuconfig "Z80 core"); `Z80_READ_SPECIAL` sends reads of NULL banks to the bus (the C128's MMU); `Z80_MSX`: eight 8 KB banks (`Z80_BANK_SHIFT` 13) and accesses to `$FFFF` to `read_special`/`write_special` while `z80_ffff_special` is set (an expanded slot's subslot register); `test/` zexdoc/zexall host test for each build (`z80_test_msx` too) |
 | `components/w65816/` | 65C816 core (the IIGS): `rd`/`wr` tables of 65,536 page pointers, NULL to the bus callbacks (which may add `penalty` cycles and call `w65816_end_run()`); `vector_bank` (the IIGS reads vectors from its ROM, bank $FF); the code page cached as a pointer (`refill()`); helpers left to the compiler and `-Os` (forced inline it was 72 KB, twice the S3's instruction cache: ~850 cycles an instruction); `test/`: SingleStepTests (`ssts`), interrupts (`irq`), run against step (`diff`), `speed` |
 | `components/m6502/` | 6502 core (from the Commodore): every bus cycle, all 256 opcodes, several CPUs at once, `m6502_run()` to the machine's next event; stalls from `stall_from` (reads only, or writes too with `stall_writes`: the Atari's HALT), and for the Atari's ANTIC tables of a line's busy and free cycles (`dma_free`, `dma_busy`, `dma_base`, `dma_len`, `dma_stop`) that it skips by itself, calling `bus.stall()` only past them or at `dma_stop` (WSYNC); `linker.lf` keeps its jump table in internal RAM; `test/` Klaus Dormann's functional test and an opcode cycle table (`make -C components/m6502/test`) |
+| `components/m6809/` | 6809 and 6309 core (the CoCo): instruction level with each instruction's documented cycles (the 6809's, the 6309's in emulation or native mode), all of the 6309 (E F W Q V MD, native mode stacking W, FIRQ with FM, TFM, the bit and register-register instructions, DIVD/DIVQ/MULD, the traps at `$FFF0`), the 6809's undocumented opcodes as commonly described; memory through 256-byte `rd`/`wr` pages (NULL: the bus callbacks), IRQ/FIRQ levels, NMI edges (armed once S is loaded), HALT, CWAI/SYNC; `M6809_HOST_HOOK` for host tracing; `linker.lf` keeps its jump tables in internal RAM; disassembler and debugger adapter; `test/`: table-driven cases and every opcode's cycles and length against the data sheet (`make -C components/m6809/test test`) |
 | `components/upd765/` | uPD765A floppy controller with DSK/EDSK images (CPC, +3) |
-| `components/emudbg/` | The debugger for programs in the machines (`docs/debugger.md`, the VS Code extension `../esp32emu-vscode`): `emudbg.c` the protocol, breakpoints and steps (platform independent), `emudbg_freertos.c` the board's TCP server (port 6502, core 0), `emudbg_posix.c` the host builds' (`<M>_DEBUG=<port>`, `emudbg_host_run()`); `test/`: `dbg_test` (the commands and steps against the 6502 and Z80 cores) and `demo`, a bare 6502 or Z80 with RAM serving the debugger (the extension's tests run against it). The cores' adapters: `m6502_dbg.c`, `z80_dbg.c`, `w65816_dbg.c`, `musashi/m68k_dbg.c` |
+| `components/emudbg/` | The debugger for programs in the machines (`docs/debugger.md`, the VS Code extension `../esp32emu-vscode`): `emudbg.c` the protocol, breakpoints and steps (platform independent), `emudbg_freertos.c` the board's TCP server (port 6502, core 0), `emudbg_posix.c` the host builds' (`<M>_DEBUG=<port>`, `emudbg_host_run()`); `test/`: `dbg_test` (the commands and steps against the 6502 and Z80 cores) and `demo`, a bare 6502 or Z80 with RAM serving the debugger (the extension's tests run against it). The cores' adapters: `m6502_dbg.c`, `z80_dbg.c`, `w65816_dbg.c`, `m6809/m6809_dbg.c`, `musashi/m68k_dbg.c` |
 | `components/emu/include/emu/emu.h` | The machine interface (`emu_machine_t`) and runtime API |
 | `components/emu/emu.c` | Boot order, emulation task (core 1), presenter, stats, temperature, supervisor (touch: setup corner and machine touches), pausing |
 | `components/emu/setup_ui.c` | LVGL setup screen (status, WiFi, password, Bluetooth, pairing, drives, images) |
@@ -70,6 +77,7 @@ MINIMAL_BUILD).
 | `components/emu/disks.c` | Disk image folder, drives, NVS memory of inserted disks, blank disks |
 | `components/emu/console.c` | Serial console (`include/emu/console.h` lists the commands), with `p`: a 20 kHz sampling profiler of core 1 |
 | `components/emu/ble_hid.c` | BLE HID host: pairing, reconnecting, reports -> HID usages |
+| `components/emu/usb_hid.c` | Tab5: USB keyboards and mice (boot protocol) on the USB-A port, the same callbacks as BLE's |
 | `components/emu/net.c` | WiFi station + SNTP |
 | `components/emu/lcd.c`, `lcd_tab5.c`, `touch.c`, `sdcard.c`, `speaker.c` | Board drivers; `include/emu/board.h` picks the board's header |
 | `components/emu/tab5.c`, `tab5_keyboard.c` | Tab5: battery charging, the ESP32-C6 (power, esp_hosted, its Bluetooth controller), the Tab5 Keyboard |
@@ -107,6 +115,15 @@ MINIMAL_BUILD).
   (NULL: the row's own names); the rows follow whenever a choice changes.
   It's a machine field, not an `emu_choice_t` one: the projects fill their
   choice rows positionally, and a new field there warns (-Wextra).
+- A button name with a `\n` gets a second, smaller line under the first
+  (`FONT_NOTE`: montserrat 24 on the Tab5, 14 on the MaTouch, both already
+  in every sdkconfig; at 3/4 of the text's opacity, readable on the checked
+  button's blue too): the Macs' Monitor buttons, "640 x 480\nup to 256
+  colours", their names per model from `choice_names()`. The button matrix
+  draws a button's text as one label, so `choice_draw_task()`
+  (`LV_EVENT_DRAW_TASK_ADDED`) makes that one transparent and draws a label
+  for each line around its centre. Names without one look as before. Two
+  lines fit a three-row card's rows (54 px, 64 on the Tab5: 30 + 27).
 - Sound: the speaker's task counts the frames it had to make up when the
   machine was late (`speaker_missing_frames()`: dropouts heard as
   artefacts); the IIGS shows it with `i`.
@@ -115,7 +132,9 @@ MINIMAL_BUILD).
   `touch(x, y, pressed)` in machine screen pixels (only if the machine sets
   it; the top-right setup corner is never forwarded).
 - Drives of different kinds (the CPC's floppies and cartridge slot): the
-  optional `disks_config_t.accepts(drive, name)` limits the setup screen's
+  up to 5 drives (`DISKS_MAX_DRIVES`; the CoCo's two floppies, hard disk,
+  tape and cartridge: the drives page lays out five closer, 4 or fewer as
+  before); optional `disks_config_t.accepts(drive, name)` limits the setup screen's
   image list for a drive, `takes_blank(drive)` its "New" button. The web
   page offers every drive; `insert()` refuses what doesn't fit.
 - Disk changes from the setup screen, web page and console run inside
@@ -143,7 +162,7 @@ MINIMAL_BUILD).
 
 - Debugger (`emudbg.h`): the machine core (not `main/`, so the host build
   has it too) fills an `emudbg_machine_t` with its CPUs (`emudbg_cpu_t`: a
-  name, the core's adapter `emudbg_arch_6502`/`_z80`/`_65c816`/`_68000`,
+  name, the core's adapter `emudbg_arch_6502`/`_z80`/`_65c816`/`_68000`/`_6809`,
   the core's state, peek/poke when the core can't see memory by itself:
   the 68000s, the C128's Z80, the IIGS's shadowed RAM), `where()` (frame,
   line, cycle), `reset`, `screen`/`render_line`, `type`, and calls
@@ -310,7 +329,7 @@ MINIMAL_BUILD).
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, and `esp32emu-vscode` (the debugger's VS Code
+`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, and `esp32emu-vscode` (the debugger's VS Code
 extension, TypeScript: `npm test`, `npm run test:host` against the demo
 machine, `npm run test:vscode` inside VS Code). The
 user pushes straight to `main`; commit messages end with the
@@ -338,7 +357,9 @@ and the cores.
 - The setup screen: hold the corner with `send "t 1010 12 2600"` (Tab5:
   `t 1265 15 2600`; pauses the machine), tap buttons with `t x y`, capture
   with `lcd`. Its status lines show the WiFi name, IP and time: cut them out
-  (PIL, in a scratch venv). MaTouch, up to two choice rows: rows 104-190
+  (PIL in a scratch venv, or ImageMagick: `magick in.png \( -clone 0 -crop
+  1280x124+0+0 \) \( -clone 0 -crop 1280x506+0+214 \) -delete 0 -append
+  +repage out.png`). MaTouch, up to two choice rows: rows 104-190
   (1024x514, the first buttons at y=112); three rows (closer): 104-180
   (1024x524); four rows: 104-170 (1024x534). Tab5, three rows: 124-214
   (1280x630). Taken before the

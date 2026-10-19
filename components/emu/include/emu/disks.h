@@ -12,7 +12,7 @@
  * started yet (emu_paused() does that).
  */
 
-#define DISKS_MAX_DRIVES    4
+#define DISKS_MAX_DRIVES    5           /* the CoCo's: two floppies, hard disk, tape, cartridge */
 #define DISKS_NAME_LEN      96
 
 typedef struct {

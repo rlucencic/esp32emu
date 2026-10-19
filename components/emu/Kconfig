@@ -63,6 +63,14 @@ menu "Emulator board"
             Connect a Bluetooth LE keyboard and mouse as the machine's.
             New devices pair when put into pairing mode.
 
+    config EMU_USB_HID
+        bool "USB keyboard and mouse (Tab5)"
+        default y
+        depends on IDF_TARGET_ESP32P4
+        help
+            Keyboards and mice on the Tab5's USB-A port (boot protocol), as
+            the machine's, besides Bluetooth ones.
+
     config EMU_MOUSE_DIVIDER
         int "Mouse speed divider"
         depends on EMU_BLE_HID

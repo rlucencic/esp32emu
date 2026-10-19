@@ -661,6 +661,9 @@ void emu_run(const emu_machine_t *machine)
 #if CONFIG_IDF_TARGET_ESP32P4
     tab5_keyboard_start(hid_key);
 #endif
+#if CONFIG_EMU_USB_HID
+    usb_hid_start(hid_key, hid_mouse);
+#endif
     (void)radio;
     xTaskCreatePinnedToCore(stats_task, "stats", 3072, NULL, 2, NULL, 0);
     xTaskCreatePinnedToCore(temperature_task, "temperature", 2560, NULL, 11,
