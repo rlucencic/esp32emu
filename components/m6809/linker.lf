@@ -1,0 +1,7 @@
+# The opcode switches' jump tables (and the core's other read-only data) in
+# internal RAM, as the 6502's: from flash, through a data cache that the
+# video keeps flushing, the dispatch would cost a tenth of the emulation
+[mapping:m6809]
+archive: libm6809.a
+entries:
+    m6809 (noflash_data)

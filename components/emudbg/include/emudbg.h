@@ -180,6 +180,7 @@ static inline bool emudbg_serve(int port) { (void)port; return false; }
 
 /* The cores' adapters (each in its core's component) */
 extern const emudbg_arch_t emudbg_arch_6502;   /* m6502: core = m6502_t * */
+extern const emudbg_arch_t emudbg_arch_6809;   /* m6809: core = m6809_t * (6809 or 6309) */
 extern const emudbg_arch_t emudbg_arch_65c816; /* w65816: core = w65816_t * */
 extern const emudbg_arch_t emudbg_arch_z80;    /* z80 (one, global) */
 extern const emudbg_arch_t emudbg_arch_68000;  /* musashi (one, global): the machine gives peek and poke */
