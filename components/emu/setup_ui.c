@@ -339,23 +339,25 @@ static void build_status_screen(void)
     snprintf(title, sizeof(title), LV_SYMBOL_HOME "  %s", ui.m->name);
     make_title(s, title);
 
+    /* Three rows of choices (and the lines around them) only fit closer,
+     * four closer still, five (the PC's) closest, in a taller card (down to
+     * just above the buttons)
+     */
+    bool tight = ui.m->choice_count >= 3, tighter = ui.m->choice_count >= 4;
+    bool tightest = ui.m->choice_count >= 5;
     lv_obj_t *card = lv_obj_create(s);
-    lv_obj_set_size(card, lv_pct(100), SY(380));
+    lv_obj_set_size(card, lv_pct(100), SY(tightest ? 398 : 380));
     lv_obj_align(card, LV_ALIGN_TOP_LEFT, 0, SY(56));
     lv_obj_set_style_bg_color(card, COLOR_CARD, 0);
     lv_obj_set_style_border_width(card, 0, 0);
-    /* Three rows of choices (and the lines around them) only fit closer,
-     * four closer still
-     */
-    bool tight = ui.m->choice_count >= 3, tighter = ui.m->choice_count >= 4;
-    lv_obj_set_style_pad_all(card, SY(tighter ? 18 : 24), 0);
+    lv_obj_set_style_pad_all(card, SY(tightest ? 12 : tighter ? 18 : 24), 0);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(card, SY(tighter ? 6 : tight ? 10 : 16), 0);
+    lv_obj_set_style_pad_row(card, SY(tightest ? 3 : tighter ? 6 : tight ? 10 : 16), 0);
 
     ui.wifi_label = lv_label_create(card);
     ui.time_label = lv_label_create(card);
 
-    ui.choice_height = tighter ? 46 : tight ? 54 : 60;
+    ui.choice_height = tightest ? 44 : tighter ? 46 : tight ? 54 : 60;
     for (int i = 0; i < ui.m->choice_count && i < EMU_UI_MAX_CHOICES; i++) {
         const emu_choice_t *c = &ui.m->choices[i];
         ui.choice_rows[i] = make_choice(card, c->label, choice_names(i), c->get(), ui.choice_height,

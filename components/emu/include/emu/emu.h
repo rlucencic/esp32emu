@@ -93,7 +93,9 @@ typedef struct {
     /* JavaScript for the web page, served as /machine.js (NULL: none): it can
      * call registerConverter({description, extensions, convert}) so that
      * dropped files with those extensions are turned into disk images in the
-     * browser (see web/index.html). Usually an EMBED_FILES start and end.
+     * browser, and registerPacker({description, pack}) so that the other
+     * files (loose, in dropped folders or in ZIP files) are put together on
+     * one (see web/index.html). Usually an EMBED_FILES start and end.
      */
     const char *web_script, *web_script_end;
 

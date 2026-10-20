@@ -118,9 +118,17 @@ int disks_list(char ***names)
     while (list != NULL && n < MAX_IMAGES && (e = readdir(dir)) != NULL) {
         if (e->d_type != DT_DIR && is_image(e->d_name)) {
             list[n] = strdup(e->d_name);
+        } else if (e->d_type == DT_DIR && s_cfg.folders && e->d_name[0] != '.' &&
+                   strlen(e->d_name) < DISKS_NAME_LEN - 2) {
+            list[n] = malloc(strlen(e->d_name) + 2);
             if (list[n] != NULL) {
-                n++;
+                sprintf(list[n], "%s/", e->d_name);
             }
+        } else {
+            continue;
+        }
+        if (list[n] != NULL) {
+            n++;
         }
     }
     closedir(dir);
@@ -214,6 +222,28 @@ bool disks_valid_name(const char *name)
         }
     }
     return true;
+}
+
+bool disks_can_insert(const char *name)
+{
+    if (disks_valid_name(name)) {
+        return true;
+    }
+    size_t len = strlen(name);
+    if (!s_cfg.folders || len < 2 || len >= DISKS_NAME_LEN - 1 || name[len - 1] != '/' || name[0] == '.') {
+        return false;
+    }
+    for (size_t i = 0; i + 1 < len; i++) {
+        unsigned char c = name[i];
+        if (c < 0x20 || strchr("/\\:*?\"<>|", c) != NULL) {
+            return false;
+        }
+    }
+    char path[sizeof(s_folder) + DISKS_NAME_LEN + 1];
+    struct stat st;
+    snprintf(path, sizeof(path), "%s/%s", s_folder, name);
+    path[strlen(path) - 1] = 0;
+    return stat(path, &st) == 0 && S_ISDIR(st.st_mode);
 }
 
 bool disks_in_use(const char *name)

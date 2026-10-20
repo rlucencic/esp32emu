@@ -4,7 +4,7 @@
  *   GET    /                    the page (web/index.html)
  *   GET    /machine.js          the machine's script for the page, if it has one
  *   GET    /api/info            machine name, drives, image kinds, blank disk sizes
- *   GET    /api/disks           {"ready", "free", "disks": [{"name", "size", "drive"}]}
+ *   GET    /api/disks           {"ready", "free", "disks": [{"name", "size", "drive"[, "folder"]}]}
  *   GET    /api/status          machine, drives, board and Bluetooth status
  *   PUT    /api/drive/<n>       insert the image named in the body into drive n
  *   DELETE /api/drive/<n>       eject drive n
@@ -203,8 +203,9 @@ static esp_err_t list_get(httpd_req_t *req)
     for (int i = 0; i < n; i++) {
         char path[160], item[256];
         struct stat st;
+        bool folder = names[i][0] && names[i][strlen(names[i]) - 1] == '/';
         disk_path(path, sizeof(path), names[i]);
-        long long size = stat(path, &st) == 0 ? (long long)st.st_size : 0;
+        long long size = !folder && stat(path, &st) == 0 ? (long long)st.st_size : 0;
         const char *drive = "";
         for (int d = 0; d < disks_config()->drives; d++) {
             if (disks_name(d) != NULL && strcmp(disks_name(d), names[i]) == 0) {
@@ -216,6 +217,9 @@ static esp_err_t list_get(httpd_req_t *req)
         emu_json_str(&j, "name", names[i]);
         emu_json_int(&j, "size", size);
         emu_json_str(&j, "drive", drive);
+        if (folder) {
+            emu_json_bool(&j, "folder", true);
+        }
         emu_json_end_object(&j);
         if (i) {
             httpd_resp_sendstr_chunk(req, ",");
@@ -372,7 +376,7 @@ static esp_err_t drive_put(httpd_req_t *req)
         return send_text(req, "400 Bad Request", "PUT /api/drive/<number> with a disk image name");
     }
     name[len] = 0;
-    if (!disks_valid_name(name)) {
+    if (!disks_can_insert(name)) {
         return send_text(req, "400 Bad Request", "Not a disk image name");
     }
     drive_op_t op = { d, name, false };

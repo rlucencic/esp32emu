@@ -4,8 +4,8 @@ ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 (Macintosh Plus/SE/Classic), `../esp32cpc` (Amstrad CPC and Plus),
 `../esp32zx` (ZX Spectrum 128K, +2, +3), `../esp32cbm` (Commodore 64 and
 128), `../esp32xl` (Atari 800XL and 130XE), `../esp32msx` (MSX1, MSX2),
-`../esp32gs` (Apple IIGS) and `../esp32coco` (Tandy Color Computer 2 and 3,
-a 6809 or 6309) on two boards: the Makerfabs
+`../esp32gs` (Apple IIGS), `../esp32coco` (Tandy Color Computer 2 and 3,
+a 6809 or 6309) and `../esp32pc` (IBM PC/XT, an 8088) on two boards: the Makerfabs
 MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
 (target esp32p4); and `../esp32mac2` (Macintosh LC and II, a 68020 and
 the II's 68881), `../esp32mac3` (Macintosh LC II and LC III, a 68030
@@ -16,7 +16,7 @@ as a 68020: `CONFIG_M68K_68020`, with `m68k_set_fpu()`; the LC II and LC
 III as a 68030: `CONFIG_M68K_68030`), the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
 Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core, the
-Archimedes the ARM2 core; the CPC and the +3 share the uPD765.
+Archimedes the ARM2 core, the PC the x86 core; the CPC and the +3 share the uPD765.
 
 Changes here affect all eight emulators on both boards: build all sixteen
 after any change (only the components a project requires get built:
@@ -69,10 +69,12 @@ MINIMAL_BUILD).
 | `components/m6502/` | 6502 core (from the Commodore): every bus cycle, all 256 opcodes, several CPUs at once, `m6502_run()` to the machine's next event; stalls from `stall_from` (reads only, or writes too with `stall_writes`: the Atari's HALT), and for the Atari's ANTIC tables of a line's busy and free cycles (`dma_free`, `dma_busy`, `dma_base`, `dma_len`, `dma_stop`) that it skips by itself, calling `bus.stall()` only past them or at `dma_stop` (WSYNC); `linker.lf` keeps its jump table in internal RAM; `test/` Klaus Dormann's functional test and an opcode cycle table (`make -C components/m6502/test`) |
 | `components/m6809/` | 6809 and 6309 core (the CoCo): instruction level with each instruction's documented cycles (the 6809's, the 6309's in emulation or native mode), all of the 6309 (E F W Q V MD, native mode stacking W, FIRQ with FM, TFM, the bit and register-register instructions, DIVD/DIVQ/MULD, the traps at `$FFF0`), the 6809's undocumented opcodes as commonly described; memory through 256-byte `rd`/`wr` pages (NULL: the bus callbacks), IRQ/FIRQ levels, NMI edges (armed once S is loaded), HALT, CWAI/SYNC; `M6809_HOST_HOOK` for host tracing; `linker.lf` keeps its jump tables in internal RAM; disassembler and debugger adapter; `test/`: table-driven cases and every opcode's cycles and length against the data sheet (`make -C components/m6809/test test`) |
 | `components/arm2/` | ARM2 core (the Archimedes): ARMv2 with the 26-bit PC/PSR in R15, the four modes' banked registers, exceptions and aborts, LDM/STM with ^, LDRT/STRT, rotated unaligned LDR (not LDM), SWP for an ARM250/ARM3 (`swp`), coprocessor instructions to the machine; memory through a table of 4 KB pages (host address + access bits: user/privileged read/write, slow, watched), the rest to the bus callbacks (which may abort, add wait states to `left`, call `arm2_end_run()`: the run then ends with the ticks it used); time in memory-clock ticks (S 1, N 2, I 1; `slow_s`/`slow_n` for ROM). `arm2_run()` is a threaded interpreter: one 4096-entry label table on bits 31-20 (the AL row a handler per data processing opcode and operand form, LDR/STR by size and offset, LDM/STM, B/BL; the other conditions through `cond_mask`, kept as the flags change; NV skipped), the PC, ticks and the fast page (`run_t.page`: the PC's, or ~0 while an interrupt is pending or the debugger is on) in registers, written back around callbacks; `ARM2_HOST_HOOK` for host tracing; `linker.lf` keeps its tables in internal RAM (the label table is 16 KB); disassembler (RISC OS style) and debugger adapter (`arch` "arm2", 26-bit addresses mapped by page); `test/`: `cases` (190), `diff.py` against Unicorn, `bench` (`make -C components/arm2/test test`; host MIPS don't predict the Tab5, see esp32arc's lessons) |
-| `components/upd765/` | uPD765A floppy controller with DSK/EDSK images (CPC, +3) |
+| `components/x86/` | x86 core (the PC): the 8088, 8086 and 80286 as models of one core (the 8086s' aliases, shift counts, PUSH SP, FLAGS bits, divide error return, word wrap at FFFF and REP resume at the last prefix; the 286's 186 instructions, #UD, faults by longjmp, the 286's protected mode: descriptors, limits and rights (real mode's limits too: LOADALL's "unreal" segments), the segments' direct windows cut to their limits so the slow paths check them, CPL, call/interrupt/trap/task gates, task switches through the TSS, exceptions with error codes (`fault_err()`), the double fault and the shutdown (`bus.shutdown`, else `stuck`), IOPL, LLDT/LTR/LAR/LSL/VERR/VERW/ARPL/LOADALL, #NM from EM/TS; the 8087/287 coprocessor in `x87.c` (`x86_set_fpu()`, `bus.fpu_error`; 80-bit registers kept exactly, FADD/FSUB/FMUL/FDIV/FSQRT exact with 128-bit intermediates, the transcendental functions through doubles; x86.c reads an ESC instruction's operand bytes, the written ones too, before it runs); the far transfers and interrupts go to cold `pm_*` functions that check everything before they change anything (a task switch's later faults are the new task's); lazy flags, 4 KB pages over 16 MB (host address + `X86_NO_READ`/`X86_NO_WRITE`, the rest to the bus callbacks); time in CPU clocks (documented clocks, EA times, the 8088's word transfers, a prefetch queue model: within 3.1 clocks of the chip on average); the BIOS trap `FE 38 nn` only inside `[trap_lo, trap_hi)`; the 8088/8086's undefined flags as the chips leave them (DIV/IDIV through their CORD microcode loop, MUL/IMUL, the BCD instructions, after MartyPC, MIT). Speed: one run loop per model with the instruction set inlined (`run_286()` in internal RAM on the P4, `X86_HOT`; the 8088/8086's and a debugger loop, taken when breakpoints are set at a run's start, in flash), the instruction's bytes through a host pointer kept in registers (`code_t`; the code window per page, `fetch_slow()` past it), each segment's direct window (worked out lazily at the first access after a load, cached by base; `x86_flush()` when the page table or A20 changes), the 286's near jumps in the window moving the pointer, REP MOVS/STOS in bulk on the 286; `X86_HOST_HOOK`; `linker.lf` keeps its jump tables in internal RAM; disassembler (DOS DEBUG style); `test/`: SingleStepTests 8088 (3,007,000 tests) and 8086 (646,000) all pass with the undefined flags compared, the 286's real mode suite (1,478,000) but for 17 (protected mode: esp32pc's `host/tests/pm.S` and Minix 2.0.4); `-w` runs them with writable pages (the direct writes) (`make -C components/x86/test`, `make data` fetches the suites, ~0.9 GB, not in git; esp32pc's CLAUDE.md has the speed lessons) |
+| `components/emu8950/` | Mitsutaka Okazaki's emu8950 (MIT, v1.2.2: YM3812/Y8950, the PC's AdLib), unchanged but for `include/`; `calloc`/`malloc` renamed to PSRAM-preferring wrappers and its .bss in PSRAM (`linker.lf`, when the project sets `CONFIG_SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY`); run it at the chip's rate (its rate converter uses doubles) |
+| `components/upd765/` | uPD765A floppy controller with DSK/EDSK images (CPC, +3), and the PC's wiring (`upd765_wire()`: DMA with terminal count, the INT line, four units, multi-track; raw images through callbacks). The INT line falls at each SENSE INTERRUPT STATUS (IBM's XT BIOS asks once after a reset, then waits for the next seek's interrupt); on the PC an empty drive is still ready (its line tied high) |
 | `components/emudbg/` | The debugger for programs in the machines (`docs/debugger.md`, the VS Code extension `../esp32emu-vscode`): `emudbg.c` the protocol, breakpoints and steps (platform independent), `emudbg_freertos.c` the board's TCP server (port 6502, core 0), `emudbg_posix.c` the host builds' (`<M>_DEBUG=<port>`, `emudbg_host_run()`); `test/`: `dbg_test` (the commands and steps against the 6502 and Z80 cores) and `demo`, a bare 6502 or Z80 with RAM serving the debugger (the extension's tests run against it). The cores' adapters: `m6502_dbg.c`, `z80_dbg.c`, `w65816_dbg.c`, `m6809/m6809_dbg.c`, `musashi/m68k_dbg.c`, `arm2/arm2_dbg.c` |
 | `components/emu/include/emu/emu.h` | The machine interface (`emu_machine_t`) and runtime API |
-| `components/emu/emu.c` | Boot order, emulation task (core 1), presenter, stats, temperature, supervisor (touch: setup corner and machine touches), pausing |
+| `components/emu/emu.c` | Boot order, emulation task (core 1), presenter (its drawing in internal RAM on the S3, `PRESENT_HOT`: from flash/PSRAM it took the shared instruction cache from core 1's emulation, 3-6% of the PC's Wolfenstein 3D), stats, temperature, supervisor (touch: setup corner and machine touches), pausing |
 | `components/emu/setup_ui.c` | LVGL setup screen (status, WiFi, password, Bluetooth, pairing, drives, images) |
 | `components/emu/web.c` + `web/index.html` | Web server and the page (one page for all machines: it reads `/api/info`) |
 | `components/emu/disks.c` | Disk image folder, drives, NVS memory of inserted disks, blank disks |
@@ -108,7 +110,9 @@ MINIMAL_BUILD).
   speed, Tab5 only) changes the machine as it's set, no restart; `set()` may run on
   another task, so the machine picks the value up between frames. Three
   choice rows fit closer (`tight` in setup_ui.c), four closer still
-  (`tighter`: 46-pixel rows). The buttons share 560 pixels; a row with a
+  (`tighter`: 46-pixel rows), five (the PC's) closest (`tightest`: less
+  padding, 44-pixel rows, an 18 px taller card down to just above the
+  buttons: no scrollbar on the MaTouch). The buttons share 560 pixels; a row with a
   single button (the IIGS's memory on the MaTouch, shown but not choosable)
   gets one button's width in a row of four (140). A row whose buttons
   another choice decides (the MSX's memory: one 64 KB button for an MSX1,
@@ -149,6 +153,17 @@ MINIMAL_BUILD).
   bytes, {isImage, log})})`, which returns `[{name, data}]` images: files
   with those extensions (also inside ZIP files) are converted in the browser,
   then uploaded as usual. The Mac uses it for StuffIt/BinHex archives.
+  It can also call `registerPacker({description, pack(name, files, ctx)})`
+  (the PC's): the files that are neither images nor a converter's (loose,
+  from dropped folders, whose paths `dropped()` reads through
+  `webkitGetAsEntry`, or a ZIP's, with their folders) are packed together
+  into images `[{name, data}]`, named after their common top folder, the
+  ZIP or "FILES". With a packer the file picker takes any file.
+- Folders as drives (optional, `disks_config_t.folders`, the PC's): the
+  disk folder's subfolders are listed too, as `NAME/`; `insert()` gets the
+  path with the slash; `disks_can_insert()` (the web's drive PUT) accepts
+  them; `/api/disks` marks them `"folder": true` and the page offers only
+  Insert for them (no download, replace or delete).
 - Uploads from the page go through `XMLHttpRequest` (`put()` in index.html):
   `fetch()` can't report an upload's progress. The log line shows the
   percentage, rate and time left over a bar, then "writing it to the SD
@@ -330,7 +345,7 @@ MINIMAL_BUILD).
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, `esp32arc`, and `esp32emu-vscode` (the debugger's VS Code
+`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, `esp32arc`, `esp32pc` (not on GitHub yet), and `esp32emu-vscode` (the debugger's VS Code
 extension, TypeScript: `npm test`, `npm run test:host` against the demo
 machine, `npm run test:vscode` inside VS Code). The
 user pushes straight to `main`; commit messages end with the

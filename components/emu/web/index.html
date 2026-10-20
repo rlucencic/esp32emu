@@ -146,6 +146,13 @@ const converters = [];
 window.registerConverter = c => converters.push(c);
 const converterFor = name => converters.find(c => c.extensions.some(e => name.toLowerCase().endsWith(e)));
 
+/* The machine's packer (/machine.js), if it has one: the other files, loose,
+ * in dropped folders or in a ZIP file, are put together onto one disk image
+ * here. registerPacker({description, pack(name, files, ctx)}): files are
+ * [{path, data, date}] (folders and name joined by "/"), it gives [{name, data}] */
+let packer = null;
+window.registerPacker = p => { packer = p; };
+
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 const kv = rows => rows.filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
 const bar = (pct, warn = 75, bad = 90) =>
@@ -199,7 +206,7 @@ async function refresh() {
     }
     const sz = document.createElement("td");
     sz.className = "size";
-    sz.textContent = size(d.size);
+    sz.textContent = d.folder ? "folder" : size(d.size);
     const act = document.createElement("td");
     act.className = "actions";
     const ins = document.createElement("select");
@@ -232,7 +239,8 @@ async function refresh() {
       }
       refresh();
     };
-    act.append(ins, dl, del);
+    if (d.folder) act.append(ins);           /* (a folder on the card: nothing to download) */
+    else act.append(ins, dl, del);
     tr.append(name, sz, act);
     return tr;
   });
@@ -291,7 +299,8 @@ async function upload(name, data) {
   }
 }
 
-/* The disk images (and files for the converters) in a ZIP file: [{name, data}] */
+/* The disk images (and files for the converters) in a ZIP file: {disks:
+ * [{name, data}], others: [{path, data, date}]} (the rest, for the packer) */
 async function unzip(file) {
   const buf = await file.arrayBuffer();
   const v = new DataView(buf);
@@ -302,17 +311,19 @@ async function unzip(file) {
   if (eocd < 0) throw new Error("not a ZIP file");
   const count = v.getUint16(eocd + 10, true);
   let p = v.getUint32(eocd + 16, true);
-  const out = [];
+  const out = [], others = [];
   for (let n = 0; n < count; n++) {
     if (v.getUint32(p, true) !== 0x02014b50) throw new Error("damaged ZIP file");
     const method = v.getUint16(p + 10, true);
+    const t = v.getUint16(p + 12, true), d = v.getUint16(p + 14, true);
     const csize = v.getUint32(p + 20, true);
     const nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
     const local = v.getUint32(p + 42, true);
     const full = new TextDecoder().decode(new Uint8Array(buf, p + 46, nlen));
     p += 46 + nlen + xlen + clen;
     const name = full.split("/").pop();
-    if (!(imageRe.test(name) || converterFor(name)) || name.startsWith(".")) continue;
+    const disk = imageRe.test(name) || converterFor(name);
+    if (!(disk || packer) || !name || name.startsWith(".") || full.startsWith("__MACOSX/")) continue;
     const start = local + 30 + v.getUint16(local + 26, true) + v.getUint16(local + 28, true);
     const raw = new Uint8Array(buf, start, csize);
     let data;
@@ -325,28 +336,78 @@ async function unzip(file) {
       log(name + ": compressed in a way this page can't unpack", "bad");
       continue;
     }
-    out.push({ name, data });
+    if (disk) out.push({ name, data });
+    else others.push({ path: full, data, date: new Date(1980 + (d >> 9), ((d >> 5) & 15) - 1, d & 31, t >> 11, (t >> 5) & 63, (t & 31) * 2) });
   }
+  return { disks: out, others };
+}
+
+/* The dropped files, and with a packer the files in dropped folders (their
+ * path in relPath). Called in the drop event: the items go with it */
+async function dropped(dt) {
+  const entries = packer ? [...dt.items].map(i => i.webkitGetAsEntry && i.webkitGetAsEntry()).filter(Boolean) : [];
+  if (!entries.some(e => e.isDirectory)) return [...dt.files];
+  const out = [];
+  const walk = async (entry, path) => {
+    if (entry.name.startsWith(".")) return;
+    if (entry.isFile) {
+      const f = await new Promise((ok, bad) => entry.file(ok, bad));
+      f.relPath = path + f.name;
+      out.push(f);
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      for (let batch; (batch = await new Promise((ok, bad) => reader.readEntries(ok, bad))).length;) {
+        for (const e of batch) await walk(e, path + entry.name + "/");
+      }
+    }
+  };
+  for (const e of entries) await walk(e, "");
   return out;
 }
 
 async function send(files) {
+  const others = [];
   for (const file of files) {
-    if (/\.zip$/i.test(file.name)) {
+    if (file.relPath) {
+      others.push({ path: file.relPath, data: file, date: new Date(file.lastModified) });   /* (in a folder) */
+    } else if (/\.zip$/i.test(file.name)) {
       try {
-        const disks = await unzip(file);
-        if (!disks.length) log(file.name + ": no disk image inside", "bad");
-        for (const d of disks) await sendOne(d.name, d.data);
+        const z = await unzip(file);
+        if (!z.disks.length && !z.others.length) log(file.name + ": no disk image inside", "bad");
+        for (const d of z.disks) await sendOne(d.name, d.data);
+        if (z.others.length) await pack(file.name.replace(/\.zip$/i, ""), z.others);
       } catch (e) {
         log(file.name + ": " + e.message, "bad");
       }
     } else if (imageRe.test(file.name) || converterFor(file.name)) {
       await sendOne(file.name, file);
+    } else if (packer) {
+      others.push({ path: file.name, data: file, date: new Date(file.lastModified) });
     } else {
       log(file.name + ": not " + accepted(), "bad");
     }
   }
+  if (others.length) {
+    /* named after the folder they're all in, or the one file */
+    const tops = new Set(others.map(f => f.path.split("/")[0]));
+    await pack(tops.size === 1 ? [...tops][0].replace(/\.[^.]*$/, "") : "FILES", others);
+  }
   refresh();
+}
+
+/* Files onto a disk image of their own (the packer) */
+async function pack(name, files) {
+  const line = log("Putting " + (files.length === 1 ? files[0].path : files.length + " files") + " on a disk image …");
+  try {
+    await new Promise(r => setTimeout(r, 0));          /* show the line first */
+    for (const f of files) if (f.data instanceof Blob) f.data = new Uint8Array(await f.data.arrayBuffer());
+    const disks = await packer.pack(name, files, { log: t => log(t) });
+    line.remove();
+    for (const d of disks) await upload(d.name, d.data);
+  } catch (e) {
+    line.textContent = name + ": " + e.message;
+    line.className = "bad";
+  }
 }
 
 /* One image, or a file a converter makes images of */
@@ -369,7 +430,8 @@ async function sendOne(name, data) {
 /* "Disk images (.ST, .MSA), Mac archives (.SIT, ...) or .ZIP files" */
 function accepted() {
   const d = info.disks.description;               /* "Disk images (...)" mid-sentence */
-  return [d.charAt(0).toLowerCase() + d.slice(1), ...converters.map(c => c.description)].join(", ") + " or .ZIP files";
+  return [d.charAt(0).toLowerCase() + d.slice(1), ...converters.map(c => c.description),
+          ...(packer ? [packer.description] : [])].join(", ") + " or .ZIP files";
 }
 
 const drop = $("drop");
@@ -378,7 +440,7 @@ drop.onkeydown = e => { if (e.key === "Enter" || e.key === " ") $("pick").click(
 $("pick").onchange = e => { send([...e.target.files]); e.target.value = ""; };
 drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
 drop.ondragleave = () => drop.classList.remove("over");
-drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); send([...e.dataTransfer.files]); };
+drop.ondrop = async e => { e.preventDefault(); drop.classList.remove("over"); send(await dropped(e.dataTransfer)); };
 document.ondragover = e => e.preventDefault();
 document.ondrop = e => e.preventDefault();
 
@@ -504,10 +566,12 @@ async function start() {
       document.head.append(s);
     });
   }
-  $("pick").accept = [...info.disks.extensions, ".zip", ...converters.flatMap(c => c.extensions)].join(",");
+  $("pick").accept = packer ? "" : [...info.disks.extensions, ".zip", ...converters.flatMap(c => c.extensions)].join(",");
   $("drop-text").textContent = "Drop " + accepted() + " here";
   if (converters.length) $("drop-hint").textContent = "or click to choose them. ZIP files are unpacked, " +
     converters.map(c => c.description.replace(/\s*\(.*\)/, "")).join(", ") + " put on a disk image of their own.";
+  if (packer) $("drop-hint").textContent = "or click to choose them. ZIP files are unpacked; " +
+    packer.description + " go onto a disk image together.";
   if (info.disks.can_create && info.disks.sizes.length) {
     $("new-size").innerHTML = info.disks.sizes.map(s => `<option value="${s.bytes}">${esc(s.label)}</option>`).join("");
     $("new").hidden = false;

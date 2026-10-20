@@ -34,6 +34,12 @@ typedef struct {
     const disks_size_t *sizes;          /* blank disk sizes offered, first = default */
     int size_count;
     uint64_t max_upload;                /* web uploads, bytes */
+    /* The folder's subfolders are listed too, as "NAME/", for drives the
+     * machine makes of a folder's files (the PC's hard disks): insert()
+     * gets the folder's path with the slash. The web page can't download,
+     * replace or delete them.
+     */
+    bool folders;
 
     /* The machine's drives */
     bool (*insert)(int drive, const char *path);
@@ -87,6 +93,11 @@ const char *disks_folder(void);
 
 /* `name` is a plain file name with one of the extensions: no folders */
 bool disks_valid_name(const char *name);
+
+/* `name` can go into a drive: a valid name, or with `folders` a subfolder's
+ * "NAME/" that's there
+ */
+bool disks_can_insert(const char *name);
 
 /* `name` is in a drive */
 bool disks_in_use(const char *name);

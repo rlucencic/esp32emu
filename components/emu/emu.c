@@ -326,6 +326,15 @@ static inline uint32_t expand565(uint16_t c)
     return (c | ((uint32_t)c << 16)) & 0x07E0F81F;
 }
 
+/* The presenter's drawing in internal RAM on the S3: from flash/PSRAM its
+ * code took the shared instruction cache from the emulation on core 1
+ */
+#if CONFIG_IDF_TARGET_ESP32S3
+#define PRESENT_HOT IRAM_ATTR
+#else
+#define PRESENT_HOT
+#endif
+
 static inline uint16_t blend565(uint16_t a, uint16_t b, int w)
 {
     if (a == b || w == 0) {
@@ -365,7 +374,7 @@ static void make_taps(tap_t *taps, int dst, int src, bool smooth)
     }
 }
 
-static void scale_row(const uint16_t *src, uint16_t *dst, const tap_t *taps, int n)
+static PRESENT_HOT void scale_row(const uint16_t *src, uint16_t *dst, const tap_t *taps, int n)
 {
     for (int x = 0; x < n; x++) {
         const tap_t t = taps[x];
@@ -373,7 +382,7 @@ static void scale_row(const uint16_t *src, uint16_t *dst, const tap_t *taps, int
     }
 }
 
-static uint32_t line_hash(const uint16_t *line, int width)
+static PRESENT_HOT uint32_t line_hash(const uint16_t *line, int width)
 {
     const uint32_t *p = (const uint32_t *)line;
     uint32_t h = 2166136261u;
@@ -389,7 +398,7 @@ static uint32_t line_hash(const uint16_t *line, int width)
  */
 #define MAX_SOURCE_LINES    1024
 
-static void present_task(void *arg)
+static PRESENT_HOT void present_task(void *arg)
 {
     uint16_t *fb = arg;
     const int view_w = emu_view_width();
