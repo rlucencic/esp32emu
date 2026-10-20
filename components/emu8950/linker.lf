@@ -1,0 +1,6 @@
+# The tables (~10 KB of .bss) in PSRAM where the project allows .bss there
+[mapping:emu8950]
+archive: libemu8950.a
+entries:
+    if SPIRAM_ALLOW_BSS_SEG_EXTERNAL_MEMORY = y:
+        * (extram_bss)
