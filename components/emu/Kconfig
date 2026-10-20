@@ -37,6 +37,9 @@ menu "Emulator board"
         bool "Setup screen before the machine starts"
         depends on EMU_WIFI
         default y
+        # (the buttons' second lines: 12 on the MaTouch, 20 on the Tab5)
+        select LV_FONT_MONTSERRAT_12
+        select LV_FONT_MONTSERRAT_20
         help
             Touch screen for WiFi, Bluetooth, disks and the machine's
             settings. Hold the top-right corner for 2 s to come back to it.

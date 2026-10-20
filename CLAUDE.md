@@ -112,7 +112,10 @@ MINIMAL_BUILD).
   choice rows fit closer (`tight` in setup_ui.c), four closer still
   (`tighter`: 46-pixel rows), five (the PC's) closest (`tightest`: less
   padding, 44-pixel rows, an 18 px taller card down to just above the
-  buttons: no scrollbar on the MaTouch). The buttons share 560 pixels; a row with a
+  buttons: no scrollbar on the MaTouch), six (`EMU_UI_MAX_CHOICES`) with
+  2 px between rows and, on the MaTouch, 38-pixel ones (the Tab5's
+  second lines need its 44; tried with the PC's coprocessor row, which
+  later replaced its BIOS row: no machine has six now). The buttons share 560 pixels; a row with a
   single button (the IIGS's memory on the MaTouch, shown but not choosable)
   gets one button's width in a row of four (140). A row whose buttons
   another choice decides (the MSX's memory: one 64 KB button for an MSX1,
@@ -121,8 +124,9 @@ MINIMAL_BUILD).
   It's a machine field, not an `emu_choice_t` one: the projects fill their
   choice rows positionally, and a new field there warns (-Wextra).
 - A button name with a `\n` gets a second, smaller line under the first
-  (`FONT_NOTE`: montserrat 24 on the Tab5, 14 on the MaTouch, both already
-  in every sdkconfig; at 3/4 of the text's opacity, readable on the checked
+  (`FONT_NOTE`: montserrat 20 on the Tab5, 12 on the MaTouch, which
+  `CONFIG_EMU_SETUP_SCREEN` selects: an existing build needs `idf.py
+  reconfigure` once, else it doesn't find them; at 3/4 of the text's opacity, readable on the checked
   button's blue too): the Macs' Monitor buttons, "640 x 480\nup to 256
   colours", their names per model from `choice_names()`. The button matrix
   draws a button's text as one label, so `choice_draw_task()`
