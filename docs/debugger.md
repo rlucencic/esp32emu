@@ -42,7 +42,7 @@ and written at any time.
 
 | Command | Answer | |
 |---|---|---|
-| `hello` | `protocol`, `machine`, `state`, `frame`, `cpus`, `stop` | `cpus`: `[{"name":"6502","arch":"6502","addr_bits":16,"regs":[{"name":"PC","bits":16,"flags":1},...]}]`. Register flags: 1 the program counter, 2 the stack pointer, 4 a status register (`flag_names`, one letter per bit, MSB first, `-` unused), 8 read only. `arch`: `6502`, `65c816`, `z80`, `68000`, `6809`, `arm2` (`addr_bits` 26; the PSR is its own register, the PC without it) |
+| `hello` | `protocol`, `machine`, `state`, `frame`, `cpus`, `stop` | `cpus`: `[{"name":"6502","arch":"6502","addr_bits":16,"regs":[{"name":"PC","bits":16,"flags":1},...]}]`. Register flags: 1 the program counter, 2 the stack pointer, 4 a status register (`flag_names`, one letter per bit, MSB first, `-` unused), 8 read only, 16 a floating-point register (the value is an IEEE single's bits; `0x7FA00000` means empty). `arch`: `6502`, `65c816`, `z80`, `68000`, `6809`, `arm2` (`addr_bits` 26; the PSR is its own register, the PC without it), `x86` (`addr_bits` 24; addresses linear: `PC` is CS:IP and `SSP` SS:SP as the CPU forms them, both from the registers; writing `PC` sets IP in the current CS; the coprocessor's `FCW`, `FSW`, `FTW` and `ST0`-`ST7`, the stack registers as floats, empty without one) |
 | `state` | `state`, `frame`, `stop` | `state`: `none` (no machine: the setup screen before the start), `running`, `stopped`, `paused` (the setup screen). `stop`: `{"reason","cpu","pc"}` while stopped |
 | `pause` | | Stops at the next instruction of any CPU. If none runs for 3 frames (WAI, STOP, HALT with interrupts off), it stops between frames instead |
 | `continue` | | |
@@ -51,7 +51,7 @@ and written at any time.
 | `out <cpu>` | | Runs until a return takes the stack above where it is now |
 | `frames <n>` | | Runs n frames and stops between frames (reason `frames`). Useful after a reset, to let the machine start up |
 | `reset [stop]` | | A cold reset at the end of the frame; with `stop` the machine stops at the first instruction |
-| `bps <cpu> [addr...]` | `count` | Sets that CPU's breakpoints, replacing all of them (up to 128). Addresses are CPU addresses (24-bit on the 65C816 and 68000) |
+| `bps <cpu> [addr...]` | `count` | Sets that CPU's breakpoints, replacing all of them (up to 128). Addresses are CPU addresses (24-bit on the 65C816 and 68000; linear on the x86) |
 | `regs <cpu>` | `regs` | The values, in `hello`'s order |
 | `setreg <cpu> <name> <value>` | `value` | |
 | `read <cpu> <addr> <len>` | `data` | Memory as the CPU sees it, without side effects (I/O reads `ff`). `data` is hex. Up to 4096 bytes |

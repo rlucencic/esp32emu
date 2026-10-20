@@ -49,7 +49,13 @@ enum {
     EMUDBG_REG_SP = 0x02,               /* the stack pointer (step out compares it) */
     EMUDBG_REG_FLAGS = 0x04,            /* a status register: `flags` names its bits */
     EMUDBG_REG_RO = 0x08,               /* read only */
+    EMUDBG_REG_FLOAT = 0x10,            /* an IEEE single's bits, shown as a number (wider ones rounded to it) */
 };
+
+/* An EMUDBG_REG_FLOAT register with nothing in it (a coprocessor's empty
+ * stack register): a signaling NaN the conversions never make
+ */
+#define EMUDBG_FLOAT_EMPTY  0x7FA00000u
 
 typedef struct {
     const char *name;                   /* "PC", "A", "D0" */
@@ -64,9 +70,9 @@ typedef enum {
     EMUDBG_INSN_RETURN,                 /* RTS, RTL, RTI, RET, RETI, RTE: step out stops after one */
 } emudbg_insn_t;
 
-/* A CPU core's side (m6502_dbg.c, z80_dbg.c, w65816_dbg.c, m68k_dbg.c, arm2_dbg.c) */
+/* A CPU core's side (m6502_dbg.c, z80_dbg.c, w65816_dbg.c, m68k_dbg.c, arm2_dbg.c, x86_dbg.c) */
 typedef struct {
-    const char *arch;                   /* "6502", "65c816", "z80", "68000", "6809", "arm2" */
+    const char *arch;                   /* "6502", "65c816", "z80", "68000", "6809", "arm2", "x86" */
     uint8_t addr_bits;                  /* 16, 24 or 26 (the ARM2: maps by page, as 24) */
     const emudbg_reg_t *regs;
     int reg_count;
@@ -185,6 +191,7 @@ extern const emudbg_arch_t emudbg_arch_65c816; /* w65816: core = w65816_t * */
 extern const emudbg_arch_t emudbg_arch_z80;    /* z80 (one, global) */
 extern const emudbg_arch_t emudbg_arch_68000;  /* musashi (one, global): the machine gives peek and poke */
 extern const emudbg_arch_t emudbg_arch_arm2;   /* arm2: core = arm2_t * */
+extern const emudbg_arch_t emudbg_arch_x86;    /* x86: core = x86_t * (addresses linear) */
 
 /* Before the instruction at pc (the core's registers are in its state):
  * may block until the debugger lets the machine go on, and may have

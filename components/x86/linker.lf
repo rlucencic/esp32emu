@@ -1,0 +1,8 @@
+# The opcode switch's jump table (and the core's other read-only data) in
+# internal RAM: from flash, through a data cache that the video keeps
+# flushing, the 6502's dispatch was a tenth of the emulation's time. The
+# disassembler's tables (x86_dis.c) stay in flash.
+[mapping:x86]
+archive: libx86.a
+entries:
+    x86 (noflash_data)

@@ -10,7 +10,15 @@
  * sizes per track and sector, sector status bytes, several copies of a
  * weak sector). Read into memory; writes go back with upd765_disk_flush(),
  * track by track in place, or the whole file (as EDSK) when formatting
- * changed its layout.
+ * changed its layout. Raw images the machine keeps (the PC's): the tracks'
+ * IDs here, each sector through its callbacks.
+ *
+ * The PC's wiring (upd765_wire()): DMA moves each sector at once, the
+ * terminal count ends a command normally after its sector; the INT line
+ * at a data command's result (until its first byte is read), at a seek's
+ * end and after a reset (falling at each SENSE INTERRUPT STATUS, which
+ * tells the units' statuses one by one; an empty drive is ready);
+ * multi-track reads and writes go on to head 1.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -60,9 +68,14 @@ typedef struct {
     track_t trk[MAX_CYL][2];
     uint8_t id_index;
     uint32_t weak;
+    const upd765_raw_t *raw;    /* the machine's raw image (tracks without data here) */
 } disk_t;
 
+#define UNITS           4       /* unit numbers in commands (the CPC's: 0, 1) */
+
 static disk_t *s_disk[UPD765_DRIVES];
+static upd765_wiring_t w;
+static uint8_t s_sector[1024];  /* a raw image's sector in transfer */
 static char s_creator[15] = "esp32emu";
 static upd765_status_t s_stat;
 static int s_light_frames;
@@ -76,10 +89,13 @@ static struct {
     int cmd_len, cmd_pos;
     uint8_t res[7];
     int res_len, res_pos;
-    uint8_t pcn[UPD765_DRIVES];
-    uint8_t seek_st0[UPD765_DRIVES];
-    bool seek_pending[UPD765_DRIVES];
+    uint8_t pcn[UNITS];
+    uint8_t seek_st0[UNITS];
+    bool seek_pending[UNITS];
+    bool reset_pending[UNITS];  /* the PC's: ready changed, after a reset */
     bool motor;
+    bool nd;                    /* SPECIFY: non-DMA */
+    bool int_line;
 
     /* The command running */
     uint8_t op;
@@ -309,7 +325,7 @@ bool upd765_disk_dirty(void)
 {
     for (int dr = 0; dr < UPD765_DRIVES; dr++) {
         disk_t *d = s_disk[dr];
-        if (d == NULL) {
+        if (d == NULL || d->raw) {
             continue;
         }
         if (d->relayout) {
@@ -328,7 +344,7 @@ void upd765_disk_flush(void)
 {
     for (int dr = 0; dr < UPD765_DRIVES; dr++) {
         disk_t *d = s_disk[dr];
-        if (d == NULL || d->wp) {
+        if (d == NULL || d->wp || d->raw) {
             continue;
         }
         bool ok = d->relayout ? write_image(d) : write_tracks(d);
@@ -434,6 +450,8 @@ void upd765_disk_status(upd765_status_t *s)
 
 /* ---- The controller ---- */
 
+static void set_int(bool on);
+
 static int command_length(uint8_t op)
 {
     switch (op) {
@@ -481,6 +499,7 @@ static void rw_result(void)
     f.res[5] = f.r;
     f.res[6] = f.n;
     result(7);
+    set_int(true);
 }
 
 static void rw_error(uint8_t st0, uint8_t st1, uint8_t st2)
@@ -493,7 +512,20 @@ static void rw_error(uint8_t st0, uint8_t st1, uint8_t st2)
 
 static disk_t *disk(void)
 {
-    return s_disk[f.drive];
+    return f.drive < UPD765_DRIVES ? s_disk[f.drive] : NULL;
+}
+
+static void set_int(bool on)
+{
+    if (w.irq && f.int_line != on) {
+        f.int_line = on;
+        w.irq(on);
+    }
+}
+
+static bool dma_on(void)
+{
+    return w.dma && !f.nd;
 }
 
 static void light(void)
@@ -544,6 +576,30 @@ static void end_of_cylinder(void)
     f.st1 |= 0x80;
     f.c++;
     f.r = 1;
+    if (w.multitrack && f.mt) {
+        f.h ^= 1;
+    }
+    rw_result();
+}
+
+/* The terminal count after a sector: a normal end, the next sector's ID
+ * in the result (the datasheet's table)
+ */
+static void terminal_count(void)
+{
+    f.st0 = st0_base();
+    if (f.r != f.eot) {
+        f.r++;
+    } else if (w.multitrack && f.mt && f.side == 0) {
+        f.h ^= 1;
+        f.r = 1;
+    } else {
+        f.c++;
+        f.r = 1;
+        if (w.multitrack && f.mt) {
+            f.h ^= 1;
+        }
+    }
     rw_result();
 }
 
@@ -583,6 +639,25 @@ static void next_sector(void)
         break;
     }
     light();
+    if (disk()->raw) {
+        f.xfer = s_sector;
+        f.xfer_len = f.sec->len;
+        if (write) {
+            f.phase = PH_EXEC_WRITE;
+            f.msr = 0xB0;
+            s_stat.writes[f.drive]++;
+        } else {
+            if (!disk()->raw->read(f.drive, f.sec->c, f.sec->h, f.sec->r, s_sector)) {
+                rw_error(0x40, f.st1 | 0x20, f.st2 | 0x20);     /* data error */
+                return;
+            }
+            f.phase = PH_EXEC_READ;
+            f.msr = 0xF0;
+            s_stat.reads[f.drive]++;
+        }
+        f.xfer_pos = 0;
+        return;
+    }
     if (write) {
         f.xfer = f.trk->data + f.sec->off;
         f.xfer_len = f.sec->len;
@@ -610,7 +685,14 @@ static void next_sector(void)
 static void sector_done(void)
 {
     if (f.phase == PH_EXEC_WRITE) {
-        f.trk->dirty = true;
+        if (disk()->raw) {
+            if (!disk()->raw->write(f.drive, f.sec->c, f.sec->h, f.sec->r, s_sector)) {
+                rw_error(0x40, f.st1 | 0x20, f.st2);
+                return;
+            }
+        } else {
+            f.trk->dirty = true;
+        }
     }
     uint8_t s1 = f.sec->st1 & 0x25, s2 = f.sec->st2 & 0x61;
     if (f.phase == PH_EXEC_READ && ((s1 & 0x20) || (s2 & 0x20))) {
@@ -626,11 +708,52 @@ static void sector_done(void)
         return;
     }
     if (f.r == f.eot) {
+        if (w.multitrack && f.mt && f.side == 0 && disk()->sides > 1) {
+            f.side = 1;             /* MT: on to head 1 */
+            f.h ^= 1;
+            f.r = 1;
+            f.trk = current_track();
+            if (f.trk == NULL || f.trk->nsec == 0) {
+                rw_error(0x40, 0x01, 0);
+                return;
+            }
+            next_sector();
+            return;
+        }
         end_of_cylinder();
         return;
     }
     f.r++;
     next_sector();
+}
+
+/* DMA: the sectors' bytes through it, until the terminal count, the
+ * command's end, or a DMA that doesn't take them (an overrun)
+ */
+static void dma_sectors(void)
+{
+    while (f.phase == PH_EXEC_READ || f.phase == PH_EXEC_WRITE) {
+        bool tc = false;
+        int n = w.dma(f.phase == PH_EXEC_READ, f.xfer + f.xfer_pos, f.xfer_len - f.xfer_pos, &tc);
+        f.xfer_pos += n;
+        if (f.xfer_pos < f.xfer_len && !tc) {
+            rw_error(0x40, f.st1 | 0x10, f.st2);        /* overrun */
+            return;
+        }
+        if (tc) {
+            if (f.phase == PH_EXEC_WRITE && disk()->raw &&
+                !disk()->raw->write(f.drive, f.sec->c, f.sec->h, f.sec->r, s_sector)) {
+                rw_error(0x40, f.st1 | 0x20, f.st2);
+                return;
+            }
+            if (f.phase == PH_EXEC_WRITE && !disk()->raw) {
+                f.trk->dirty = true;
+            }
+            terminal_count();
+            return;
+        }
+        sector_done();
+    }
 }
 
 static void start_rw(void)
@@ -660,6 +783,9 @@ static void start_rw(void)
         return;
     }
     next_sector();
+    if (dma_on()) {
+        dma_sectors();
+    }
 }
 
 static void format_done(void)
@@ -667,6 +793,27 @@ static void format_done(void)
     disk_t *d = disk();
     int cyl = f.pcn[f.drive];
     int nsec = f.fmt_len / 4;
+    if (d->raw) {
+        /* The layout stays: each 512-byte sector it has is filled */
+        memset(s_sector, f.cmd[5], 512);
+        for (int i = 0; i < nsec; i++) {
+            const uint8_t *id = f.fmt + i * 4;
+            if (id[3] == 2 && cyl < d->cyls && f.side < d->sides && id[2] >= 1 &&
+                id[2] <= d->trk[cyl][f.side].nsec && !d->raw->write(f.drive, cyl, f.side, id[2], s_sector)) {
+                rw_error(0x40, 0x20, 0);
+                return;
+            }
+        }
+        s_stat.writes[f.drive] += nsec;
+        f.st0 = st0_base();
+        f.st1 = f.st2 = 0;
+        f.c = f.fmt[(nsec - 1) * 4];
+        f.h = f.fmt[(nsec - 1) * 4 + 1];
+        f.r = f.fmt[(nsec - 1) * 4 + 2];
+        f.n = f.fmt[(nsec - 1) * 4 + 3];
+        rw_result();
+        return;
+    }
     track_t *t = &d->trk[cyl][f.side];
     uint32_t size = 0;
     for (int i = 0; i < nsec; i++) {
@@ -719,10 +866,11 @@ static void format_done(void)
 
 static void execute(void)
 {
-    f.drive = f.cmd[1] & 1;
+    f.drive = f.cmd[1] & (w.four_units ? 3 : 1);
     f.side = (f.cmd[1] >> 2) & 1;
     switch (f.op) {
     case 0x03:                          /* SPECIFY */
+        f.nd = f.cmd[2] & 1;
         idle();
         break;
     case 0x04: {                        /* SENSE DRIVE STATUS */
@@ -730,6 +878,7 @@ static void execute(void)
         uint8_t st3 = st0_base() | 0x20;
         st3 |= f.pcn[f.drive] == 0 ? 0x10 : 0;
         st3 |= (d == NULL || d->wp) ? 0x40 : 0;
+        st3 |= w.multitrack && d && d->sides > 1 ? 0x08 : 0;    /* (the PC's drives: two sides) */
         if (d == NULL) {
             st3 &= ~0x20;
         }
@@ -743,17 +892,32 @@ static void execute(void)
         if (f.pcn[f.drive] >= MAX_CYL) {
             f.pcn[f.drive] = MAX_CYL - 1;
         }
-        f.seek_st0[f.drive] = 0x20 | f.drive | (disk() ? 0 : 0x48);
+        /* an empty drive: not ready (the CPC's); the PC's drives are always
+         * ready (their line tied high), the units it doesn't have fail
+         */
+        if (!w.four_units) {
+            f.seek_st0[f.drive] = 0x20 | f.drive | (disk() ? 0 : 0x48);
+        } else {
+            f.seek_st0[f.drive] = 0x20 | f.drive | (f.drive < UPD765_DRIVES ? 0 : 0x50);
+        }
         f.seek_pending[f.drive] = true;
+        if (w.seek) {
+            w.seek(f.drive);
+        }
         idle();
+        set_int(true);
         break;
     case 0x08:                          /* SENSE INTERRUPT STATUS */
-        for (int d = 0; d < UPD765_DRIVES; d++) {
-            if (f.seek_pending[d]) {
-                f.seek_pending[d] = false;
-                f.res[0] = f.seek_st0[d];
+        for (int d = 0; d < UNITS; d++) {
+            if (f.seek_pending[d] || f.reset_pending[d]) {
+                f.res[0] = f.seek_pending[d] ? f.seek_st0[d] : 0xC0 | d;
+                f.seek_pending[d] = f.reset_pending[d] = false;
                 f.res[1] = f.pcn[d];
                 result(2);
+                /* the line falls with each one told (IBM's XT BIOS asks once
+                 * after a reset, then waits for the next seek's interrupt)
+                 */
+                set_int(false);
                 return;
             }
         }
@@ -796,6 +960,15 @@ static void execute(void)
                 f.phase = PH_EXEC_WRITE;
                 f.msr = 0xB0;
                 light();
+                if (dma_on()) {
+                    bool tc = false;
+                    f.xfer_pos = w.dma(false, f.fmt, f.fmt_len, &tc);
+                    if (f.xfer_pos >= f.fmt_len) {
+                        format_done();
+                    } else {
+                        rw_error(0x40, 0x10, 0);        /* overrun */
+                    }
+                }
             }
         }
         break;
@@ -821,6 +994,9 @@ uint8_t upd765_read(void)
         return v;
     }
     if (f.phase == PH_RESULT) {
+        if (f.res_pos == 0 && f.res_len == 7) {
+            set_int(false);             /* a data command's: read */
+        }
         uint8_t v = f.res[f.res_pos++];
         if (f.res_pos >= f.res_len) {
             idle();
@@ -882,10 +1058,59 @@ void upd765_frame(void)
 
 void upd765_reset(void)
 {
-    uint8_t pcn[UPD765_DRIVES];
+    uint8_t pcn[UNITS];
     memcpy(pcn, f.pcn, sizeof(pcn));
+    bool line = f.int_line;
     memset(&f, 0, sizeof(f));
     memcpy(f.pcn, pcn, sizeof(pcn));
+    f.int_line = line;
     idle();
     s_stat.light = -1;
+    if (w.irq) {
+        set_int(false);
+        for (int d = 0; d < UNITS; d++) {
+            f.reset_pending[d] = true;  /* polling: each unit's ready line "changed" */
+        }
+        set_int(true);
+    }
+}
+
+void upd765_wire(const upd765_wiring_t *wiring)
+{
+    w = *wiring;
+}
+
+bool upd765_disk_attach(int drive, const upd765_raw_t *io, int cyls, int heads, int sectors, bool wp,
+                        const char *path)
+{
+    if (drive < 0 || drive >= UPD765_DRIVES || cyls < 1 || heads < 1 || heads > 2 || sectors < 1 ||
+        sectors > MAX_SECTORS) {
+        return false;
+    }
+    disk_t *d = dsk_calloc(1, sizeof(disk_t));
+    if (d == NULL) {
+        return false;
+    }
+    snprintf(d->path, sizeof(d->path), "%s", path);
+    d->raw = io;
+    d->wp = wp;
+    d->cyls = cyls > MAX_CYL ? MAX_CYL : cyls;
+    d->sides = heads;
+    for (int c = 0; c < d->cyls; c++) {
+        for (int h = 0; h < heads; h++) {
+            track_t *t = &d->trk[c][h];
+            t->present = true;
+            t->n = 2;
+            t->nsec = sectors;
+            t->gap3 = 0x54;
+            t->filler = 0xF6;
+            t->size = sectors * 512;
+            for (int i = 0; i < sectors; i++) {
+                t->sec[i] = (sector_t){ .c = c, .h = h, .r = i + 1, .n = 2, .len = 512, .off = i * 512 };
+            }
+        }
+    }
+    upd765_disk_eject(drive);
+    s_disk[drive] = d;
+    return true;
 }
