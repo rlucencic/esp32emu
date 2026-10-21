@@ -434,6 +434,46 @@ bool upd765_disk_create(const char *path, int cyls, int sectors, uint8_t first_i
     return ok;
 }
 
+static const track_t *disk_track(int drive, int cyl, int head)
+{
+    const disk_t *d = drive >= 0 && drive < UPD765_DRIVES ? s_disk[drive] : NULL;
+    if (d == NULL || cyl < 0 || cyl >= d->cyls || head < 0 || head >= d->sides || !d->trk[cyl][head].present) {
+        return NULL;
+    }
+    return &d->trk[cyl][head];
+}
+
+int upd765_disk_track_ids(int drive, int cyl, int head, uint8_t *ids, int max)
+{
+    const track_t *t = disk_track(drive, cyl, head);
+    int n = 0;
+    for (; t && n < t->nsec && n < max; n++) {
+        ids[n] = t->sec[n].r;
+    }
+    return n;
+}
+
+bool upd765_disk_read(int drive, int cyl, int head, uint8_t r, uint32_t offset, void *buf, uint32_t len)
+{
+    const track_t *t = disk_track(drive, cyl, head);
+    if (t == NULL || s_disk[drive]->raw) {
+        return false;
+    }
+    for (int i = 0; i < t->nsec; i++) {
+        const sector_t *s = &t->sec[i];
+        if (s->r != r) {
+            continue;
+        }
+        uint32_t size = s->len < sector_size(s->n) ? s->len : sector_size(s->n);
+        if (offset > size || len > size - offset) {
+            return false;
+        }
+        memcpy(buf, t->data + s->off + offset, len);
+        return true;
+    }
+    return false;
+}
+
 void upd765_set_creator(const char *name)
 {
     snprintf(s_creator, sizeof(s_creator), "%s", name);

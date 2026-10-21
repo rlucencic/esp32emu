@@ -179,11 +179,16 @@ def profile(port, elf, samples, top, core=1):
     for pc in pcs:
         i = bisect.bisect_right(starts, pc) - 1
         if i >= 0 and pc < syms[i][0] + max(syms[i][1], 1):
-            count[syms[i][2]] += 1
+            count[(syms[i][2], syms[i][0])] += 1
         else:
-            count["?%08x" % (pc & ~0xFFF)] += 1
+            count[("?%08x" % (pc & ~0xFFF), None)] += 1
+    names = collections.Counter(s[2] for s in syms)
+    addr2line = find_nm(elf)[:-2] + "addr2line"
     print("%d samples, core %d" % (len(pcs), core))
-    for name, n in count.most_common(top):
+    for (name, start), n in count.most_common(top):
+        if start is not None and names[name] > 1:     # a static name in several files: which one
+            out = subprocess.run([addr2line, "-e", elf, "0x%x" % start], capture_output=True, text=True).stdout
+            name += " (%s)" % os.path.basename(out.split(":")[0]) if out and not out.startswith("??") else ""
         print("%5.1f%%  %s" % (100.0 * n / len(pcs), name))
 
 

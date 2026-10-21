@@ -44,6 +44,17 @@ void upd765_disk_flush(void);
 bool upd765_disk_create(const char *path, int cyls, int sectors, uint8_t first_id,
                         const uint8_t *first_sector);
 
+/* What's on a disk, for the machine to look at (its free space), like the
+ * other disk calls not while it runs. A track's sector IDs (R) in the
+ * order they're on it: how many (up to max; 0: no such track)
+ */
+int upd765_disk_track_ids(int drive, int cyl, int head, uint8_t *ids, int max);
+/* len bytes from offset in a sector, found on its track by R (a weak
+ * sector: its first copy); false if it isn't there or is shorter (raw
+ * images: always)
+ */
+bool upd765_disk_read(int drive, int cyl, int head, uint8_t r, uint32_t offset, void *buf, uint32_t len);
+
 /* The "creator" field of EDSK files written ("esp32emu" by default) */
 void upd765_set_creator(const char *name);
 

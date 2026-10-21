@@ -9,3 +9,4 @@ components/m6809/test/build/
 components/arm2/test/build/
 components/x86/test/build/
 components/x86/test/data/
+components/diskspace/test/build/
