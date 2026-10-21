@@ -147,21 +147,33 @@ static bool hw_read(int *x, int *y, bool *pressed)
 
 #endif
 
-static volatile int64_t s_inject_until;
-static volatile int s_inject_x, s_inject_y;
+static volatile int64_t s_inject_from, s_inject_until;
+static volatile int s_inject_x, s_inject_y, s_inject_x2, s_inject_y2;
 
-void touch_inject(int x, int y, int ms)
+void touch_inject_drag(int x, int y, int x2, int y2, int ms)
 {
     s_inject_x = x;
     s_inject_y = y;
-    s_inject_until = esp_timer_get_time() + ms * 1000LL;
+    s_inject_x2 = x2;
+    s_inject_y2 = y2;
+    s_inject_from = esp_timer_get_time();
+    s_inject_until = s_inject_from + ms * 1000LL;
+}
+
+void touch_inject(int x, int y, int ms)
+{
+    touch_inject_drag(x, y, x, y, ms);
 }
 
 bool touch_read(int *x, int *y, bool *pressed)
 {
-    if (esp_timer_get_time() < s_inject_until) {
-        *x = s_inject_x;
-        *y = s_inject_y;
+    int64_t now = esp_timer_get_time();
+    if (now < s_inject_until) {
+        int64_t moving = (s_inject_until - s_inject_from) * 3 / 4;
+        int64_t done = now - s_inject_from;
+        done = done < moving ? done : moving;
+        *x = s_inject_x + (int)(moving > 0 ? (s_inject_x2 - s_inject_x) * done / moving : 0);
+        *y = s_inject_y + (int)(moving > 0 ? (s_inject_y2 - s_inject_y) * done / moving : 0);
         *pressed = true;
         return true;
     }

@@ -67,6 +67,7 @@ static struct {
     bool running;                   /* the machine is paused behind this screen */
     int before[EMU_UI_MAX_CHOICES]; /* its choices when the screen opened */
     lv_obj_t *choice_rows[EMU_UI_MAX_CHOICES];  /* their button matrices */
+    lv_obj_t *choices, *status_card;    /* the rows' scrolling box, the card around it */
     int choice_height;
     bool done;
     bool reset;                     /* [Reset] pressed */
@@ -226,7 +227,8 @@ static void choice_draw_task(lv_event_t *e)
 static void set_choice_buttons(lv_obj_t *m, const char *const *names, int checked, int height)
 {
     lv_buttonmatrix_set_map(m, (const char **)names);
-    lv_buttonmatrix_set_button_ctrl_all(m, LV_BUTTONMATRIX_CTRL_CHECKABLE);
+    /* (chosen on release: a drag that scrolls the rows chooses nothing) */
+    lv_buttonmatrix_set_button_ctrl_all(m, LV_BUTTONMATRIX_CTRL_CHECKABLE | LV_BUTTONMATRIX_CTRL_CLICK_TRIG);
     lv_buttonmatrix_clear_button_ctrl_all(m, LV_BUTTONMATRIX_CTRL_CHECKED);
     lv_buttonmatrix_set_one_checked(m, true);
     lv_buttonmatrix_set_button_ctrl(m, checked, LV_BUTTONMATRIX_CTRL_CHECKED);
@@ -243,6 +245,7 @@ static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *co
 {
     lv_obj_t *row = lv_obj_create(parent);
     lv_obj_remove_style_all(row);
+    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(row, lv_pct(100), SY(height));
     lv_obj_t *l = lv_label_create(row);
     lv_label_set_text(l, label);
@@ -250,6 +253,7 @@ static lv_obj_t *make_choice(lv_obj_t *parent, const char *label, const char *co
     lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
 
     lv_obj_t *m = lv_buttonmatrix_create(row);
+    lv_obj_remove_flag(m, LV_OBJ_FLAG_SCROLLABLE);
     set_choice_buttons(m, names, checked, height);
     lv_obj_align(m, LV_ALIGN_LEFT_MID, SX(160), 0);
     lv_obj_set_style_bg_opa(m, LV_OPA_TRANSP, 0);
@@ -326,6 +330,31 @@ static void choice_changed(lv_event_t *e)
     }
 }
 
+/* A drag that scrolls the rows chooses nothing: the button it began on lets
+ * go (the matrix would choose it on release)
+ */
+static void choices_scrolled(lv_event_t *e)
+{
+    for (int i = 0; i < EMU_UI_MAX_CHOICES; i++) {
+        if (ui.choice_rows[i]) {
+            lv_buttonmatrix_set_selected_button(ui.choice_rows[i], LV_BUTTONMATRIX_BUTTON_NONE);
+        }
+    }
+}
+
+/* The rows' box takes what the card's other lines leave: the rows scroll
+ * when they don't fit (and look as before when they do)
+ */
+static void fit_choices(void)
+{
+    lv_obj_set_height(ui.choices, LV_SIZE_CONTENT);
+    lv_obj_update_layout(ui.status_card);
+    int32_t over = lv_obj_get_scroll_bottom(ui.status_card);
+    if (over > 0) {
+        lv_obj_set_height(ui.choices, lv_obj_get_height(ui.choices) - over);
+    }
+}
+
 static void show_networks(lv_event_t *e);
 static void show_disks(lv_event_t *e);
 #if CONFIG_EMU_BLE_HID
@@ -339,31 +368,47 @@ static void build_status_screen(void)
     snprintf(title, sizeof(title), LV_SYMBOL_HOME "  %s", ui.m->name);
     make_title(s, title);
 
-    /* Three rows of choices (and the lines around them) only fit closer,
-     * four closer still, five closest, in a taller card (down to just above
-     * the buttons), six (the PC's) with lower buttons
+    /* Three rows of choices (and the lines around them) only fit closer;
+     * more (the Amiga's, the PC's) keep a three-row card's rows and scroll,
+     * in a taller card (down to just above the buttons) with less padding
      */
-    bool tight = ui.m->choice_count >= 3, tighter = ui.m->choice_count >= 4;
-    bool tightest = ui.m->choice_count >= 5, six = ui.m->choice_count >= 6;
-    lv_obj_t *card = lv_obj_create(s);
-    lv_obj_set_size(card, lv_pct(100), SY(tightest ? 398 : 380));
+    bool tight = ui.m->choice_count >= 3, more = ui.m->choice_count >= 4;
+    int gap = SY(more ? 6 : tight ? 10 : 16);
+    lv_obj_t *card = ui.status_card = lv_obj_create(s);
+    lv_obj_set_size(card, lv_pct(100), SY(more ? 398 : 380));
     lv_obj_align(card, LV_ALIGN_TOP_LEFT, 0, SY(56));
     lv_obj_set_style_bg_color(card, COLOR_CARD, 0);
     lv_obj_set_style_border_width(card, 0, 0);
-    lv_obj_set_style_pad_all(card, SY(six ? 8 : tightest ? 12 : tighter ? 18 : 24), 0);
+    lv_obj_set_style_pad_all(card, SY(more ? 12 : 24), 0);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
-    lv_obj_set_style_pad_row(card, SY(six ? 2 : tightest ? 3 : tighter ? 6 : tight ? 10 : 16), 0);
+    lv_obj_set_style_pad_row(card, gap, 0);
+    lv_obj_remove_flag(card, LV_OBJ_FLAG_SCROLLABLE);
 
     ui.wifi_label = lv_label_create(card);
     ui.time_label = lv_label_create(card);
 
-    /* (six: lower buttons on the MaTouch; the Tab5's second lines, in a
-     * relatively bigger font, need the height, and its card has the room)
+    /* The rows' box: as tall as they are, or what the card has left
+     * (fit_choices()), then they scroll
      */
-    ui.choice_height = six && BOARD_LCD_V_RES <= 600 ? 38 : tightest ? 44 : tighter ? 46 : tight ? 54 : 60;
+    lv_obj_t *rows = ui.choices = lv_obj_create(card);
+    lv_obj_set_size(rows, lv_pct(100), LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_opa(rows, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_border_width(rows, 0, 0);
+    lv_obj_set_style_radius(rows, 0, 0);
+    lv_obj_set_style_pad_all(rows, 0, 0);
+    lv_obj_set_flex_flow(rows, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_style_pad_row(rows, gap, 0);
+    lv_obj_set_scroll_dir(rows, LV_DIR_VER);
+    lv_obj_remove_flag(rows, LV_OBJ_FLAG_SCROLL_CHAIN);
+    lv_obj_add_event_cb(rows, choices_scrolled, LV_EVENT_SCROLL_BEGIN, NULL);
+
+    /* (the Tab5's second lines, in a relatively bigger font, need 64
+     * pixels: 54 scaled)
+     */
+    ui.choice_height = tight ? 54 : 60;
     for (int i = 0; i < ui.m->choice_count && i < EMU_UI_MAX_CHOICES; i++) {
         const emu_choice_t *c = &ui.m->choices[i];
-        ui.choice_rows[i] = make_choice(card, c->label, choice_names(i), c->get(), ui.choice_height,
+        ui.choice_rows[i] = make_choice(rows, c->label, choice_names(i), c->get(), ui.choice_height,
                                         choice_changed, (void *)c);
     }
 
@@ -381,6 +426,7 @@ static void build_status_screen(void)
                           ui.running ? "Changing these settings restarts the machine."
                                      : "Hold the top-right corner of the screen for 2 s to come back here.");
     lv_obj_set_style_text_color(info, COLOR_DIM, 0);
+    fit_choices();
 
     lv_obj_t *wifi_btn = make_button(s, LV_SYMBOL_WIFI "  WiFi", show_networks, 190);
     lv_obj_align(wifi_btn, LV_ALIGN_BOTTOM_LEFT, 0, 0);

@@ -375,8 +375,11 @@ static void console_task(void *arg)
             break;
         }
         case 't': {
-            int x = 0, y = 0, ms = 150;
-            if (sscanf(line + 1, "%d %d %d", &x, &y, &ms) >= 2) {
+            int x = 0, y = 0, ms = 150, x2 = 0, y2 = 0;
+            int n = sscanf(line + 1, "%d %d %d %d %d", &x, &y, &ms, &x2, &y2);
+            if (n == 5) {
+                touch_inject_drag(x, y, x2, y2, ms);
+            } else if (n >= 2) {
                 touch_inject(x, y, ms);
             }
             break;

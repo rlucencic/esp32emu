@@ -109,14 +109,18 @@ components a project requires get built: MINIMAL_BUILD).
   restart fails, the runtime sets
   the old choices back and starts again. A `live` choice (the ST's CPU
   speed, Tab5 only) changes the machine as it's set, no restart; `set()` may run on
-  another task, so the machine picks the value up between frames. Three
-  choice rows fit closer (`tight` in setup_ui.c), four closer still
-  (`tighter`: 46-pixel rows), five (the PC's) closest (`tightest`: less
-  padding, 44-pixel rows, an 18 px taller card down to just above the
-  buttons: no scrollbar on the MaTouch), six (`EMU_UI_MAX_CHOICES`) with
-  2 px between rows and, on the MaTouch, 38-pixel ones (the Tab5's
-  second lines need its 44; tried with the PC's coprocessor row, which
-  later replaced its BIOS row: no machine has six now). The buttons share 560 pixels; a row with a
+  another task, so the machine picks the value up between frames. The
+  choice rows are in a box that scrolls (the user's request once the Amiga
+  had five): as tall as the rows, or what the card's other lines leave
+  (`fit_choices()`), so up to three look as before and more scroll
+  instead of shrinking. Three rows fit closer (`tight` in setup_ui.c:
+  54-pixel rows), four or more (the Archimedes, CoCo, PC, Amiga) keep
+  those rows in a taller card (down to just above the buttons) with less
+  padding, and the last ones show cut off under the others with the
+  scrollbar beside them. Buttons choose on release (`CLICK_TRIG`) and a
+  drag that starts scrolling drops its button (`choices_scrolled()`):
+  LVGL's matrix would choose on press, and still sends RELEASED after a
+  scroll. Up to six rows (`EMU_UI_MAX_CHOICES`). The buttons share 560 pixels; a row with a
   single button (the IIGS's memory on the MaTouch, shown but not choosable)
   gets one button's width in a row of four (140). A row whose buttons
   another choice decides (the MSX's memory: one 64 KB button for an MSX1,
@@ -247,6 +251,9 @@ components a project requires get built: MINIMAL_BUILD).
   `portMAX_DELAY` write once hung the board).
 - **Simulated touches** (`t x y`) last 150 ms: send taps in separate
   `emu_console.py send` calls, or LVGL sees one press sliding between them.
+  `t x y ms x2 y2` drags (moving for 3/4 of the time, then still: no
+  fling): `t 425 440 800 425 240` scrolls the Tab5's choice rows to the
+  end.
 - Flash writes (NVS) briefly stall both cores: write from core 0 tasks, not
   from the emulation.
 - **Profile before optimising**: `emu_console.py PORT profile build/X.elf`.
@@ -382,8 +389,9 @@ and the cores.
   1280x124+0+0 \) \( -clone 0 -crop 1280x506+0+214 \) -delete 0 -append
   +repage out.png`). MaTouch, up to two choice rows: rows 104-190
   (1024x514, the first buttons at y=112); three rows (closer): 104-180
-  (1024x524); four rows: 104-170 (1024x534). Tab5, three rows: 124-214
-  (1280x630). Taken before the
+  (1024x524); four rows (the old squeezed layout): 104-170 (1024x534);
+  more rows now scroll (not measured on the MaTouch yet). Tab5, three
+  rows: 124-214 (1280x630). Taken before the
   machine starts, it says "Start" (while it's paused "Back").
 - This repo's own: `docs/images/matouch-setup-xl.png` (1024x524) and
   `tab5-setup-xl.png` (1280x630), the Atari XL's setup screen on each board

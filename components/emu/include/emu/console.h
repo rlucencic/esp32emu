@@ -9,6 +9,8 @@
  *   F <drive> [name]   insert <name> from the disk folder into drive 0, 1, ...;
  *                      eject without a name, "+" for a new blank disk
  *   t <x> <y> [ms]     touch the screen there (default 150 ms)
+ *   t <x> <y> <ms> <x2> <y2>  drag from there to x2, y2 (scrolls the setup
+ *                      screen's choices)
  *   i                  print the machine state
  *   x <ms>             hold off core 0's interrupts for 1-100 ms, as a flash
  *                      write does (a test of the RGB panel's recovery)
