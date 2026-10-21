@@ -420,6 +420,12 @@ and the cores.
 
 ## To do
 
+- **README screenshots, from time to time** (the user, 2026-10-21): for
+  every emulator, replace them with more spectacular ones as we find them
+  (games, demos, desktops at their best), following "README screenshots"
+  above (new file names, no private data). Known stale: the siblings'
+  `web.png` shows the page before the free RAM and disk space bars
+  (esp32ami's is current).
 - **Assembler for time-critical code on both boards** (the user,
   2026-10-21): RISC-V on the ESP32-P4 (an open ISA) and Xtensa LX7 on the
   ESP32-S3 (the user checked: it may be programmed in assembler; ESP-IDF
