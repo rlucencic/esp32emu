@@ -156,18 +156,20 @@ static uint16_t *s_lcd_fb;
 static void dump_screen(bool lcd)
 {
     const emu_machine_t *m = emu_machine();
-    emu_screen_t mode;
+    emu_screen_t mode = { 0 };
     int repeat = 1;
     if (lcd) {
         if (s_lcd_fb == NULL) {
             return;
         }
-        mode = (emu_screen_t){ BOARD_LCD_H_RES, BOARD_LCD_V_RES, 0 };
+        mode = (emu_screen_t){ .width = BOARD_LCD_H_RES, .height = BOARD_LCD_V_RES };
     } else {
         m->screen_mode(&mode);
         /* Pixel shape on the panel: view width / width wide, panel height / height tall */
-        int view_w = emu_view_width();
-        repeat = (BOARD_LCD_V_RES * mode.width + view_w * mode.height / 2) / (view_w * mode.height);
+        int view_w = mode.view_w > 0 ? mode.view_w : emu_view_width();
+        int view_h = mode.view_h > 0 ? mode.view_h : BOARD_LCD_V_RES;
+        int cols = mode.src_w > 0 ? mode.src_w : mode.width;
+        repeat = (view_h * cols + view_w * mode.height / 2) / (view_w * mode.height);
         repeat = repeat < 1 ? 1 : repeat;
     }
     size_t row_bytes = mode.width * sizeof(uint16_t);

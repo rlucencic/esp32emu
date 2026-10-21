@@ -146,7 +146,7 @@ static void emulation_task(void *arg)
             continue;
         }
 #endif
-        emu_screen_t mode;
+        emu_screen_t mode = { 0 };
         M->screen_mode(&mode);
         next += 1000000 / mode.hz;
         int64_t now = esp_timer_get_time();
@@ -295,7 +295,7 @@ static void stats_task(void *arg)
         }
 
         if (s_started && !s_paused) {
-            emu_screen_t mode;
+            emu_screen_t mode = { 0 };
             M->screen_mode(&mode);
             s_info.fps = (frames - last_frames) * 1e6f / elapsed;
             s_info.speed = (int)(s_info.fps * 100 / mode.hz + 0.5f);
@@ -398,25 +398,41 @@ static PRESENT_HOT uint32_t line_hash(const uint16_t *line, int width)
  */
 #define MAX_SOURCE_LINES    1024
 
+/* Widest source line (the Amiga's super-hires frames on the Tab5), widest
+ * picture on the panel (the whole width on the Tab5; on the MaTouch the
+ * machine's own, internal RAM is short there)
+ */
+#if BOARD_LCD_H_RES >= 1280
+#define MAX_SOURCE_WIDTH    1536
+#define MAX_VIEW_W(own)     BOARD_LCD_H_RES
+#else
+#define MAX_SOURCE_WIDTH    1024
+#define MAX_VIEW_W(own)     (own)
+#endif
+
+/* Where the picture is on the panel now (the presenter's; touches follow it) */
+static volatile int s_view_x, s_view_y, s_view_w, s_view_h, s_src_x, s_src_w;
+
 static PRESENT_HOT void present_task(void *arg)
 {
     uint16_t *fb = arg;
-    const int view_w = emu_view_width();
-    const int view_x = (BOARD_LCD_H_RES - view_w) / 2;
+    const int default_w = emu_view_width();
+    const int max_w = MAX_VIEW_W(default_w);
     const bool smooth = M->scale == EMU_SCALE_SMOOTH;
-    uint16_t *src = heap_caps_malloc(1024 * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
+    uint16_t *src = heap_caps_malloc(MAX_SOURCE_WIDTH * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
     uint16_t *rows[2] = {
-        heap_caps_malloc(view_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
-        heap_caps_malloc(view_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
+        heap_caps_malloc(max_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
+        heap_caps_malloc(max_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
     };
-    uint16_t *out = heap_caps_malloc(view_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
-    tap_t *xtaps = heap_caps_malloc(view_w * sizeof(tap_t), MALLOC_CAP_INTERNAL);
+    uint16_t *out = heap_caps_malloc(max_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
+    tap_t *xtaps = heap_caps_malloc(max_w * sizeof(tap_t), MALLOC_CAP_INTERNAL);
     static tap_t ytaps[VIEW_H];
     uint32_t *hashes = heap_caps_calloc(MAX_SOURCE_LINES, sizeof(uint32_t), MALLOC_CAP_SPIRAM);
     uint8_t *changed = heap_caps_malloc(MAX_SOURCE_LINES, MALLOC_CAP_SPIRAM);
     uint32_t last_signature = 0;
-    int last_width = 0, last_height = 0;
-    bool redraw = true;
+    emu_screen_t last = { 0 };
+    int vx = 0, vy = 0, vw = 0, vh = 0;     /* the picture on the panel */
+    bool redraw = true, clear = false;
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(PRESENT_MS));
@@ -431,17 +447,48 @@ static PRESENT_HOT void present_task(void *arg)
         }
         last_signature = signature;
 
-        emu_screen_t mode;
+        emu_screen_t mode = { 0 };
         M->screen_mode(&mode);
-        if (mode.width > 1024 || mode.height > MAX_SOURCE_LINES) {
+        if (mode.width > MAX_SOURCE_WIDTH || mode.height > MAX_SOURCE_LINES) {
             continue;
         }
-        if (mode.width != last_width || mode.height != last_height) {
-            make_taps(xtaps, view_w, mode.width, smooth);
-            make_taps(ytaps, VIEW_H, mode.height, smooth);
-            last_width = mode.width;
-            last_height = mode.height;
+        if (mode.src_w <= 0 || mode.src_x < 0 || mode.src_x + mode.src_w > mode.width) {
+            mode.src_x = 0;
+            mode.src_w = mode.width;
+        }
+        mode.view_w = mode.view_w > 0 && mode.view_w <= max_w ? mode.view_w : default_w;
+        mode.view_h = mode.view_h > 0 && mode.view_h <= VIEW_H ? mode.view_h : VIEW_H;
+        if (mode.width != last.width || mode.height != last.height || mode.view_w != last.view_w ||
+            mode.view_h != last.view_h || mode.src_x != last.src_x || mode.src_w != last.src_w) {
+            clear |= mode.view_w != last.view_w || mode.view_h != last.view_h;
+            vw = mode.view_w;
+            vh = mode.view_h;
+            vx = (BOARD_LCD_H_RES - vw) / 2;
+            vy = (VIEW_H - vh) / 2;
+            make_taps(xtaps, vw, mode.src_w, smooth);
+            for (int x = 0; x < vw; x++) {
+                xtaps[x].pos += mode.src_x;
+            }
+            make_taps(ytaps, vh, mode.height, smooth);
+            s_view_x = vx;
+            s_view_y = vy;
+            s_view_w = vw;
+            s_view_h = vh;
+            s_src_x = mode.src_x;
+            s_src_w = mode.src_w;
+            last = mode;
             redraw = true;
+        }
+        if (clear) {
+            /* Black around the picture: above, below, left and right */
+            memset(fb, 0, vy * BOARD_LCD_H_RES * sizeof(uint16_t));
+            memset(fb + (vy + vh) * BOARD_LCD_H_RES, 0,
+                   (VIEW_H - vy - vh) * BOARD_LCD_H_RES * sizeof(uint16_t));
+            for (int r = vy; r < vy + vh; r++) {
+                memset(fb + r * BOARD_LCD_H_RES, 0, vx * sizeof(uint16_t));
+                memset(fb + r * BOARD_LCD_H_RES + vx + vw, 0,
+                       (BOARD_LCD_H_RES - vx - vw) * sizeof(uint16_t));
+            }
         }
 
         /* Which source lines changed since the last time */
@@ -455,8 +502,8 @@ static PRESENT_HOT void present_task(void *arg)
 
         /* Scaled source rows, kept while consecutive output rows use them */
         int have[2] = { -1, -1 };
-        int first = VIEW_H, last = -1;      /* rows written */
-        for (int r = 0; r < VIEW_H; r++) {
+        int first = VIEW_H, last_row = -1;  /* rows written */
+        for (int r = 0; r < vh; r++) {
             int y = ytaps[r].pos, w = ytaps[r].w;
             if (!changed[y] && (!w || !changed[y + 1])) {
                 continue;
@@ -476,21 +523,26 @@ static PRESENT_HOT void present_task(void *arg)
                     continue;
                 }
                 M->render_line(need[k], src);
-                scale_row(src, rows[k], xtaps, view_w);
+                scale_row(src, rows[k], xtaps, vw);
                 have[k] = need[k];
             }
             const uint16_t *line = rows[0];
             if (w) {
-                for (int x = 0; x < view_w; x++) {
+                for (int x = 0; x < vw; x++) {
                     out[x] = blend565(rows[0][x], rows[1][x], w);
                 }
                 line = out;
             }
-            memcpy(fb + r * BOARD_LCD_H_RES + view_x, line, view_w * sizeof(uint16_t));
-            first = r < first ? r : first;
-            last = r;
+            memcpy(fb + (vy + r) * BOARD_LCD_H_RES + vx, line, vw * sizeof(uint16_t));
+            first = vy + r < first ? vy + r : first;
+            last_row = vy + r;
         }
-        lcd_flush(first, last + 1);
+        if (clear) {
+            first = 0;
+            last_row = VIEW_H - 1;
+            clear = false;
+        }
+        lcd_flush(first, last_row + 1);
     }
 }
 
@@ -533,8 +585,6 @@ static void supervisor_task(void *arg)
     int64_t held_since = 0;
     bool forwarding = false;
     int last_x = 0, last_y = 0;
-    const int view_w = emu_view_width();
-    const int view_x = (BOARD_LCD_H_RES - view_w) / 2;
 
     for (;;) {
         vTaskDelay(pdMS_TO_TICKS(TOUCH_POLL_MS));
@@ -544,13 +594,24 @@ static void supervisor_task(void *arg)
         bool in_zone = x >= SETUP_ZONE_X && y <= SETUP_ZONE_Y;
 
         if (M->touch != NULL && !s_paused) {
-            emu_screen_t mode;
+            emu_screen_t mode = { 0 };
             M->screen_mode(&mode);
+            /* the picture where the presenter last put it */
+            int view_x = s_view_x, view_y = s_view_y, view_w = s_view_w, view_h = s_view_h;
+            int src_x = s_src_x, src_w = s_src_w;
+            if (view_w <= 0 || view_h <= 0 || src_w <= 0) {
+                view_w = emu_view_width();
+                view_x = (BOARD_LCD_H_RES - view_w) / 2;
+                view_y = 0;
+                view_h = VIEW_H;
+                src_x = 0;
+                src_w = mode.width;
+            }
             if (pressed && (forwarding || (!in_zone && x >= view_x && x < view_x + view_w))) {
-                int mx = (x - view_x) * mode.width / view_w;
-                int my = y * mode.height / VIEW_H;
+                int mx = src_x + (x - view_x) * src_w / view_w;
+                int my = (y - view_y) * mode.height / view_h;
                 last_x = mx < 0 ? 0 : mx >= mode.width ? mode.width - 1 : mx;
-                last_y = my;
+                last_y = my < 0 ? 0 : my >= mode.height ? mode.height - 1 : my;
                 M->touch(last_x, last_y, true);
                 forwarding = true;
             } else if (!pressed && forwarding) {

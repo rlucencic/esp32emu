@@ -252,7 +252,7 @@ static esp_err_t status_get(httpd_req_t *req)
     emu_json_str(&j, "name", m->name);
     emu_json_str(&j, "state", states[info.state]);
     if (emu_started()) {
-        emu_screen_t mode;
+        emu_screen_t mode = { 0 };
         m->screen_mode(&mode);
         emu_json_int(&j, "hz", mode.hz);
         emu_json_num(&j, "fps", info.fps);

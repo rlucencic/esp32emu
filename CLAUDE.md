@@ -190,6 +190,13 @@ components a project requires get built: MINIMAL_BUILD).
   `emu_view_width()` x the panel's height (centred) when
   `screen_signature()` changes, then `lcd_flush()` of the rows it wrote;
   `EMU_SCALE_SMOOTH` filters (1-bit pictures at odd factors), `NEAREST` doesn't.
+  A frame may say otherwise (`emu_screen_t`, 0 for the default): its size
+  on the panel (`view_w`, `view_h`, centred, the margins cleared when it
+  changes) and the columns shown (`src_x`, `src_w`); the Amiga's
+  super-hires frames, 1440 wide, show 1280 columns one to one. Sources up
+  to 1536 wide on the Tab5 (1024 on the MaTouch, whose presenter buffers
+  stay at the machine's own width: internal RAM). Touches follow the
+  presenter's last geometry. Callers zero their `emu_screen_t`.
 
 - Debugger (`emudbg.h`): the machine core (not `main/`, so the host build
   has it too) fills an `emudbg_machine_t` with its CPUs (`emudbg_cpu_t`: a
@@ -444,6 +451,25 @@ and the cores.
   before assembler. Candidates: planar-to-chunky drawing (the Amiga's
   Denise, the ST's bitplanes), line conversion and scaling, big blits,
   the CPU cores' dispatch and memory fast paths.
+- **The Tab5 Keyboard's two LEDs as drive lights** (the user,
+  2026-10-21): it has two programmable RGB LEDs; light one for floppy and
+  one for hard disk activity (the drives' `light` the web page shows), in
+  every emulator. No power LED: on the board that no longer means
+  anything. `tab5_keyboard.c` doesn't touch them yet; esp32_basic's
+  `main/tab5_keyboard.c` does (an SD activity light): REG_MODE_RGB $11 = 1
+  (custom), RGB1 at $60-$62 and RGB2 at $64-$66 (B, G, R), brightness $03
+  (0-100); the I2C bus is shared with the key polling, so write only on a
+  change, from the keyboard's own task.
+- **The machines' serial ports over USB** (the user, 2026-10-21): a
+  machine's serial port (the ST's MFP RS-232, the PC's COM ports, the
+  Amiga's Paula, ... wherever there is one) as a USB serial port for the
+  computer at the other end of the cable. The Tab5 has one USB-C port: it
+  powers the board and would carry the serial port too. The MaTouch has a
+  second USB port: "the first one must be for powering the device, and
+  the second one will be used to emulate the serial port". To settle: which
+  of the MaTouch's ports is which (the console is on the S3's own USB
+  today, `/dev/cu.usbmodem1101`), and where the console goes when a port
+  is the machine's (on the Tab5 it is the only one).
 
 ## Working with the user
 

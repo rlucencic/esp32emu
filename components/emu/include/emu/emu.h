@@ -25,6 +25,12 @@ typedef struct {
     int width;
     int height;
     int hz;                     /* frames per second of the emulated video */
+    /* Optional (0: the machine's view_width at the panel's height, every
+     * column): the picture's size on the panel, centred, and the columns of
+     * it shown (src_x, src_w), e.g. the Amiga's super-hires frames 1:1
+     */
+    int view_w, view_h;
+    int src_x, src_w;
 } emu_screen_t;
 
 typedef enum {

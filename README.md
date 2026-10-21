@@ -94,7 +94,10 @@ void app_main(void)
 and runs it on core 1, one frame at a time, paced to its refresh rate (or to
 the speaker). Everything else runs on core 0. The picture is scaled to the
 panel's height (600 lines on the MaTouch, 720 on the Tab5), as wide as
-`view_width` says for 600 lines.
+`view_width` says for 600 lines. A machine's `screen_mode()` can give a
+frame its own size on the panel and the columns of it shown (`view_w`,
+`view_h`, `src_x`, `src_w` in `emu_screen_t`): the Amiga shows its
+super-hires frames one to one that way.
 
 | | |
 |---|---|
