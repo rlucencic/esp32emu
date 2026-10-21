@@ -7,10 +7,12 @@
   emu_console.py PORT send "r" ...         send console commands
   emu_console.py PORT info                 print the machine state
   emu_console.py PORT reset                hard-reset the board, then log 10 s
-  emu_console.py PORT profile ELF [N [TOP]]  where core 1 (the emulation) spends its
-                                           time: N samples at 20 kHz (default 8000),
-                                           the TOP functions (default 25), by the
-                                           build's ELF (its toolchain's nm)
+  emu_console.py PORT profile ELF [N [TOP [CORE]]]  where a core spends its time
+                                           (CORE 1, the emulation, by default; 0 the
+                                           presenter, WiFi, ...): N samples at 20 kHz
+                                           (default 8000, up to 32000), the TOP
+                                           functions (default 25), by the build's ELF
+                                           and the chip's ROM ELF (its toolchain's nm)
 """
 import base64
 import bisect
@@ -135,17 +137,30 @@ def find_nm(elf):
     return found[-1]
 
 
-def profile(port, elf, samples, top):
+def rom_elf(elf):
+    """The ROM's ELF for the build's chip (RISC-V: the P4, Xtensa: the S3), if installed"""
+    with open(elf, "rb") as f:
+        machine = int.from_bytes(f.read(20)[18:20], "little")
+    chip = {243: "esp32p4", 94: "esp32s3"}.get(machine)
+    tools = os.environ.get("IDF_TOOLS_PATH", os.path.expanduser("~/.espressif"))
+    found = sorted(glob.glob(os.path.join(tools, "tools", "esp-rom-elfs", "*", "%s_rev0_rom.elf" % chip)))
+    return found[-1] if chip and found else None
+
+
+def profile(port, elf, samples, top, core=1):
     syms = []
-    out = subprocess.run([find_nm(elf), "-S", "--defined-only", elf], capture_output=True, text=True).stdout
-    for line in out.splitlines():
-        f = line.split()
-        if len(f) == 4 and f[2].lower() in "tw":
-            syms.append((int(f[0], 16), int(f[1], 16), f[3]))
+    for path in (elf, rom_elf(elf)):
+        if path is None:
+            continue
+        out = subprocess.run([find_nm(elf), "-S", "--defined-only", path], capture_output=True, text=True).stdout
+        for line in out.splitlines():
+            f = line.split()
+            if len(f) == 4 and f[2].lower() in "tw":
+                syms.append((int(f[0], 16), int(f[1], 16), f[3]))
     syms.sort()
     starts = [s[0] for s in syms]
     port.reset_input_buffer()
-    port.write(b"p %d\n" % samples)
+    port.write(b"p %d %d\n" % (samples, core))
     pcs = []
     end = time.time() + samples / 20000 + 15
     while time.time() < end:
@@ -167,7 +182,7 @@ def profile(port, elf, samples, top):
             count[syms[i][2]] += 1
         else:
             count["?%08x" % (pc & ~0xFFF)] += 1
-    print("%d samples" % len(pcs))
+    print("%d samples, core %d" % (len(pcs), core))
     for name, n in count.most_common(top):
         print("%5.1f%%  %s" % (100.0 * n / len(pcs), name))
 
@@ -198,7 +213,7 @@ def main():
                 break
     elif cmd == "profile":
         profile(port, sys.argv[3], int(sys.argv[4]) if len(sys.argv) > 4 else 8000,
-                int(sys.argv[5]) if len(sys.argv) > 5 else 25)
+                int(sys.argv[5]) if len(sys.argv) > 5 else 25, int(sys.argv[6]) if len(sys.argv) > 6 else 1)
     elif cmd == "reset":
         if is_native_usb(sys.argv[1]):
             port.dtr = False

@@ -371,7 +371,8 @@ zx-spectrum, atari-8bit, ...); each README has badges and screenshots, the
 About text lists the main features. esp32emu's own: the CPUs (m68k, z80,
 6502), upd765, both boards' and one per machine (atari-st, macintosh,
 amstrad-cpc, zx-spectrum, commodore-64, atari-8bit). esp32emu, esp32mac,
-esp32cpc, esp32zx and esp32cbm are at GitHub's limit of 20: a new topic
+esp32cpc, esp32zx, esp32cbm and esp32pc (its topics added 2026-10-21: the boards' eleven
+plus ibm-pc, x86, 8088, 80286, ms-dos, dos, vga, adlib, sound-blaster) are at GitHub's limit of 20: a new topic
 replaces one (for the Tab5: embedded, floppy-controller, musashi, ble-hid,
 floppy-disk, tape-emulation, cp-m, vic-ii and 1571 went; esp32emu's risc-v
 for atari-8bit, esp32-p4 says it). Its About text names the runtime's parts
@@ -414,13 +415,18 @@ and the cores.
 
 ## To do
 
-- **Assembler for time-critical code on the Tab5** (the user, 2026-10-21):
-  RISC-V assembler may be used on the ESP32-P4 (an open ISA). The P4
-  build compiles with `-march=rv32imafc_zicsr_zifencei_xesppie`, so `.S`
-  files can also use Espressif's PIE (128-bit SIMD on 8/16/32-bit lanes,
-  `esp.*` mnemonics, documented in the P4's Technical Reference Manual;
-  esp-dsp is written that way). Not on the MaTouch's Xtensa LX7 until the
-  user decides whether its ISA may be used. Profile first
+- **Assembler for time-critical code on both boards** (the user,
+  2026-10-21): RISC-V on the ESP32-P4 (an open ISA) and Xtensa LX7 on the
+  ESP32-S3 (the user checked: it may be programmed in assembler; ESP-IDF
+  and esp-dsp contain Xtensa assembler themselves). Wherever C code can be
+  made faster with assembler, do it. The P4 build compiles with
+  `-march=rv32imafc_zicsr_zifencei_xesppie`, so `.S` files can also use
+  Espressif's PIE (128-bit SIMD on 8/16/32-bit lanes, `esp.*` mnemonics,
+  documented in the P4's Technical Reference Manual; esp-dsp is written
+  that way); the S3 has its own PIE (`ee.*`, 128-bit, in the S3's TRM).
+  The MaTouch gains most: it is the board short of time (the ST ~78% of
+  real time on average, no 16 MHz). Each `.S` per CPU, with the C kept
+  for the host builds. Profile first
   (`emu_console.py PORT profile ELF`; it samples core 1 only, the
   presenter is on core 0), then memory placement (TCM, internal RAM) and
   the P4's own hardware (the PPA could scale as well as rotate, 2D-DMA)

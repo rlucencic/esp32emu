@@ -504,8 +504,10 @@ function showStatus(s) {
     const detail = [d.detail !== null ? esc(d.detail) : "", counters].filter(Boolean).join(" · ");
     const ej = d.name && i < info.disks.drives.length && info.disks.drives[i] === d.label
       ? `<button onclick="eject(${i})">Eject</button>` : "<span></span>";
+    const space = d.name && d.size
+      ? `<span class="detail">${size(d.free)} free of ${size(d.size)}${bar(100 - d.free * 100 / d.size)}</span>` : "";
     return `<div class="drive"><span class="led${d.light || reading || writing ? " on" : ""}"></span>` +
-           `<b>${esc(d.label)}</b><span class="what">${what}</span>${ej}<span class="detail">${detail}</span></div>`;
+           `<b>${esc(d.label)}</b><span class="what">${what}</span>${ej}<span class="detail">${detail}</span>${space}</div>`;
   }).join("") || '<span class="dim">No drives.</span>';
 
   const b = s.board;
@@ -519,8 +521,8 @@ function showStatus(s) {
     ["Core 1", `${b.load[1]}% busy <span class="dim">(${esc(info.short_name)} emulation)</span>${bar(b.load[1], 101, 101)}`],
     b.temperature !== null && ["Chip", `${b.temperature.toFixed(0)} °C`],
     ["Internal RAM", `${kb(b.internal_free)} free <span class="dim">(lowest ${kb(b.internal_min)}, largest block ${kb(b.internal_largest)})</span>`],
-    ["PSRAM", `${mb(b.psram_free)} free of ${mb(b.psram_total)}`],
-    b.sd_total && ["SD card", `${size(b.sd_free)} free of ${size(b.sd_total)}`],
+    ["PSRAM", `${mb(b.psram_free)} free of ${mb(b.psram_total)}${bar(100 - b.psram_free * 100 / b.psram_total, 101, 101)}`],
+    b.sd_total && ["SD card", `${size(b.sd_free)} free of ${size(b.sd_total)}${bar(100 - b.sd_free * 100 / b.sd_total)}`],
   ]);
 
   const kinds = { keyboard: "⌨️", mouse: "🖱️", device: "🔵" };

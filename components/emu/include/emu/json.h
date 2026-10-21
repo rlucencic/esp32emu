@@ -41,6 +41,12 @@ void emu_json_row_bar(emu_json_t *j, const char *key, const char *html, int perc
  */
 void emu_json_drive(emu_json_t *j, const char *label, const char *name, bool read_only,
                     bool light, unsigned long reads, unsigned long writes, const char *detail);
+/* ... with the disk's free space and size in bytes, as its own filesystem
+ * counts them (size 0: not known; the page shows a bar)
+ */
+void emu_json_drive_space(emu_json_t *j, const char *label, const char *name, bool read_only, bool light,
+                          unsigned long reads, unsigned long writes, const char *detail, uint64_t free_bytes,
+                          uint64_t size);
 
 /* Begin "key":{ / "key":[ ... and end them */
 void emu_json_object(emu_json_t *j, const char *key);

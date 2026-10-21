@@ -139,8 +139,9 @@ void emu_json_row_bar(emu_json_t *j, const char *key, const char *html, int perc
     emu_json_end_array(j);
 }
 
-void emu_json_drive(emu_json_t *j, const char *label, const char *name, bool read_only,
-                    bool light, unsigned long reads, unsigned long writes, const char *detail)
+void emu_json_drive_space(emu_json_t *j, const char *label, const char *name, bool read_only, bool light,
+                          unsigned long reads, unsigned long writes, const char *detail, uint64_t free_bytes,
+                          uint64_t size)
 {
     emu_json_object(j, NULL);
     emu_json_str(j, "label", label);
@@ -150,5 +151,15 @@ void emu_json_drive(emu_json_t *j, const char *label, const char *name, bool rea
     emu_json_int(j, "reads", reads);
     emu_json_int(j, "writes", writes);
     emu_json_str(j, "detail", detail);
+    if (name && size) {
+        emu_json_int(j, "free", (long long)(free_bytes < size ? free_bytes : size));
+        emu_json_int(j, "size", (long long)size);
+    }
     emu_json_end_object(j);
+}
+
+void emu_json_drive(emu_json_t *j, const char *label, const char *name, bool read_only,
+                    bool light, unsigned long reads, unsigned long writes, const char *detail)
+{
+    emu_json_drive_space(j, label, name, read_only, light, reads, writes, detail, 0, 0);
 }

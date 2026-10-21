@@ -14,8 +14,10 @@
  *   i                  print the machine state
  *   x <ms>             hold off core 0's interrupts for 1-100 ms, as a flash
  *                      write does (a test of the RGB panel's recovery)
- *   p [samples]        sample core 1's program counter at 20 kHz (default
- *                      8000 samples): "EMUPROF <hex> ..." lines, "EMUPROF END"
+ *   p [samples] [core] sample a core's program counter at 20 kHz (default
+ *                      8000 samples, up to 32000; core 1, the emulation, or
+ *                      0: the presenter, WiFi, ...): "EMUPROF <hex> ..."
+ *                      lines, "EMUPROF END"
  *
  * Anything else goes to the machine (emu_machine_t.console_command), e.g.
  * keys and mouse.

@@ -254,7 +254,7 @@ static void disk_command(void *arg)
     }
 }
 
-/* ---- p: a profile of the emulation (core 1) ---- */
+/* ---- p: a profile of a core (1: the emulation, 0: the presenter, WiFi, ...) ---- */
 
 #define PROFILE_HZ      20000
 #define PROFILE_MAX     32000
@@ -279,8 +279,8 @@ static bool IRAM_ATTR profile_tick(gptimer_handle_t t, const gptimer_alarm_event
     return false;
 }
 
-/* On core 1, above the emulation (it doesn't yield while it's behind), so
- * the timer's interrupt is that core's
+/* On the core sampled, above the emulation (it doesn't yield while it's
+ * behind), so the timer's interrupt is that core's
  */
 static void profile_task(void *arg)
 {
@@ -305,7 +305,7 @@ static void profile_task(void *arg)
     vTaskDelete(NULL);
 }
 
-static void profile(int samples)
+static void profile(int samples, int core)
 {
     if (samples <= 0 || samples > PROFILE_MAX) {
         samples = 8000;
@@ -319,7 +319,7 @@ static void profile(int samples)
     }
     s_prof_n = 0;
     s_prof_want = samples;
-    xTaskCreatePinnedToCore(profile_task, "profile", 3072, xTaskGetCurrentTaskHandle(), 20, NULL, 1);
+    xTaskCreatePinnedToCore(profile_task, "profile", 3072, xTaskGetCurrentTaskHandle(), 20, NULL, core == 0 ? 0 : 1);
     ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(samples * 1000 / PROFILE_HZ + 5000));
     for (int i = 0; i < s_prof_n; i += 16) {
         char line[16 * 9 + 16];
@@ -387,9 +387,12 @@ static void console_task(void *arg)
         case 'i':
             print_info();
             break;
-        case 'p':
-            profile(atoi(line + 1));
+        case 'p': {
+            int samples = 0, core = 1;
+            sscanf(line + 1, "%d %d", &samples, &core);
+            profile(samples, core);
             break;
+        }
         default:
             if (emu_machine()->console_command) {
                 emu_machine()->console_command(line);
