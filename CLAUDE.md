@@ -412,6 +412,22 @@ and the cores.
 - Never overwrite an existing screenshot: a new file name each time (the
   user asks for "another screenshot" to add one, not to replace one).
 
+## To do
+
+- **Assembler for time-critical code on the Tab5** (the user, 2026-10-21):
+  RISC-V assembler may be used on the ESP32-P4 (an open ISA). The P4
+  build compiles with `-march=rv32imafc_zicsr_zifencei_xesppie`, so `.S`
+  files can also use Espressif's PIE (128-bit SIMD on 8/16/32-bit lanes,
+  `esp.*` mnemonics, documented in the P4's Technical Reference Manual;
+  esp-dsp is written that way). Not on the MaTouch's Xtensa LX7 until the
+  user decides whether its ISA may be used. Profile first
+  (`emu_console.py PORT profile ELF`; it samples core 1 only, the
+  presenter is on core 0), then memory placement (TCM, internal RAM) and
+  the P4's own hardware (the PPA could scale as well as rotate, 2D-DMA)
+  before assembler. Candidates: planar-to-chunky drawing (the Amiga's
+  Denise, the ST's bitplanes), line conversion and scaling, big blits,
+  the CPU cores' dispatch and memory fast paths.
+
 ## Working with the user
 
 - Expects changes built (all projects), flashed and checked on the board,
