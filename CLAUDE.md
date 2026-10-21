@@ -146,6 +146,32 @@ components a project requires get built: MINIMAL_BUILD).
   usages $E0-$E7, each side separately), `hid_mouse(dx, dy, buttons)`,
   `touch(x, y, pressed)` in machine screen pixels (only if the machine sets
   it; the top-right setup corner is never forwarded).
+- **The touchpad** (`touchpad(dx, dy, buttons)`, wins over `touch`): the
+  touch screen drives the machine's mouse, the user's choice over the
+  pointer jumping under the finger (2026-10-21: at higher resolutions the
+  pointer's tip stays in sight, and a tap anywhere clicks). The
+  supervisor's state machine (esp32ami's, which the user liked): touches
+  anywhere but the setup corner; moving more than `TOUCHPAD_SLOP` (the
+  panel's height / 90) moves the pointer as far as the finger goes on the
+  picture (moves in machine pixels, the fractions kept); a tap clicks the
+  left button (held 60 ms; the supervisor waits); touching again within
+  300 ms of a tap drags with it; holding still 0.5 s holds the right one
+  until the finger lifts. Each machine turns pixels into its mouse's
+  counts (the ST, Macs, CPC: one each; the IIGS halves 320 mode's; the
+  Amiga halves super-hires; the PC's mickeys of 640 x 400; the
+  Archimedes' RISC OS 3's 3 OS units a count; the CoCo's joystick steps)
+  and maps the right button (the Macs and IIGS: their one button, the
+  Archimedes: Menu). Console tests: `t x y [ms]` taps, `t x y ms x2 y2`
+  moves (the duration third). Checked on the Tab5 (2026-10-21) with those,
+  screenshots measuring the pointer: slow drags move it as far as the
+  finger on the picture within 1-3% on the Amiga, ST, Archimedes
+  (640x480), IIGS (640 mode) and Mac LC (fast ones get the machine's own
+  acceleration: Intuition, ADB); taps anywhere click (double taps open a
+  disk on all five), a tap and a drag moves a window (Amiga, ST), the long
+  press holds the right button (Workbench's menu bar), Menu (RISC OS's
+  Filer menu), the one button (GS/OS's File menu); the setup corner still
+  opens the setup screen. Not on the board: the MaTouch, the PC, CPC,
+  CoCo, Mac Plus, LC III.
 - Drives of different kinds (the CPC's floppies and cartridge slot): the
   up to 5 drives (`DISKS_MAX_DRIVES`; the CoCo's two floppies, hard disk,
   tape and cartridge: the drives page lays out five closer, 4 or fewer as
@@ -470,6 +496,22 @@ and the cores.
   of the MaTouch's ports is which (the console is on the S3's own USB
   today, `/dev/cu.usbmodem1101`), and where the console goes when a port
   is the machine's (on the Tab5 it is the only one).
+- **Clock and time zone** (an audit of every machine's clock, 2026-10-21):
+  the clock chips (ST IKBD, Mac RTC/Egret, IIGS, Archimedes PCF8583, Amiga
+  MSM6242, PC MC146818, MSX RP5C01, CPC Symbiface II) all read `time()` +
+  `localtime_r()` on each access: the Tab5's RTC chip sets the system time
+  at boot (before the machine starts), NTP on both boards (written back to
+  the Tab5's RTC), so a later sync shows at once. To fix here: the time
+  zone is set only in `net_init()` (`net.c`), so with WiFi off (or the
+  Tab5's C6 not starting) local time is UTC, and the Tab5 shows its RTC's
+  UTC as local: set TZ in `emu_run()` before `tab5_init()`. No shared
+  "not set yet" (the MaTouch before NTP is at 1970; a manual Start there
+  starts the machine then, autostart waits): the Archimedes and the PC's
+  BIOS take years before 2024 as unset, the MSX shows garbage, the PC's
+  CMOS 1970 with a good battery; perhaps one `emu_time_set()` for all.
+  Guests that read the clock at boot and then count ticks (GEMDOS, DOS,
+  the Mac) fall behind below real time. Each machine's own findings are
+  in its CLAUDE.md's open items.
 
 ## Working with the user
 

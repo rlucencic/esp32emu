@@ -7,7 +7,8 @@
 
 esp32emu is everything an emulator on these boards needs apart from the
 machine itself: the display and touch panel, the SD card, WiFi with the clock
-from the internet, Bluetooth keyboards and mice, a setup screen, a web page for
+from the internet, Bluetooth keyboards and mice (the touch screen as a
+touchpad too), a setup screen, a web page for
 disk images, a serial console for testing, and the CPU cores and chips the
 machines share: a 68000 (or 68020), a Z80, a 6502, a 65C816, a 6809, an ARM2, an x86 (8088, 8086, 80286) and a uPD765 floppy controller. A machine
 describes itself in one struct, and `emu_run()` does the rest, on either board:
@@ -75,7 +76,7 @@ static const emu_machine_t machine = {
     .screen_mode = screen_mode, .screen_signature = mac_screen_signature,
     .render_line = mac_render_line_rgb565,
     .hid_key = hid_key, .hid_mouse = hid_mouse,       /* Bluetooth */
-    .touch = touch,                                   /* optional */
+    .touchpad = hid_mouse,                            /* optional: touch as a touchpad */
     .choices = choices, .choice_count = 2,            /* setup screen rows: label, names, get, set, live */
     .disks = &disks,                                  /* drives and image folder */
     .status = status,                                 /* web page rows and drives */
@@ -108,6 +109,7 @@ super-hires frames one to one that way.
 | Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages. On the Tab5 the radio is its ESP32-C6, through esp_hosted |
 | USB keyboard and mouse | Tab5: on its USB-A port (boot protocol), plugged in at any time; keys and motion arrive like a Bluetooth keyboard's and mouse's |
 | Tab5 Keyboard | M5Stack's keyboard for the Tab5 (Ext.Port1), found at start-up; its keys arrive like a Bluetooth keyboard's |
+| Touchpad | On both boards, for when there's no mouse at hand (a Bluetooth or USB mouse is the better way): the touch screen drives the machine's mouse. A finger moving anywhere on it moves the pointer as far as it goes on the picture, a tap clicks the left button, a tap and touching again drags, holding still for half a second holds the right one (menus). The machine turns the moves (in its screen's pixels) into its mouse's counts |
 | Debugger | TCP port 6502, announced over mDNS: debug the program the machine runs from VS Code ([esp32emu-vscode](https://github.com/rlucencic/esp32emu-vscode)), with source lines, breakpoints, steps, registers, memory and the screen. Every CPU of the machine stops between two instructions; without a client the cores test one pointer per instruction |
 
 <p align="center">

@@ -84,6 +84,13 @@ typedef struct {
     void (*hid_mouse)(int dx, int dy, uint8_t buttons);
     /* Touch on the picture, in machine screen pixels (NULL: not used) */
     void (*touch)(int x, int y, bool pressed);
+    /* Or the touch screen as a touchpad for the machine's mouse (NULL: not
+     * used; it wins over touch): a finger's moves anywhere on the panel, in
+     * machine screen pixels; buttons bit 0 the left (a tap clicks; a tap
+     * and touching again drags with it), bit 1 the right (held down while
+     * the finger, held still for half a second, stays)
+     */
+    void (*touchpad)(int dx, int dy, uint8_t buttons);
 
     /* Setup screen */
     const emu_choice_t *choices;

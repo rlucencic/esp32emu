@@ -4,6 +4,7 @@
  */
 #include <math.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
@@ -577,8 +578,101 @@ static void setup_while_running(void)
 
 #endif
 
+/* The picture where the presenter last put it: on the panel, and the
+ * machine's columns shown there
+ */
+typedef struct {
+    int x, y, w, h;
+    int src_x, src_w;
+    int width, height;          /* the machine's picture */
+} view_t;
+
+static void picture_view(view_t *v)
+{
+    emu_screen_t mode = { 0 };
+    M->screen_mode(&mode);
+    *v = (view_t){ s_view_x, s_view_y, s_view_w, s_view_h, s_src_x, s_src_w, mode.width, mode.height };
+    if (v->w <= 0 || v->h <= 0 || v->src_w <= 0) {
+        v->w = emu_view_width();
+        v->x = (BOARD_LCD_H_RES - v->w) / 2;
+        v->y = 0;
+        v->h = VIEW_H;
+        v->src_x = 0;
+        v->src_w = mode.width;
+    }
+}
+
+/* The touch screen as a touchpad (machines with .touchpad), anywhere on
+ * the panel: a finger moving more than TOUCHPAD_SLOP pixels moves the
+ * pointer as far as it goes on the picture, a tap clicks the left button
+ * (held TOUCHPAD_CLICK_MS), touching again within TOUCHPAD_AGAIN_MS of a
+ * tap drags with it, holding still for TOUCHPAD_RIGHT_MS holds the right
+ * one down until the finger lifts (menus). From esp32ami's.
+ */
+#define TOUCHPAD_SLOP       (BOARD_LCD_V_RES / 90)
+#define TOUCHPAD_CLICK_MS   60
+#define TOUCHPAD_AGAIN_MS   300
+#define TOUCHPAD_RIGHT_MS   500
+
+static void touchpad(int x, int y, bool pressed, const view_t *v)
+{
+    static enum { IDLE, PENDING, MOVE, DRAG, RIGHT } state;
+    static int x0, y0, lx, ly, fx, fy;
+    static uint8_t held;            /* the buttons the machine has down */
+    static bool again;
+    static int64_t t0, t_tap;
+    int64_t now = esp_timer_get_time();
+    if (!pressed) {
+        if (state == PENDING) {
+            M->touchpad(0, 0, 1);
+            vTaskDelay(pdMS_TO_TICKS(TOUCHPAD_CLICK_MS));
+            M->touchpad(0, 0, 0);
+            t_tap = esp_timer_get_time();
+        } else if (held) {
+            M->touchpad(0, 0, 0);
+        }
+        held = 0;
+        state = IDLE;
+        return;
+    }
+    if (state == IDLE) {
+        x0 = lx = x;
+        y0 = ly = y;
+        fx = fy = 0;
+        t0 = now;
+        again = now - t_tap < TOUCHPAD_AGAIN_MS * 1000LL;
+        state = PENDING;
+        return;
+    }
+    if (state == PENDING) {
+        if (abs(x - x0) <= TOUCHPAD_SLOP && abs(y - y0) <= TOUCHPAD_SLOP) {
+            if (now - t0 >= TOUCHPAD_RIGHT_MS * 1000LL) {
+                state = RIGHT;
+                held = 2;
+                M->touchpad(0, 0, held);
+            }
+            return;
+        }
+        state = again ? DRAG : MOVE;
+    }
+    /* The finger's move in the machine's pixels, the fractions kept */
+    fx += (x - lx) * v->src_w;
+    fy += (y - ly) * v->height;
+    lx = x;
+    ly = y;
+    int dx = fx / v->w, dy = fy / v->h;
+    fx -= dx * v->w;
+    fy -= dy * v->h;
+    uint8_t buttons = state == DRAG ? 1 : state == RIGHT ? 2 : 0;
+    if (dx || dy || buttons != held) {
+        held = buttons;
+        M->touchpad(dx, dy, buttons);
+    }
+}
+
 /* Touches: a long press in the top-right corner opens the setup screen;
- * on the picture they go to the machine if it wants them
+ * on the picture (anywhere for a touchpad) they go to the machine if it
+ * wants them
  */
 static void supervisor_task(void *arg)
 {
@@ -593,25 +687,24 @@ static void supervisor_task(void *arg)
         touch_read(&x, &y, &pressed);
         bool in_zone = x >= SETUP_ZONE_X && y <= SETUP_ZONE_Y;
 
-        if (M->touch != NULL && !s_paused) {
-            emu_screen_t mode = { 0 };
-            M->screen_mode(&mode);
-            /* the picture where the presenter last put it */
-            int view_x = s_view_x, view_y = s_view_y, view_w = s_view_w, view_h = s_view_h;
-            int src_x = s_src_x, src_w = s_src_w;
-            if (view_w <= 0 || view_h <= 0 || src_w <= 0) {
-                view_w = emu_view_width();
-                view_x = (BOARD_LCD_H_RES - view_w) / 2;
-                view_y = 0;
-                view_h = VIEW_H;
-                src_x = 0;
-                src_w = mode.width;
+        if (M->touchpad != NULL && !s_paused) {
+            if (pressed && (forwarding || !in_zone)) {
+                view_t v;
+                picture_view(&v);
+                touchpad(x, y, true, &v);
+                forwarding = true;
+            } else if (!pressed && forwarding) {
+                touchpad(x, y, false, NULL);
+                forwarding = false;
             }
-            if (pressed && (forwarding || (!in_zone && x >= view_x && x < view_x + view_w))) {
-                int mx = src_x + (x - view_x) * src_w / view_w;
-                int my = (y - view_y) * mode.height / view_h;
-                last_x = mx < 0 ? 0 : mx >= mode.width ? mode.width - 1 : mx;
-                last_y = my < 0 ? 0 : my >= mode.height ? mode.height - 1 : my;
+        } else if (M->touch != NULL && !s_paused) {
+            view_t v;
+            picture_view(&v);
+            if (pressed && (forwarding || (!in_zone && x >= v.x && x < v.x + v.w))) {
+                int mx = v.src_x + (x - v.x) * v.src_w / v.w;
+                int my = (y - v.y) * v.height / v.h;
+                last_x = mx < 0 ? 0 : mx >= v.width ? v.width - 1 : mx;
+                last_y = my < 0 ? 0 : my >= v.height ? v.height - 1 : my;
                 M->touch(last_x, last_y, true);
                 forwarding = true;
             } else if (!pressed && forwarding) {
