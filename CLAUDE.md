@@ -363,10 +363,9 @@ components a project requires get built: MINIMAL_BUILD).
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, `esp32arc`, `esp32pc`, and `esp32emu-vscode` (the debugger's VS Code
+`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, `esp32arc`, `esp32pc`, `esp32ami` (public since 2026-10-21), and `esp32emu-vscode` (the debugger's VS Code
 extension, TypeScript: `npm test`, `npm run test:host` against the demo
-machine, `npm run test:vscode` inside VS Code); `esp32ami` isn't on GitHub
-yet. The user pushes straight to `main`; commit messages end with the
+machine, `npm run test:vscode` inside VS Code). The user pushes straight to `main`; commit messages end with the
 `Co-Authored-By` line the session gives. When the user says "commit and
 push all", that's all of them (esp32emu first: the others build against
 it). Topics on GitHub: emulator, esp-idf, esp32-s3, lvgl, m68k (z80 for the
