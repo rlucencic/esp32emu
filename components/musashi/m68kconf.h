@@ -40,6 +40,9 @@
 #if defined(CONFIG_M68K_NO_BUS_ERRORS) && !defined(M68K_NO_BUS_ERRORS)
 #define M68K_NO_BUS_ERRORS
 #endif
+#if defined(CONFIG_M68K_PROGRAM_READS) && !defined(M68K_PROGRAM_READS)
+#define M68K_PROGRAM_READS
+#endif
 
 #if defined(M68K_68020) || defined(M68K_68030) || defined(M68K_RUNTIME)
 /* Musashi's CPU_TYPE_IS_010_LESS() and friends are only right with the
@@ -73,7 +76,16 @@
 #define M68K_EMULATE_040            OPT_OFF
 
 /* ---- Bus ---- */
+/* Instruction words and PC-relative operands through their own callbacks
+ * (m68k_read_immediate_*(), m68k_read_pcrelative_*()) for a machine that
+ * tells them apart (CONFIG_M68K_PROGRAM_READS, -DM68K_PROGRAM_READS: the
+ * Amiga's 68EC020 instruction cache)
+ */
+#ifdef M68K_PROGRAM_READS
+#define M68K_SEPARATE_READS         OPT_ON
+#else
 #define M68K_SEPARATE_READS         OPT_OFF
+#endif
 #define M68K_SIMULATE_PD_WRITES     OPT_OFF
 #define M68K_EMULATE_FC             OPT_OFF
 #define M68K_SET_FC_CALLBACK(A)     your_set_fc_handler_function(A)

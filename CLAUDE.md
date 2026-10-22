@@ -18,7 +18,11 @@ III as a 68030: `CONFIG_M68K_68030`; the Amiga's 68000 or 68EC020 chosen at
 run time: `CONFIG_M68K_RUNTIME`; a machine that never calls
 `m68k_bus_error()` sets `CONFIG_M68K_NO_BUS_ERRORS`, the Amiga: the 68010
 and up otherwise copy their 16 registers before every instruction, to
-restart it after one), the Z80 ones the
+restart it after one; `CONFIG_M68K_PROGRAM_READS`, Musashi's
+`M68K_SEPARATE_READS`: instruction words through the machine's
+`m68k_read_immediate_16/32()`, PC-relative operands through
+`m68k_read_pcrelative_8/16/32()`, the Amiga's 68EC020 instruction cache),
+the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
 Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core, the
 Archimedes the ARM2 core, the PC the x86 core; the CPC and the +3 share the uPD765.

@@ -26,4 +26,14 @@ menu "68000 core (Musashi)"
             a bus error), and each run sets one setjmp() fewer. For machines
             that never call m68k_bus_error() (the Amiga: empty space reads 0).
 
+    config M68K_PROGRAM_READS
+        bool "Instruction words read through their own callbacks"
+        default n
+        help
+            Musashi's M68K_SEPARATE_READS: opcodes and extension words come
+            through m68k_read_immediate_16/32(), PC-relative operands through
+            m68k_read_pcrelative_8/16/32(), which the machine provides. For
+            machines that tell them apart (the Amiga's 68EC020 instruction
+            cache).
+
 endmenu
