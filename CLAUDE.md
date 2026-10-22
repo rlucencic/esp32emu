@@ -10,11 +10,12 @@ MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
 (target esp32p4); and `../esp32mac2` (Macintosh LC and II, a 68020 and
 the II's 68881), `../esp32mac3` (Macintosh LC II and LC III, a 68030
 with its MMU), `../esp32arc` (Acorn Archimedes, an ARM2) and `../esp32ami`
-(Amiga 500, 2000 and 600, a 68000), the Tab5 only. It is a library: it isn't built on its own. Build and
+(Amiga 500, 2000, 600 and 1200, a 68000 or a 68EC020), the Tab5 only. It is a library: it isn't built on its own. Build and
 test through one of the projects (each has `EXTRA_COMPONENT_DIRS` pointing
 here). ESP-IDF v5.5.4, C. The 68000 machines use Musashi (the LC and II
 as a 68020: `CONFIG_M68K_68020`, with `m68k_set_fpu()`; the LC II and LC
-III as a 68030: `CONFIG_M68K_68030`), the Z80 ones the
+III as a 68030: `CONFIG_M68K_68030`; the Amiga's 68000 or 68EC020 chosen at
+run time: `CONFIG_M68K_RUNTIME`), the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
 Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core, the
 Archimedes the ARM2 core, the PC the x86 core; the CPC and the +3 share the uPD765.

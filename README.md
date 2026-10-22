@@ -18,7 +18,7 @@ the build target picks it (`esp32s3` the MaTouch, `esp32p4` the Tab5).
 
 | Component | What |
 |---|---|
-| `components/musashi` | The 68000 core: [Musashi](https://github.com/kstenerud/Musashi), evansm7's embedded fork, with static opcode tables (see its README); a 68020 with `CONFIG_M68K_68020`, and its FPU as a 68881 |
+| `components/musashi` | The 68000 core: [Musashi](https://github.com/kstenerud/Musashi), evansm7's embedded fork, with static opcode tables (see its README); a 68020 with `CONFIG_M68K_68020`, and its FPU as a 68881; the type chosen at run time with `CONFIG_M68K_RUNTIME` |
 | `components/z80` | The Z80 core (passes zexall), timed in T-states, optionally with the ZX Spectrum's memory contention, or in Amstrad CPC microseconds, optionally reading unmapped banks through the machine, or with the MSX's memory (eight 8 KB banks and the subslot register at `$FFFF`) (menuconfig **Z80 core**); `test/` runs zexdoc/zexall on a desktop |
 | `components/m6502` | The 6502 core (6510, 8502, disk drives, the Atari's 6502C): every bus cycle as on the chip, all 256 opcodes including the undocumented ones, several CPUs at once, cycle stealing (the VIC-II's, or the Atari's ANTIC, whose DMA cycles on a line it skips from a table by itself); `test/` runs Klaus Dormann's functional test on a desktop |
 | `components/w65816` | The 65C816 core (the Apple IIGS): emulation and native mode, all 256 opcodes, decimal mode in both widths, memory through tables of 256-byte pages with the machine's callbacks for the rest, vectors from a bank of the machine's choosing; `test/` runs the SingleStepTests 65816 suite (5 million tests, bus cycles included) on a desktop |

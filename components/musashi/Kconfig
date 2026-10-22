@@ -4,8 +4,8 @@ menu "68000 core (Musashi)"
         prompt "CPU"
         default M68K_68000
         help
-            The machine's CPU, fixed at compile time. The project's
-            sdkconfig.defaults sets it.
+            The machine's CPU, fixed at compile time (or chosen at run
+            time, a little slower). The project's sdkconfig.defaults sets it.
 
         config M68K_68000
             bool "68000 (Atari ST, compact Macintosh)"
@@ -13,6 +13,8 @@ menu "68000 core (Musashi)"
             bool "68020 (Macintosh LC and II)"
         config M68K_68030
             bool "68030 with its MMU (Macintosh LC II and LC III)"
+        config M68K_RUNTIME
+            bool "68000 to 68020, chosen at run time (Amiga)"
     endchoice
 
 endmenu

@@ -20,7 +20,10 @@
 /* ---- CPU model, selected at compile time: a plain 68000, or a 68020 or
  * a 68030 for the machines that ask for one (CONFIG_M68K_68020 or
  * CONFIG_M68K_68030 in the project's sdkconfig, -DM68K_68020 or
- * -DM68K_68030 in host builds: the Macintosh LC and II, LC II and LC III)
+ * -DM68K_68030 in host builds: the Macintosh LC and II, LC II and LC III).
+ * Or chosen at run time, 68000 to 68020 (CONFIG_M68K_RUNTIME,
+ * -DM68K_RUNTIME: the Amiga's A500 and A1200 in one firmware): the type
+ * checks read m68k_set_cpu_type()'s choice instead of folding.
  */
 #ifdef ESP_PLATFORM
 #include "sdkconfig.h"
@@ -31,8 +34,11 @@
 #if defined(CONFIG_M68K_68030) && !defined(M68K_68030)
 #define M68K_68030
 #endif
+#if defined(CONFIG_M68K_RUNTIME) && !defined(M68K_RUNTIME)
+#define M68K_RUNTIME
+#endif
 
-#if defined(M68K_68020) || defined(M68K_68030)
+#if defined(M68K_68020) || defined(M68K_68030) || defined(M68K_RUNTIME)
 /* Musashi's CPU_TYPE_IS_010_LESS() and friends are only right with the
  * models below it on too (with just the 020, the 68000's address errors
  * stayed in); with the type fixed they fold to constants all the same
@@ -53,6 +59,9 @@
 #define M68K_EMULATE_030            OPT_OFF
 #define M68K_EMULATE_PMMU           OPT_OFF
 #define M68K_FIXED_CPU_TYPE         CPU_TYPE_020
+#elif defined(M68K_RUNTIME)
+#define M68K_EMULATE_030            OPT_OFF
+#define M68K_EMULATE_PMMU           OPT_OFF
 #else
 #define M68K_EMULATE_030            OPT_OFF
 #define M68K_EMULATE_PMMU           OPT_OFF

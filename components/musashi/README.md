@@ -8,7 +8,12 @@ III (`../esp32mac3`): the `M68K_CPU` choice in this component's Kconfig
 (`CONFIG_M68K_68020` or `CONFIG_M68K_68030` in the project's
 `sdkconfig.defaults`), `-DM68K_68020` or `-DM68K_68030` in host builds. The
 Mac II's 68881 is Musashi's FPU, switched on with `m68k_set_fpu()`; the
-68030 always has it.
+68030 always has it. Or the type chosen at run time, 68000 to 68020
+(`CONFIG_M68K_RUNTIME`, `-DM68K_RUNTIME`: the Amiga's A500 and A1200 in one
+firmware): no `M68K_FIXED_CPU_TYPE`, so the type checks read
+`m68k_set_cpu_type()`'s choice; measured for the Amiga's 68000 on the host
+and the Tab5, no slower (2026-10-21). Set the type before
+`m68k_use_table_copies()` (the copy takes its cycle counts).
 
 ## Source
 
