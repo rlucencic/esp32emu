@@ -199,6 +199,20 @@ components a project requires get built: MINIMAL_BUILD).
   before); optional `disks_config_t.accepts(drive, name)` limits the setup screen's
   image list for a drive, `takes_blank(drive)` its "New" button. The web
   page offers every drive; `insert()` refuses what doesn't fit.
+- **Offers for a disk** (optional, `disks_config_t.offer(drive)` and
+  `take_offer(drive)`, the user's request 2026-10-22 for the Amiga's RP9
+  games): a sentence for what the machine would do for the disk in a
+  drive ("Ants wants an A500+: 1 MB chip RAM, ..."), NULL for nothing;
+  taking it changes the machine's settings. The setup screen's disk page
+  shows the first drive's offer on its status line and a button at the top
+  right ("Set up and restart", before the first start "Set up and
+  start"): it takes the offer and closes the screen, whose caller then
+  restarts as for changed choices (the old ones back if it can't start).
+  The web page shows each under its drive with a button: `/api/status`'s
+  `offers` (`drive`, `text`), `POST /api/drive/<n>/offer` through
+  `emu_take_offer()` (the same restart; a machine not started yet only
+  gets the settings). offer() is asked every second by the web page:
+  keep it cheap (the Amiga reads the manifest as the disk goes in).
 - Disk changes from the setup screen, web page and console run inside
   `emu_paused()` (between frames). A machine that ejects a disk itself calls
   `disks_ejected(drive)` from the emulation task; NVS is written later from

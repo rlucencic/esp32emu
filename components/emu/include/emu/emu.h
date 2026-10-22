@@ -165,6 +165,13 @@ bool emu_paused(void (*fn)(void *arg), void *arg);
 /* Start the machine again with its current settings (paused meanwhile) */
 bool emu_restart(void);
 
+/* Take the machine's offer for a drive's disk (disks_config_t.offer): its
+ * settings change and a running machine restarts with them (with the old
+ * ones again if it can't start). False if there is none, or the setup
+ * screen holds the machine.
+ */
+bool emu_take_offer(int drive);
+
 /* Restart the board and go straight into the machine (for memory that only
  * fits in one block right after power-on)
  */

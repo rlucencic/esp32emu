@@ -85,6 +85,8 @@ static struct {
     char bt_shown[512], pair_shown[512];   /* what the lists show now */
     lv_obj_t *disk_screen, *images_screen;
     lv_obj_t *disk_status, *drive_label[DISKS_MAX_DRIVES], *drive_buttons[DISKS_MAX_DRIVES][3];
+    lv_obj_t *offer_button;                 /* the machine's offer for a disk (disks_offer()) */
+    int offer_drive;
     lv_obj_t *images_title, *images_count, *images_list;
     int images_drive;                       /* drive the chooser inserts into */
     char **images;
@@ -857,6 +859,8 @@ static void update_bluetooth(void)
 
 enum { BTN_INSERT, BTN_NEW, BTN_EJECT };
 
+static void update_offer(void);
+
 static void update_disks(void)
 {
     for (int d = 0; d < ui.disks->drives; d++) {
@@ -881,12 +885,42 @@ static void update_disks(void)
             }
         }
     }
+    update_offer();
 }
 
 static void set_disk_status(const char *text, lv_color_t color)
 {
     lv_label_set_text(ui.disk_status, text);
     lv_obj_set_style_text_color(ui.disk_status, color, 0);
+}
+
+/* The first drive whose disk the machine offers something for: its button
+ * at the top right, what it does on the status line
+ */
+static void update_offer(void)
+{
+    const char *text = NULL;
+    for (int d = 0; d < ui.disks->drives && text == NULL; d++) {
+        text = disks_offer(d);
+        ui.offer_drive = d;
+    }
+    if (text == NULL) {
+        lv_obj_add_flag(ui.offer_button, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    set_disk_status(text, COLOR_WARN);
+    lv_obj_remove_flag(ui.offer_button, LV_OBJ_FLAG_HIDDEN);
+}
+
+/* The settings change; the screen closes and the machine (re)starts with
+ * them (the choices differ from the screen's start: emu_ui_run()'s caller)
+ */
+static void offer_clicked(lv_event_t *e)
+{
+    if (disks_offer(ui.offer_drive) != NULL) {
+        ui.disks->take_offer(ui.offer_drive);
+        ui.done = true;
+    }
 }
 
 static void show_disks(lv_event_t *e)
@@ -1002,6 +1036,11 @@ static void build_disk_screens(void)
     char title[48];
     snprintf(title, sizeof(title), LV_SYMBOL_SAVE "  %s", ui.disks->title);
     make_title(s, title);
+    ui.offer_button = make_button(s, ui.running ? LV_SYMBOL_REFRESH "  Set up and restart"
+                                                : LV_SYMBOL_PLAY "  Set up and start", offer_clicked, 340);
+    lv_obj_set_height(ui.offer_button, SY(48));
+    lv_obj_align(ui.offer_button, LV_ALIGN_TOP_RIGHT, 0, -SY(4));
+    lv_obj_add_flag(ui.offer_button, LV_OBJ_FLAG_HIDDEN);
     ui.disk_status = lv_label_create(s);
     lv_obj_set_width(ui.disk_status, lv_pct(100));
     lv_label_set_long_mode(ui.disk_status, LV_LABEL_LONG_DOT);

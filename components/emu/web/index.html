@@ -89,6 +89,7 @@
   .drive b { font-weight: 600; white-space: nowrap; }
   .drive .what { min-width: 0; overflow-wrap: anywhere; }
   .drive .detail { grid-column: 3 / 5; color: var(--dim); font-size: 13px; }
+  .drive .detail.offer { color: var(--warn); }
   .drive button { padding: 2px 10px; font-size: 13px; }
   .dim { color: var(--dim); }
   .msg { color: var(--warn); }
@@ -475,6 +476,17 @@ function eject(i) {
     .then(() => { refresh(); status(); });
 }
 
+/* What the machine offers for a drive's disk (an RP9 game's machine):
+ * its settings change and it restarts
+ */
+function takeOffer(n) {
+  log("Setting the machine up as the disk asks, restarting it…");
+  request("POST", "/api/drive/" + n + "/offer")
+    .then(() => log("Restarted as the disk asks.", "ok"))
+    .catch(e => log(e.message, "bad"))
+    .then(() => status());
+}
+
 function showStatus(s) {
   const m = s.machine;
   const state = { running: "Running", paused: "Paused: setup screen", setup: "Setup screen",
@@ -506,8 +518,11 @@ function showStatus(s) {
       ? `<button onclick="eject(${i})">Eject</button>` : "<span></span>";
     const space = d.name && d.size
       ? `<span class="detail">${size(d.free)} free of ${size(d.size)}${bar(100 - d.free * 100 / d.size)}</span>` : "";
+    const o = (s.offers || []).find(o => o.drive === i + 1);
+    const offer = o ? `<span class="detail offer">${esc(o.text)} ` +
+                      `<button onclick="takeOffer(${o.drive})">Set up and restart</button></span>` : "";
     return `<div class="drive"><span class="led${d.light || reading || writing ? " on" : ""}"></span>` +
-           `<b>${esc(d.label)}</b><span class="what">${what}</span>${ej}<span class="detail">${detail}</span>${space}</div>`;
+           `<b>${esc(d.label)}</b><span class="what">${what}</span>${ej}<span class="detail">${detail}</span>${space}${offer}</div>`;
   }).join("") || '<span class="dim">No drives.</span>';
 
   const b = s.board;

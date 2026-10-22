@@ -8,6 +8,8 @@
  *   GET    /api/status          machine, drives, board and Bluetooth status
  *   PUT    /api/drive/<n>       insert the image named in the body into drive n
  *   DELETE /api/drive/<n>       eject drive n
+ *   POST   /api/drive/<n>/offer take what the machine offers for drive n's disk
+ *                               (the status's "offers": its settings, a restart)
  *   POST   /api/new?size=<bytes>  make a blank disk image
  *   PUT    /disks/<name>        upload (raw body; also POST), replaces an image
  *                               of that name unless it's in a drive
@@ -284,6 +286,19 @@ static esp_err_t status_get(httpd_req_t *req)
     }
     emu_json_end_array(&j);
 
+    /* What the machine offers for its drives' disks (a button each) */
+    emu_json_array(&j, "offers");
+    for (int d = 0; d < disks_config()->drives; d++) {
+        const char *text = disks_offer(d);
+        if (text) {
+            emu_json_object(&j, NULL);
+            emu_json_int(&j, "drive", d + 1);
+            emu_json_str(&j, "text", text);
+            emu_json_end_object(&j);
+        }
+    }
+    emu_json_end_array(&j);
+
     /* The board */
     char ip[20] = "";
     wifi_ap_record_t ap;
@@ -400,6 +415,22 @@ static esp_err_t drive_delete(httpd_req_t *req)
     if (!emu_paused(drive_op, &op)) {
         return send_text(req, "409 Conflict", "The setup screen is open on the board");
     }
+    return send_text(req, "200 OK", "OK");
+}
+
+static esp_err_t drive_post(httpd_req_t *req)
+{
+    int d = drive_number(req);
+    if (d < 0 || strstr(req->uri, "/offer") == NULL) {
+        return send_text(req, "400 Bad Request", "POST /api/drive/<number>/offer");
+    }
+    if (disks_offer(d) == NULL) {
+        return send_text(req, "404 Not Found", "Nothing offered for that drive's disk");
+    }
+    if (!emu_take_offer(d)) {
+        return send_text(req, "409 Conflict", "The setup screen is open on the board");
+    }
+    ESP_LOGI(TAG, "%s: its disk's offer taken", disks_config()->drive_names[d]);
     return send_text(req, "200 OK", "OK");
 }
 
@@ -693,6 +724,7 @@ void emu_web_start(void)
         { .uri = "/api/status",     .method = HTTP_GET,    .handler = status_get },
         { .uri = "/api/drive/*",    .method = HTTP_PUT,    .handler = drive_put },
         { .uri = "/api/drive/*",    .method = HTTP_DELETE, .handler = drive_delete },
+        { .uri = "/api/drive/*",    .method = HTTP_POST,   .handler = drive_post },
         { .uri = "/api/new",        .method = HTTP_POST,   .handler = new_post },
         { .uri = "/disks/*",        .method = HTTP_PUT,    .handler = disk_put },
         { .uri = "/disks/*",        .method = HTTP_POST,   .handler = disk_put },

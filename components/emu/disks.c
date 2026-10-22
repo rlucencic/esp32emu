@@ -256,6 +256,14 @@ bool disks_in_use(const char *name)
     return false;
 }
 
+const char *disks_offer(int drive)
+{
+    if (!s_ready || s_cfg.offer == NULL || s_cfg.take_offer == NULL || drive < 0 || drive >= s_cfg.drives) {
+        return NULL;
+    }
+    return s_cfg.offer(drive);
+}
+
 void disks_removed(const char *name)
 {
     if (s_cfg.removed) {

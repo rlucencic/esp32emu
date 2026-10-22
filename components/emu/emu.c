@@ -209,6 +209,44 @@ bool emu_restart(void)
     return emu_paused(start_fn, &ok) && ok;
 }
 
+typedef struct {
+    int drive;
+    bool taken;
+} offer_t;
+
+/* (as the setup screen's restart: the choices back if it can't start) */
+static void offer_fn(void *arg)
+{
+    offer_t *o = arg;
+    if (disks_offer(o->drive) == NULL) {
+        return;
+    }
+    int before[EMU_UI_MAX_CHOICES];
+    for (int i = 0; i < M->choice_count && i < EMU_UI_MAX_CHOICES; i++) {
+        before[i] = M->choices[i].get();
+    }
+    disks_config()->take_offer(o->drive);
+    o->taken = true;
+    if (!s_started) {
+        return;
+    }
+    ESP_LOGI(TAG, "restarting the %s as its disk asks", M->short_name);
+    bool ok = false;
+    start_fn(&ok);
+    if (!ok) {
+        for (int i = 0; i < M->choice_count && i < EMU_UI_MAX_CHOICES; i++) {
+            M->choices[i].set(before[i]);
+        }
+        start_fn(&ok);
+    }
+}
+
+bool emu_take_offer(int drive)
+{
+    offer_t o = { drive, false };
+    return emu_paused(offer_fn, &o) && o.taken;
+}
+
 void emu_info(emu_info_t *info)
 {
     *info = s_info;

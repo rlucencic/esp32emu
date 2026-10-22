@@ -132,6 +132,7 @@ super-hires frames one to one that way.
 | `GET /disks/<name>` / `DELETE /disks/<name>` | Download / delete (not while in a drive) |
 | `PUT /api/drive/<n>` | Insert the image named in the body into drive n (1, 2, ...) |
 | `DELETE /api/drive/<n>` | Eject drive n |
+| `POST /api/drive/<n>/offer` | Take what the machine offers for drive n's disk (the status's `offers`: e.g. an Amiga game's machine), which changes its settings and restarts it |
 | `POST /api/new?size=<bytes>` | Make a blank disk image |
 
 `curl -T game.st http://atari-ste.local/disks/` uploads from a script.

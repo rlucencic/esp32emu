@@ -62,6 +62,15 @@ typedef struct {
      */
     uint32_t (*default_size)(int drive);
     const char *(*extension_for)(uint32_t bytes);
+    /* Optional: something the machine offers for the disk in a drive, as a
+     * sentence (the Amiga's RP9 games: "Ants wants an A500+: 1 MB chip RAM,
+     * 1 MB fast RAM, Kickstart 1.3"), NULL for nothing; take_offer() does
+     * it by changing the machine's settings, which it then restarts with.
+     * A button on the setup screen's disk page and on the web page. Keep
+     * offer() cheap: the web page asks every second.
+     */
+    const char *(*offer)(int drive);
+    void (*take_offer)(int drive);
 } disks_config_t;
 
 /* Make the folder if needed; false without an SD card */
@@ -104,6 +113,11 @@ bool disks_in_use(const char *name);
 
 /* `name` was deleted or replaced */
 void disks_removed(const char *name);
+
+/* The machine's offer for a drive's disk (NULL: none); emu_take_offer()
+ * takes it from outside the setup screen
+ */
+const char *disks_offer(int drive);
 
 /* The blank disk size made for a drive (-1: any) when none is chosen */
 uint32_t disks_default_size(int drive);
