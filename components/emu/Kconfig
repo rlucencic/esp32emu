@@ -101,5 +101,10 @@ menu "Emulator board"
         depends on EMU_SPEAKER
         range 0 100
         default 60
+        help
+            The volume as a share of full scale until one is set on the
+            setup screen (its Sound row's slider and mute button, saved in
+            NVS for every project on the board). The slider scales by its
+            square: 60% shows as 77 there.
 
 endmenu

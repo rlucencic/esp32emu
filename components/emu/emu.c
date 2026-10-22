@@ -763,6 +763,9 @@ void emu_run(const emu_machine_t *machine)
     if (err != ESP_OK) {
         ESP_LOGE(TAG, "NVS init failed: %s", esp_err_to_name(err));
     }
+#if CONFIG_EMU_SPEAKER
+    speaker_load(CONFIG_EMU_SPEAKER_VOLUME);
+#endif
 
     bool start_now = s_start_after_restart == START_AFTER_RESTART;
     s_start_after_restart = 0;
@@ -866,7 +869,7 @@ void emu_run(const emu_machine_t *machine)
     }
 #if CONFIG_EMU_SPEAKER
     if (M->audio_render) {
-        speaker_start(M->audio_hz, M->audio_render, CONFIG_EMU_SPEAKER_VOLUME);
+        speaker_start(M->audio_hz, M->audio_render);
     }
 #endif
     xTaskCreatePinnedToCore(emulation_task, "emulation", 8192, NULL, 10, NULL, 1);

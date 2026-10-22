@@ -140,6 +140,23 @@ components a project requires get built: MINIMAL_BUILD).
   (`LV_EVENT_DRAW_TASK_ADDED`) makes that one transparent and draws a label
   for each line around its centre. Names without one look as before. Two
   lines fit a three-row card's rows (54 px, 64 on the Tab5: 30 + 27).
+- **The Sound row** (the user's request, 2026-10-22: sound sometimes too
+  loud, no way to lower it): with `CONFIG_EMU_SPEAKER` and a machine with
+  `audio_render` (every one), the setup screen adds a last row of its own
+  after the machine's choices (it counts in `tight`/`more`, not in
+  `EMU_UI_MAX_CHOICES`): a mute button where the buttons begin (grey with
+  a speaker, blue and a speaker with an X while muted) and a slider with
+  its value (0-100). Both live; moving the slider unmutes; the slider goes
+  grey while muted. The samples are scaled by the slider's square (an even
+  feel), in `speaker.c` (the Tab5's codec stays at full scale);
+  `CONFIG_EMU_SPEAKER_VOLUME` (60% of full scale) shows as 77 until one is
+  set. NVS namespace `speaker` (`volume`, `muted`), the same for every
+  project on the board, written as the setup screen closes (and by the
+  console's `v [0-100|m]`). LVGL 9.4's slider moves only after 10 px of
+  sideways drag and leaves a drag that scrolls the rows alone (checked:
+  a swipe starting on it scrolled the Amiga's rows, the volume unchanged).
+  Checked on the Tab5 (esp32ami: mute, the slider, restored after a
+  restart); the loudness itself only by ear.
 - Sound: the speaker's task counts the frames it had to make up when the
   machine was late (`speaker_missing_frames()`: dropouts heard as
   artefacts); the IIGS shows it with `i`.

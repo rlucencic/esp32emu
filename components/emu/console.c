@@ -19,6 +19,7 @@
 #include "emu/board.h"
 #include "emu/console.h"
 #include "emu/disks.h"
+#include "emu/speaker.h"
 #include "emu/touch.h"
 #include "emu_internal.h"
 
@@ -395,6 +396,21 @@ static void console_task(void *arg)
             profile(samples, core);
             break;
         }
+#if CONFIG_EMU_SPEAKER
+        case 'v': {
+            const char *arg = line + 1 + strspn(line + 1, " ");
+            if (*arg == 'm') {
+                speaker_set_muted(!speaker_muted());
+            } else if (*arg != 0) {
+                speaker_set_volume(atoi(arg));
+            }
+            if (*arg != 0) {
+                speaker_save();
+            }
+            emu_console_printf("volume %d%s\n", speaker_volume(), speaker_muted() ? ", muted" : "");
+            break;
+        }
+#endif
         default:
             if (emu_machine()->console_command) {
                 emu_machine()->console_command(line);

@@ -18,6 +18,8 @@
  *                      8000 samples, up to 32000; core 1, the emulation, or
  *                      0: the presenter, WiFi, ...): "EMUPROF <hex> ..."
  *                      lines, "EMUPROF END"
+ *   v [0-100|m]        the speaker's volume (the setup screen's slider), set
+ *                      it, or m: mute or unmute; saved (with a speaker only)
  *
  * Anything else goes to the machine (emu_machine_t.console_command), e.g.
  * keys and mouse.

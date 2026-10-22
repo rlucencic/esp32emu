@@ -4,10 +4,12 @@
  * Tab5: the ES8388 codec and NS4150 amp through the BSP (esp_codec_dev).
  * The I2S clock is the master: this task drains the machine's sound ring
  * at exactly its rate, and the emulator paces itself on the ring's level.
+ * The volume scales the samples (the Tab5's codec stays at full scale).
  */
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "nvs.h"
 #include "emu/board.h"
 #include "emu/speaker.h"
 #if CONFIG_IDF_TARGET_ESP32P4
@@ -23,10 +25,14 @@
 #else
 #define STACK           3072
 #endif
+#define NVS_NAMESPACE   "speaker"
 
 static const char *TAG = "speaker";
 static speaker_render_t s_render;
-static int32_t s_volume;
+static int s_volume = 100;              /* the slider, 0-100 */
+static bool s_muted;
+static int s_saved_volume = -1, s_saved_muted = -1;    /* what NVS has */
+static volatile int32_t s_gain = 65536; /* the samples' scale, 1/65536 */
 static volatile uint32_t s_missing;     /* frames the machine didn't have in time */
 
 #if CONFIG_IDF_TARGET_ESP32P4
@@ -112,8 +118,9 @@ static void speaker_task(void *arg)
             buf[i * 2] = n ? buf[(n - 1) * 2] : 0;
             buf[i * 2 + 1] = n ? buf[(n - 1) * 2 + 1] : 0;
         }
+        int32_t gain = s_gain;
         for (int i = 0; i < CHUNK_FRAMES * 2; i++) {
-            buf[i] = (int32_t)buf[i] * s_volume >> 16;
+            buf[i] = (int32_t)buf[i] * gain >> 16;
         }
         output_write(buf, sizeof(buf));
     }
@@ -124,10 +131,76 @@ uint32_t speaker_missing_frames(void)
     return s_missing;
 }
 
-bool speaker_start(int rate, speaker_render_t render, int volume)
+static void set_gain(void)
+{
+    s_gain = s_muted ? 0 : s_volume * s_volume * 65536 / 10000;
+}
+
+void speaker_load(int default_percent)
+{
+    /* (the slider whose square is that share: 60% of full scale is 77) */
+    int v = 0;
+    while ((v + 1) * (v + 1) <= default_percent * 100) {
+        v++;
+    }
+    s_volume = v;
+    nvs_handle_t h;
+    if (nvs_open(NVS_NAMESPACE, NVS_READONLY, &h) == ESP_OK) {
+        uint8_t u;
+        if (nvs_get_u8(h, "volume", &u) == ESP_OK && u <= 100) {
+            s_volume = s_saved_volume = u;
+        }
+        if (nvs_get_u8(h, "muted", &u) == ESP_OK) {
+            s_muted = u != 0;
+            s_saved_muted = u != 0;
+        }
+        nvs_close(h);
+    }
+    set_gain();
+}
+
+int speaker_volume(void)
+{
+    return s_volume;
+}
+
+bool speaker_muted(void)
+{
+    return s_muted;
+}
+
+void speaker_set_volume(int volume)
+{
+    s_volume = volume < 0 ? 0 : volume > 100 ? 100 : volume;
+    set_gain();
+}
+
+void speaker_set_muted(bool muted)
+{
+    s_muted = muted;
+    set_gain();
+}
+
+void speaker_save(void)
+{
+    if (s_volume == s_saved_volume && (int)s_muted == s_saved_muted) {
+        return;
+    }
+    nvs_handle_t h;
+    if (nvs_open(NVS_NAMESPACE, NVS_READWRITE, &h) == ESP_OK) {
+        nvs_set_u8(h, "volume", (uint8_t)s_volume);
+        nvs_set_u8(h, "muted", s_muted);
+        if (nvs_commit(h) == ESP_OK) {
+            s_saved_volume = s_volume;
+            s_saved_muted = s_muted;
+        }
+        nvs_close(h);
+    }
+}
+
+bool speaker_start(int rate, speaker_render_t render)
 {
     s_render = render;
-    s_volume = volume * 65536 / 100;
     if (!output_start(rate)) {
         return false;
     }

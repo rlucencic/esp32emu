@@ -102,10 +102,10 @@ super-hires frames one to one that way.
 
 | | |
 |---|---|
-| Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start (**Start**), and any time by holding the top-right corner of the screen for 2 s (**Back** returns, **Reset** resets the machine); changing a choice there restarts the machine (**Restart**), unless the machine applies it at once (e.g. the ST's CPU speed on the Tab5) |
+| Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start (**Start**), and any time by holding the top-right corner of the screen for 2 s (**Back** returns, **Reset** resets the machine); changing a choice there restarts the machine (**Restart**), unless the machine applies it at once (e.g. the ST's CPU speed on the Tab5). With the speaker on, a **Sound** row for every machine: a mute button and a volume slider, applied at once and kept for every emulator on the board |
 | Disks | One folder of images on the SD card for the machine's drives; inserted disks are remembered in NVS. Blank disks of the sizes the machine offers |
 | Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, with a progress bar: how far, how fast, how long still; ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks (a machine can add a script that turns other files into images in the browser, e.g. the Mac's StuffIt archives, or packs dropped files and folders onto one, the PC's FAT images); a machine can take the disk folder's subfolders as drives too (the PC's read-only hard disks) |
-| Console | Native USB port (MaTouch: the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, plus the machine's own commands |
+| Console | Native USB port (MaTouch: the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, the speaker's volume, plus the machine's own commands |
 | Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages. On the Tab5 the radio is its ESP32-C6, through esp_hosted |
 | USB keyboard and mouse | Tab5: on its USB-A port (boot protocol), plugged in at any time; keys and motion arrive like a Bluetooth keyboard's and mouse's |
 | Tab5 Keyboard | M5Stack's keyboard for the Tab5 (Ext.Port1), found at start-up; its keys arrive like a Bluetooth keyboard's |
@@ -155,7 +155,7 @@ such as the network name):
 | Web page | on | |
 | Setup screen | on | Optionally starting the machine by itself after a countdown |
 | BLE keyboard and mouse | on | Mouse speed divider |
-| Sound on the speaker | MaTouch off, Tab5 on | Volume. MaTouch: moves the console to the UART port |
+| Sound on the speaker | MaTouch off, Tab5 on | Volume until one is set on the setup screen. MaTouch: moves the console to the UART port |
 | Debugger (menu **Debugger**) | on | TCP port (6502) |
 
 ## Hardware

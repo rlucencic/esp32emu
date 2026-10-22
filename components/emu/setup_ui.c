@@ -29,6 +29,7 @@
 #include "emu/disks.h"
 #include "emu/lcd.h"
 #include "emu/net.h"
+#include "emu/speaker.h"
 #include "emu/touch.h"
 #include "emu_internal.h"
 
@@ -69,6 +70,7 @@ static struct {
     lv_obj_t *choice_rows[EMU_UI_MAX_CHOICES];  /* their button matrices */
     lv_obj_t *choices, *status_card;    /* the rows' scrolling box, the card around it */
     int choice_height;
+    lv_obj_t *mute_button, *mute_label, *volume_slider, *volume_label;  /* the Sound row */
     bool done;
     bool reset;                     /* [Reset] pressed */
     bool countdown_cancelled;
@@ -330,6 +332,99 @@ static void choice_changed(lv_event_t *e)
     }
 }
 
+/* ---- the Sound row: [mute] slider 77% (the board's speaker, every machine) ---- */
+
+#if CONFIG_EMU_SPEAKER
+
+static bool has_sound(void)
+{
+    return ui.m->audio_render != NULL;
+}
+
+/* Muted: the button checked, a speaker with an X, the slider grey (where
+ * the sound comes back to)
+ */
+static void show_volume(void)
+{
+    bool muted = speaker_muted();
+    lv_label_set_text(ui.mute_label, muted ? LV_SYMBOL_MUTE LV_SYMBOL_CLOSE : LV_SYMBOL_VOLUME_MAX);
+    if (muted) {
+        lv_obj_add_state(ui.mute_button, LV_STATE_CHECKED);
+        lv_obj_add_state(ui.volume_slider, LV_STATE_USER_1);
+    } else {
+        lv_obj_remove_state(ui.mute_button, LV_STATE_CHECKED);
+        lv_obj_remove_state(ui.volume_slider, LV_STATE_USER_1);
+    }
+    lv_label_set_text_fmt(ui.volume_label, "%d%%", speaker_volume());
+}
+
+static void mute_clicked(lv_event_t *e)
+{
+    speaker_set_muted(!speaker_muted());
+    show_volume();
+}
+
+/* Moving the slider turns the sound back on. (LVGL's slider moves only
+ * after a sideways drag, and a drag that scrolls the rows leaves it alone)
+ */
+static void volume_changed(lv_event_t *e)
+{
+    speaker_set_volume(lv_slider_get_value(ui.volume_slider));
+    speaker_set_muted(false);
+    show_volume();
+}
+
+/* Like a choice row: the mute button where the buttons begin, as grey as
+ * they are, blue (checked) while muted; the slider and its value after it
+ */
+static void make_sound_row(lv_obj_t *parent, int height)
+{
+    lv_obj_t *row = lv_obj_create(parent);
+    lv_obj_remove_style_all(row);
+    lv_obj_remove_flag(row, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(row, lv_pct(100), SY(height));
+    lv_obj_t *l = lv_label_create(row);
+    lv_label_set_text(l, "Sound");
+    lv_obj_set_style_text_color(l, COLOR_TEXT, 0);
+    lv_obj_align(l, LV_ALIGN_LEFT_MID, 0, 0);
+
+    lv_obj_t *b = ui.mute_button = lv_button_create(row);
+    lv_obj_set_size(b, SX(96), SY(height));
+    lv_obj_align(b, LV_ALIGN_LEFT_MID, SX(160), 0);
+    lv_obj_set_style_bg_color(b, lv_palette_lighten(LV_PALETTE_GREY, 2), 0);
+    lv_obj_set_style_text_color(b, lv_palette_darken(LV_PALETTE_GREY, 4), 0);
+    lv_obj_set_style_bg_color(b, lv_theme_get_color_primary(b), LV_STATE_CHECKED);
+    lv_obj_set_style_text_color(b, lv_color_white(), LV_STATE_CHECKED);
+    lv_obj_add_event_cb(b, mute_clicked, LV_EVENT_CLICKED, NULL);
+    ui.mute_label = lv_label_create(b);
+    lv_obj_center(ui.mute_label);
+
+    lv_obj_t *s = ui.volume_slider = lv_slider_create(row);
+    lv_obj_set_size(s, SX(352), SY(12));
+    lv_obj_align(s, LV_ALIGN_LEFT_MID, SX(288), 0);
+    lv_slider_set_range(s, 0, 100);
+    lv_slider_set_value(s, speaker_volume(), LV_ANIM_OFF);
+    lv_obj_set_style_bg_color(s, lv_palette_lighten(LV_PALETTE_GREY, 2), LV_PART_MAIN);
+    lv_obj_set_style_bg_opa(s, LV_OPA_COVER, LV_PART_MAIN);
+    lv_obj_set_style_pad_all(s, SY(8), LV_PART_KNOB);
+    lv_obj_set_style_bg_color(s, COLOR_DIM, LV_PART_INDICATOR | LV_STATE_USER_1);
+    lv_obj_set_style_bg_color(s, COLOR_DIM, LV_PART_KNOB | LV_STATE_USER_1);
+    lv_obj_set_ext_click_area(s, SY(18));
+    lv_obj_add_event_cb(s, volume_changed, LV_EVENT_VALUE_CHANGED, NULL);
+
+    ui.volume_label = lv_label_create(row);
+    lv_obj_set_style_text_color(ui.volume_label, COLOR_TEXT, 0);
+    lv_obj_align(ui.volume_label, LV_ALIGN_LEFT_MID, SX(664), 0);
+    show_volume();
+}
+
+#else
+static bool has_sound(void)
+{
+    return false;
+}
+#endif
+
 /* A drag that scrolls the rows chooses nothing: the button it began on lets
  * go (the matrix would choose it on release)
  */
@@ -370,9 +465,11 @@ static void build_status_screen(void)
 
     /* Three rows of choices (and the lines around them) only fit closer;
      * more (the Amiga's, the PC's) keep a three-row card's rows and scroll,
-     * in a taller card (down to just above the buttons) with less padding
+     * in a taller card (down to just above the buttons) with less padding.
+     * The Sound row is one of them.
      */
-    bool tight = ui.m->choice_count >= 3, more = ui.m->choice_count >= 4;
+    int row_count = ui.m->choice_count + (has_sound() ? 1 : 0);
+    bool tight = row_count >= 3, more = row_count >= 4;
     int gap = SY(more ? 6 : tight ? 10 : 16);
     lv_obj_t *card = ui.status_card = lv_obj_create(s);
     lv_obj_set_size(card, lv_pct(100), SY(more ? 398 : 380));
@@ -411,6 +508,11 @@ static void build_status_screen(void)
         ui.choice_rows[i] = make_choice(rows, c->label, choice_names(i), c->get(), ui.choice_height,
                                         choice_changed, (void *)c);
     }
+#if CONFIG_EMU_SPEAKER
+    if (has_sound()) {
+        make_sound_row(rows, ui.choice_height);
+    }
+#endif
 
     ui.message_label = lv_label_create(card);
     lv_obj_set_width(ui.message_label, lv_pct(100));
@@ -1042,6 +1144,9 @@ void emu_ui_run(uint16_t *fb, bool running, emu_ui_result_t *result)
     }
 #if CONFIG_EMU_BLE_HID
     ble_hid_set_pairing(false);
+#endif
+#if CONFIG_EMU_SPEAKER
+    speaker_save();
 #endif
 
     disks_free_list(ui.images, ui.image_count);
