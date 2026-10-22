@@ -17,4 +17,13 @@ menu "68000 core (Musashi)"
             bool "68000 to 68020, chosen at run time (Amiga)"
     endchoice
 
+    config M68K_NO_BUS_ERRORS
+        bool "The machine never raises bus errors"
+        default n
+        help
+            Leaves Musashi's bus errors out: the 68010 and up no longer copy
+            their 16 registers before every instruction (to restart it after
+            a bus error), and each run sets one setjmp() fewer. For machines
+            that never call m68k_bus_error() (the Amiga: empty space reads 0).
+
 endmenu

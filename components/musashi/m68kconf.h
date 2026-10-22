@@ -37,6 +37,9 @@
 #if defined(CONFIG_M68K_RUNTIME) && !defined(M68K_RUNTIME)
 #define M68K_RUNTIME
 #endif
+#if defined(CONFIG_M68K_NO_BUS_ERRORS) && !defined(M68K_NO_BUS_ERRORS)
+#define M68K_NO_BUS_ERRORS
+#endif
 
 #if defined(M68K_68020) || defined(M68K_68030) || defined(M68K_RUNTIME)
 /* Musashi's CPU_TYPE_IS_010_LESS() and friends are only right with the
@@ -92,8 +95,15 @@
 /* Odd-address word/long accesses raise address errors ("3 bombs") */
 #define M68K_EMULATE_ADDRESS_ERROR  OPT_ON
 
-/* Bus errors raised from memory callbacks via m68k_bus_error() ("2 bombs") */
+/* Bus errors raised from memory callbacks via m68k_bus_error() ("2 bombs");
+ * off for a machine without them (CONFIG_M68K_NO_BUS_ERRORS, the Amiga):
+ * the 68010 and up then don't copy their registers before each instruction
+ */
+#ifdef M68K_NO_BUS_ERRORS
+#define M68K_BUS_ERR_ENABLE         OPT_OFF
+#else
 #define M68K_BUS_ERR_ENABLE         OPT_ON
+#endif
 
 #define M68K_EMULATE_BKPT_ACK       OPT_OFF
 #define M68K_BKPT_ACK_CALLBACK()    your_bkpt_ack_handler_function()
