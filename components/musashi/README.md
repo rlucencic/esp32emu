@@ -60,6 +60,15 @@ options on top of upstream; pico-mac uses it to run a Mac on an RP2040:
   `fatalerror()` logs the first few times instead of calling `exit()`
   (which on a board restarts it).
 
+- `M68K_EMULATE_PREFETCH` (`CONFIG_M68K_PREFETCH`, off by default; the
+  Amiga's on): `m68ki_read_opcode_16()` takes the opcode from the prefetch
+  too and fetches the word after it, as `m68ki_read_imm_16()` already did
+  for extension words (the fork's opcode fetch skipped it). An instruction
+  writing over the next one then runs the old word, as on a 68000:
+  Copylock-style trace decoders (Razor 1911's Voyage) toggle the next
+  instruction and rely on it. `make -C components/musashi/test run-prefetch`
+  checks self-modifying opcodes, extension-word prefetch and branch
+  refetching with the option on; the default test also checks it off.
 - `M68K_HALT_CALLBACK()` (in `m68kcpu.h`, both double-fault halts): tells
   the machine that the CPU halted (`m68k_host_halted()`), so the emulation
   stops running it and logs the fault once.

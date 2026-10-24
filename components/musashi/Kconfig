@@ -36,4 +36,14 @@ menu "68000 core (Musashi)"
             machines that tell them apart (the Amiga's 68EC020 instruction
             cache).
 
+    config M68K_PREFETCH
+        bool "The next instruction word fetched ahead"
+        default n
+        help
+            Musashi's M68K_EMULATE_PREFETCH: each instruction word read also
+            fetches the one after it, as the 68000's prefetch does, so an
+            instruction that writes over the next one runs the old word
+            (Copylock-style checks; the Amiga). A taken branch reads one
+            word more.
+
 endmenu

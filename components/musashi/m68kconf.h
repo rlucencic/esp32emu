@@ -43,6 +43,9 @@
 #if defined(CONFIG_M68K_PROGRAM_READS) && !defined(M68K_PROGRAM_READS)
 #define M68K_PROGRAM_READS
 #endif
+#if defined(CONFIG_M68K_PREFETCH) && !defined(M68K_PREFETCH)
+#define M68K_PREFETCH
+#endif
 
 #if defined(M68K_68020) || defined(M68K_68030) || defined(M68K_RUNTIME)
 /* Musashi's CPU_TYPE_IS_010_LESS() and friends are only right with the
@@ -119,7 +122,15 @@
 
 #define M68K_EMULATE_BKPT_ACK       OPT_OFF
 #define M68K_BKPT_ACK_CALLBACK()    your_bkpt_ack_handler_function()
+/* The next instruction word fetched ahead (CONFIG_M68K_PREFETCH,
+ * -DM68K_PREFETCH): an instruction writing over the next one runs the old
+ * word, as on a 68000 (the Amiga's Copylock-style checks)
+ */
+#ifdef M68K_PREFETCH
+#define M68K_EMULATE_PREFETCH       OPT_ON
+#else
 #define M68K_EMULATE_PREFETCH       OPT_OFF
+#endif
 
 /* ---- Hooks (all off: they cost time on every instruction) ---- */
 #define M68K_CMPILD_HAS_CALLBACK    OPT_OFF

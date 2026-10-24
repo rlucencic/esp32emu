@@ -21,7 +21,11 @@ and up otherwise copy their 16 registers before every instruction, to
 restart it after one; `CONFIG_M68K_PROGRAM_READS`, Musashi's
 `M68K_SEPARATE_READS`: instruction words through the machine's
 `m68k_read_immediate_16/32()`, PC-relative operands through
-`m68k_read_pcrelative_8/16/32()`, the Amiga's 68EC020 instruction cache),
+`m68k_read_pcrelative_8/16/32()`, the Amiga's 68EC020 instruction cache;
+`CONFIG_M68K_PREFETCH`, Musashi's `M68K_EMULATE_PREFETCH` with the opcode
+fetch through it too: the next word fetched ahead, so an instruction
+writing over the next one runs the old word, the Amiga's Copylock-style
+decoders),
 the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
 Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core, the

@@ -1114,8 +1114,24 @@ static inline uint m68ki_read_opcode_16(void)
 {
 	/* FIXME: fc, check PMMU, etc. */
 	m68ki_check_address_error(REG_PC, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
+#if M68K_EMULATE_PREFETCH
+	/* the opcode from the prefetch too, and the word after it fetched now:
+	 * an instruction writing over the next one runs the old word */
+	{
+		uint result;
+		if(REG_PC != CPU_PREF_ADDR)
+			result = m68k_read_instr_16(ADDRESS_68K(REG_PC));
+		else
+			result = MASK_OUT_ABOVE_16(CPU_PREF_DATA);
+		REG_PC += 2;
+		CPU_PREF_ADDR = REG_PC;
+		CPU_PREF_DATA = m68k_read_immediate_16(ADDRESS_68K(REG_PC));
+		return result;
+	}
+#else
 	REG_PC += 2;
 	return m68k_read_instr_16(ADDRESS_68K(REG_PC-2));
+#endif
 }
 
 static inline uint m68ki_read_imm_8(void)

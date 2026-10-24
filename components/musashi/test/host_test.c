@@ -165,6 +165,43 @@ static void test_disassembler(void)
     CHECK(strstr(buf, "move.w") != NULL, "disassembly '%s'", buf);
 }
 
+static void test_self_modifying_code(void)
+{
+    /* Change the following MOVEQ. The 68000 has fetched its old word
+     * before the write; a taken branch must then fetch the changed word. */
+    const unsigned short code[] = {
+        0x3081,                 /* MOVE.W D1,(A0) */
+        0x7001,                 /* MOVEQ #1,D0 (changed to #2) */
+        0x4EF9, 0x0000, 0x1002 /* JMP $1002.L */
+    };
+    load(code, sizeof(code) / sizeof(code[0]));
+    m68k_set_reg(M68K_REG_A0, 0x1002);
+    m68k_set_reg(M68K_REG_D1, 0x7002);
+    m68k_execute(8);             /* MOVE.W */
+    CHECK(rd16(0x1002) == 0x7002, "next opcode was not written");
+    m68k_execute(4);             /* MOVEQ */
+#ifdef M68K_PREFETCH
+    CHECK(reg(M68K_REG_D0) == 1, "prefetched opcode: D0 %u", reg(M68K_REG_D0));
+#else
+    CHECK(reg(M68K_REG_D0) == 2, "uncached opcode: D0 %u", reg(M68K_REG_D0));
+#endif
+    m68k_execute(10);            /* JMP */
+    m68k_execute(4);             /* changed MOVEQ */
+    CHECK(reg(M68K_REG_D0) == 2, "branch used stale opcode: D0 %u", reg(M68K_REG_D0));
+
+    /* An extension word also prefetches the following opcode. */
+    const unsigned short immediate[] = { 0x30BC, 0x7002, 0x7001, 0x4E72, 0x2700 };
+    load(immediate, sizeof(immediate) / sizeof(immediate[0]));
+    m68k_set_reg(M68K_REG_A0, 0x1004);
+    m68k_execute(12);            /* MOVE.W #$7002,(A0) */
+    m68k_execute(4);             /* MOVEQ */
+#ifdef M68K_PREFETCH
+    CHECK(reg(M68K_REG_D0) == 1, "extension prefetch: D0 %u", reg(M68K_REG_D0));
+#else
+    CHECK(reg(M68K_REG_D0) == 2, "extension without prefetch: D0 %u", reg(M68K_REG_D0));
+#endif
+}
+
 int main(void)
 {
     m68k_init();
@@ -176,6 +213,7 @@ int main(void)
     test_address_error();
     test_interrupts();
     test_disassembler();
+    test_self_modifying_code();
 
     printf(failures ? "%d check(s) failed\n" : "all checks passed\n", failures);
     return failures != 0;

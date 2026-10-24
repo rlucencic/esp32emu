@@ -9,14 +9,17 @@ OBJS      := $(patsubst $(COMPONENT)/%.c,$(BUILD)/%.o,$(SRCS))
 run: $(BUILD)/host_test
 	./$(BUILD)/host_test
 
+run-prefetch:
+	$(MAKE) BUILD=build/prefetch CFLAGS="$(CFLAGS) -DM68K_PREFETCH" run
+
 $(BUILD)/host_test: host_test.c $(OBJS)
 	$(CC) $(CFLAGS) $^ -lm -o $@
 
-$(BUILD)/%.o: $(COMPONENT)/%.c $(COMPONENT)/m68kconf.h
+$(BUILD)/%.o: $(COMPONENT)/%.c $(COMPONENT)/m68kconf.h $(wildcard $(COMPONENT)/musashi/*.h)
 	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -w -c $< -o $@
 
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: run clean
+.PHONY: run run-prefetch clean
