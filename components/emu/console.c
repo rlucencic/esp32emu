@@ -10,6 +10,7 @@
 #include "driver/gptimer.h"
 #include "driver/uart.h"
 #include "driver/usb_serial_jtag.h"
+#include "soc/uart_pins.h"
 #include "driver/usb_serial_jtag_vfs.h"
 #include "esp_heap_caps.h"
 #include "esp_log.h"
@@ -70,10 +71,17 @@ static bool console_open(void)
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_DEFAULT,
+        .source_clk = UART_SCLK_XTAL, /* 921600 needs a stable clock */
     };
-    if (uart_driver_install(UART_NUM_0, 1024, 16384, 0, NULL, 0) != ESP_OK ||
-        uart_param_config(UART_NUM_0, &cfg) != ESP_OK) {
+    /* Param and pins before install (IDF examples). TX ring: try 16 KB for
+     * screen dumps, then 2 KB if internal RAM is tight after lcd_init. */
+    if (uart_param_config(UART_NUM_0, &cfg) != ESP_OK ||
+        uart_set_pin(UART_NUM_0, U0TXD_GPIO_NUM, U0RXD_GPIO_NUM,
+                     UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE) != ESP_OK) {
+        return false;
+    }
+    if (uart_driver_install(UART_NUM_0, 1024, 16384, 0, NULL, 0) != ESP_OK &&
+        uart_driver_install(UART_NUM_0, 1024, 2048, 0, NULL, 0) != ESP_OK) {
         return false;
     }
     esp_log_set_vprintf(log_vprintf);

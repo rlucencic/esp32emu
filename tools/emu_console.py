@@ -47,12 +47,13 @@ def open_port(name):
         port.dtr = True
         port.rts = False
     else:
-        # USB-to-UART (console moved there for the speaker, 921600 baud):
-        # keep both lines as the OS left them, so the auto-reset circuit
-        # (DTR -> IO0, RTS -> EN) stays idle.
+        # USB-to-UART (console moved there for the speaker, 921600 baud).
+        # DTR/RTS both asserted holds some bridges (WCH) in reset; leave them
+        # low. Opening still pulses reset — callers that need a live machine
+        # should wait a few seconds after open (or use log/reset).
         port.baudrate = 921600
-        port.dtr = True
-        port.rts = True
+        port.dtr = False
+        port.rts = False
     port.open()
     return port
 
