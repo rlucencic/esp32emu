@@ -912,12 +912,18 @@ void emu_run(const emu_machine_t *machine)
 #endif
     xTaskCreatePinnedToCore(emulation_task, "emulation", 8192, NULL, 10, NULL, 1);
     s_started = true;
+    /* Above the presenter (5): a blinking cursor keeps presenting, and at
+     * priority 4 the long-press corner never got 2 s of polls (even idle).
+     * Stack in PSRAM (like emudbg): LVGL needs ~16 KB, and on the CBM the
+     * largest internal block at start is often under 10 KB — without this
+     * the supervisor never ran ("no supervisor task"), so the corner died.
+     */
     if (s_fb != NULL &&
-        xTaskCreatePinnedToCore(supervisor_task, "supervisor", 16384, NULL, 4, NULL, 0) != pdPASS) {
-        /* No setup screen corner, no touches: say so (it failed silently once) */
-        ESP_LOGE(TAG, "no supervisor task: internal RAM %u free, largest block %u",
-                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
-                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+        xTaskCreatePinnedToCoreWithCaps(supervisor_task, "supervisor", 16384, NULL, 6,
+                                        NULL, 0, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+        ESP_LOGE(TAG, "no supervisor task: PSRAM %u free, largest block %u",
+                 (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
+                 (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
     }
 
     ESP_LOGI(TAG, "Free internal: %u bytes, PSRAM: %u bytes",

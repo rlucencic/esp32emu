@@ -134,6 +134,7 @@ super-hires frames one to one that way.
 | `DELETE /api/drive/<n>` | Eject drive n |
 | `POST /api/drive/<n>/offer` | Take what the machine offers for drive n's disk (the status's `offers`: e.g. an Amiga game's machine), which changes its settings and restarts it |
 | `POST /api/new?size=<bytes>` | Make a blank disk image |
+| `POST /api/reset` | Cold-reset the machine (same as the console's `r`) |
 
 `curl -T game.st http://atari-ste.local/disks/` uploads from a script.
 `/floppies/` works as `/disks/` for older scripts. Two transfers can run at

@@ -11,6 +11,7 @@
  *   POST   /api/drive/<n>/offer take what the machine offers for drive n's disk
  *                               (the status's "offers": its settings, a restart)
  *   POST   /api/new?size=<bytes>  make a blank disk image
+ *   POST   /api/reset           cold-reset the machine (as the console's r)
  *   PUT    /disks/<name>        upload (raw body; also POST), replaces an image
  *                               of that name unless it's in a drive
  *   GET    /disks/<name>        download
@@ -434,6 +435,16 @@ static esp_err_t drive_post(httpd_req_t *req)
     return send_text(req, "200 OK", "OK");
 }
 
+static esp_err_t reset_post(httpd_req_t *req)
+{
+    if (!emu_started()) {
+        return send_text(req, "409 Conflict", "The machine has not started yet");
+    }
+    emu_request_reset();
+    ESP_LOGI(TAG, "reset");
+    return send_text(req, "200 OK", "OK");
+}
+
 static esp_err_t new_post(httpd_req_t *req)
 {
     char query[64], value[16];
@@ -726,6 +737,7 @@ void emu_web_start(void)
         { .uri = "/api/drive/*",    .method = HTTP_DELETE, .handler = drive_delete },
         { .uri = "/api/drive/*",    .method = HTTP_POST,   .handler = drive_post },
         { .uri = "/api/new",        .method = HTTP_POST,   .handler = new_post },
+        { .uri = "/api/reset",      .method = HTTP_POST,   .handler = reset_post },
         { .uri = "/disks/*",        .method = HTTP_PUT,    .handler = disk_put },
         { .uri = "/disks/*",        .method = HTTP_POST,   .handler = disk_put },
         { .uri = "/disks/*",        .method = HTTP_GET,    .handler = disk_get },
