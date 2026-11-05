@@ -32,7 +32,7 @@ BASE64_LINE = re.compile(rb"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{4}|[A-Za-z0-9+
 
 
 def is_native_usb(name):
-    return "usbmodem" in name
+    return "usbmodem" in name or os.path.basename(os.path.realpath(name)).startswith("ttyACM")
 
 
 def open_port(name):
