@@ -414,10 +414,15 @@ static INLINE uint32_t operand2(arm2_t *c, run_t *r, uint32_t op, uint32_t pc, u
         }
     }
     v = rm == R15_4 ? ((pc + 8) & ARM2_PC) | c->psr : REG(c, rm);
-    amount = (op >> 7) & 31;
-    if (LIKELY(type == 0)) {
-        /* LSL, the commonest (and a plain register) first */
-        if (amount == 0) { *carry = (c->psr >> 29) & 1; return v; }
+    /* Type and immediate count share bits 5-11; zero is plain Rm (LSL #0). */
+    unsigned shift = (op >> 5) & 0x7F;
+    if (LIKELY(shift == 0)) {
+        *carry = (c->psr >> 29) & 1;
+        return v;
+    }
+    type = shift & 3;
+    amount = shift >> 2;
+    if (type == 0) {
         *carry = (v >> (32 - amount)) & 1;
         return v << amount;
     }

@@ -58,3 +58,13 @@ across the initial/restored runs, assembly 60.4-61.0%. Both kept real time.
 The candidate grew `arm2_run` by 314 bytes and was rejected; the C core
 and baseline firmware were restored. See the Acorn experiment document
 for the patch, raw summaries, workload and measurement limitations.
+
+The subsequent [operand-decode experiments](../../esp32arc/docs/operand-decode-experiment-2026-11-05.md)
+tested three compact C changes on Lander and the guest loop. Grouping the
+register operand's shift type and amount into one field was retained:
+the minute-long comparison improved Lander from 98.294% to 99.003% real
+time (0.721% relative throughput), for 14 bytes more interpreter code.
+All 190 CPU checks, 100,000 differential instructions and the deterministic
+host Lander replay passed. An immediate fast path and direct conditional
+dispatch were rejected for lack of useful gain. This is a small measured
+improvement for the tested workload, not a general assembly speedup.
