@@ -884,7 +884,7 @@ static INLINE void coprocessor(arm2_t *c, run_t *r, uint32_t op, uint32_t pc)
  * i an immediate, r a register), the other conditions to their check
  * first, never (NV) to the next instruction
  */
-#define DP_PAIR(name, form)     &&dp_##name##_##form, &&dp_##name##_##form
+#define DP_PAIR(name, form)     &&dp_##name##_##form, &&dp_##name##_##form##_s
 #define DP_ROW(form)    DP_PAIR(and, form), DP_PAIR(eor, form), DP_PAIR(sub, form), DP_PAIR(rsb, form), \
                         DP_PAIR(add, form), DP_PAIR(adc, form), DP_PAIR(sbc, form), DP_PAIR(rsc, form), \
                         DP_PAIR(tst, form), DP_PAIR(teq, form), DP_PAIR(cmp, form), DP_PAIR(cmn, form), \
@@ -940,12 +940,18 @@ void arm2_host_hook(arm2_t *c);         /* host builds: tracing */
  */
 #define PC              (r->pc - 4)
 
+/* Dispatch encodes S too, so unused flag calculations disappear at compile time. */
 #define DP(name, opcode)                                                        \
     dp_##name##_i:                                                              \
-        data_processing(c, r, op, PC, opcode, OP2_IMM, (op >> 20) & 1); NEXT(); \
+        data_processing(c, r, op, PC, opcode, OP2_IMM, false); NEXT();            \
+    dp_##name##_i_s:                                                            \
+        data_processing(c, r, op, PC, opcode, OP2_IMM, true); NEXT();             \
     dp_##name##_r:                                                              \
         if (UNLIKELY(op & 0x10)) goto dp_shift_reg;                             \
-        data_processing(c, r, op, PC, opcode, OP2_SHIFT_IMM, (op >> 20) & 1); NEXT();
+        data_processing(c, r, op, PC, opcode, OP2_SHIFT_IMM, false); NEXT();     \
+    dp_##name##_r_s:                                                            \
+        if (UNLIKELY(op & 0x10)) goto dp_shift_reg;                             \
+        data_processing(c, r, op, PC, opcode, OP2_SHIFT_IMM, true); NEXT();
 
 #define ST(name, load, byte)                                                    \
     name##_i: single_transfer(c, r, op, PC, load, byte, false); NEXT();         \

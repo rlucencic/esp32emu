@@ -68,3 +68,14 @@ All 190 CPU checks, 100,000 differential instructions and the deterministic
 host Lander replay passed. An immediate fast path and direct conditional
 dispatch were rejected for lack of useful gain. This is a small measured
 improvement for the tested workload, not a general assembly speedup.
+
+The subsequent [flag-setting dispatch experiment](../../esp32arc/docs/flags-dispatch-experiment-2026-11-05.md)
+split data-processing handlers by the S bit already present in the dispatch
+index. This removes unused flag work from the generated code. Two fresh-boot
+Lander runs per build improved pooled real-time speed from 99.122% to 99.589%
+(0.471% relative throughput); paired gains were 0.752% and 0.192%. The change
+was retained, with a 6,482-byte internal code RAM cost and no table growth.
+All 190 checks, 100,000 differential instructions and the identical host
+replay passed. The workload is near its 50 FPS cap, and the small observed
+gain varies between runs. Fetch/dispatch is the next target: a merged
+dispatch tail accounted for 8.46% of a separate baseline core 1 profile.
