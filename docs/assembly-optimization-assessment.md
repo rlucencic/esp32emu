@@ -245,3 +245,14 @@ with guest instruction counts within 0.038%. This supports the rejection
 using a different metric; the percentages are not interchangeable with
 sampled CPU residency. The CPU rewrite was reverted and the timing tool
 retained for future comparisons.
+
+A subsequent [plain LDR/STR register-offset fast path](../../esp32arc/docs/address-direction-experiment-2026-11-06.md#follow-up-plain-register-offsets-no-useful-gain)
+also showed no useful gain. An early return for unshifted Rm adds 104
+interpreter bytes; A440 Lander averages 4.808 million frame-call cycles,
+versus 4.805 million initially and 4.799 million after restoring baseline.
+The candidate costs 0.064–0.201% more cycles/frame, with overlapping
+capture ranges and similar guest instruction counts. It passed 190 CPU
+checks, 100,000 Unicorn instructions, 4,718,592 offset-helper reference
+comparisons under UBSan and identical 2,000-frame host desktop output.
+The source and saved baseline firmware were restored; the small timing
+differences do not establish a precise regression.
