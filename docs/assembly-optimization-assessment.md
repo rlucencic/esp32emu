@@ -131,3 +131,14 @@ increased from 68.60% to 69.54% (1.37% relatively), while interpreter code
 grew by 2,780 bytes. Both builds held 50 FPS. The committed source and
 previously tested firmware were restored; specializing more dispatch
 bits does not reliably improve this P4 workload.
+
+The [condition lookup experiment](../../esp32arc/docs/condition-lookup-experiment-2026-11-06.md)
+then removed eager condition-mask updates and read the condition table
+only when a conditional instruction executed. It reduced interpreter
+code by 2,764 bytes but showed no game CPU improvement: A440 Lander mean
+ARM2 residency was 69.24% versus 68.64% for the baseline (0.87% relatively
+higher). The candidate passed 190 CPU checks, 100,000 Unicorn instructions,
+1,536 exhaustive condition/flag cases including in-run TEQP, and the
+identical host replay. It was rejected and the committed core, header
+and firmware were restored. Host reporting now counts condition fields;
+34.8% of Lander instructions use a checked condition.
