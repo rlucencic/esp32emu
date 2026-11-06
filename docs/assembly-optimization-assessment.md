@@ -305,3 +305,17 @@ unchanged and BSS shrinks by 16 bytes. UBSan timing/raster traces and a
 6,000-frame host mode-switch replay match exactly. New timing-input
 writers must refresh the cache; repeated timing writes now recalculate
 at the write. ARM2, sound and palette sources are otherwise unchanged.
+
+A subsequent [IOC timer-count divide experiment](../../esp32arc/docs/ioc-count-experiment-2026-11-06.md)
+was reverted. A guarded 32-bit divide compiles to a hardware `divu`,
+retaining the original 64-bit overdue/fallback paths, and passes more
+than eight million timer/state reference cases under UBSan plus the
+identical 6,000-frame host replay. A440 Lander frame cost is 0.255% higher
+than the first baseline and 0.107% lower than the restored control;
+the baseline means differ by 0.362%. There is no consistent useful gain
+and no precise regression is established. Original IOC source and saved
+baseline firmware were restored. All previously accepted changes remain.
+A subsequent 32,000-sample restored-baseline scout still places 68.881%
+of all core-1 samples in ARM2, with approximately 28.1% idle. The hottest
+ARM2 PC is the shared tail's guest-opcode load; IOC arithmetic remains a
+lower priority. This single profile is not a before/after speed comparison.
