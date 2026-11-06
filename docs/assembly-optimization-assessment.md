@@ -396,3 +396,15 @@ firmware were restored. Profile animated four-plane software before planar
 work; profile active music and event-split call lengths before further PSG
 work. These are workload-specific P4 findings, with no S3 result. See the
 [STE test report](../../esp32ste/docs/optimization-tests-2026-11-06.md).
+
+The subsequent [four-plane STE experiment](../../esp32ste/docs/planar-conversion-experiment-2026-11-06.md)
+retains a four-pixel lookup decoder in portable C. A full-screen synthetic
+guest animation first raises renderer residency to 8.1% of core 0. The
+revised path cuts isolated P4 low-resolution rendering cost by 35.685%;
+three full-firmware captures put renderer residency at 5.0–5.2% versus
+7.3–7.5% for a fresh restored reference. This is not a whole-emulator or
+FPS speedup. The one-/two-plane kernel costs rise about 0.76%, a documented
+tradeoff; P4 renderer code grows 272 bytes plus a 32-byte table. All
+347,680 UBSan scanline comparisons and the identical three-resolution
+native desktop pixel/audio replays pass. Both full firmware targets build;
+S3 runtime/performance and animated real-software coverage remain open.
