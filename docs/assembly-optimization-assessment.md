@@ -121,3 +121,13 @@ hold 50 FPS; `arm2_run` shrinks by 42 bytes. All 190 CPU checks, 100,000
 Unicorn instructions, 8,192 targeted baseline comparisons and the
 identical deterministic replay pass. Host mix reporting now lists the
 most frequent LDM and STM masks to guide further workload-based changes.
+
+The [single-transfer direction experiment](../../esp32arc/docs/address-direction-experiment-2026-11-06.md)
+then used the dispatch table's existing bit 23 to select separate add/subtract
+LDR/STR handlers. It passed 190 CPU checks, 100,000 Unicorn instructions,
+65,536 targeted baseline comparisons including cycles and full PSR, and
+the identical host replay. It was rejected: A440 Lander mean ARM2 residency
+increased from 68.60% to 69.54% (1.37% relatively), while interpreter code
+grew by 2,780 bytes. Both builds held 50 FPS. The committed source and
+previously tested firmware were restored; specializing more dispatch
+bits does not reliably improve this P4 workload.
