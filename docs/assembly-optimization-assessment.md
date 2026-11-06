@@ -224,3 +224,14 @@ and both builds holding 50 FPS. All 190 checks, 100,000 Unicorn cases,
 comparisons and the identical replay passed. The original core and exact
 baseline firmware were restored; the accepted R0-prefix optimization
 remains. Added detection and compiler layout effects were not isolated.
+
+Narrow single-register paths for STM `{LR}` and LDM `{PC}` were also
+rejected. They add 44 code bytes and preserve 88 indirect jump sites,
+but A440 Lander ARM2 residency rises to 69.80% versus 68.68% from the
+saved baseline and 68.84% from a fresh post-candidate baseline rebuild.
+All 6,241 defined functions in the rebuilt control match the saved
+firmware at identical addresses and bytes. The candidate passes 190
+checks, 100,000 Unicorn instructions, 222,720 extended block-transfer
+state comparisons (including mode changes and newly enabled interrupts)
+and the identical replay. The original source and freshly rebuilt
+baseline firmware were restored. Details are in the block-copy document.
