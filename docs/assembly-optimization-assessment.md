@@ -204,3 +204,13 @@ shrank by 12,114 and 8,630 bytes, respectively. Both passed 190 checks,
 identical host replay. These variants still alter dispatch-tail merging;
 the measurements do not isolate call overhead. Both were rejected and
 the baseline restored. Details are in the same experiment document.
+
+Combining the inner PSR helper with `no-crossjumping` on `arm2_run` alone
+was also rejected. It retains 111 indirect jump sites versus baseline 88
+and reduces interpreter-plus-helper code by 4,006 bytes, yet A440 Lander
+combined ARM2 residency rises from 68.42% to 73.40% (7.28% relatively).
+Both hold 50 FPS. All 190 CPU checks, 100,000 Unicorn instructions, 40,960
+PC/PSR state comparisons and the deterministic replay pass. More tails
+and smaller code together still do not establish a gain; the measurement
+does not isolate prediction, register allocation or layout. Original core
+and saved baseline firmware restored; see the same experiment document.
