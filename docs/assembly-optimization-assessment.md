@@ -186,5 +186,11 @@ from 68.70% to 71.40% with an unlikely hint and 70.60% without it; code
 changed by +346 and -366 bytes. Each passed the existing 190 checks,
 100,000 differential instructions, focused PC/register cases and the
 identical host replay. The baseline core and firmware were restored.
-The next candidate is sharing rare data-processing PC/PSR write paths;
-smaller code or fewer source operations alone do not establish a gain.
+Sharing rare data-processing PC writes and PSR updates was then tested
+and rejected: interpreter plus helper code shrank by 12,382 bytes, but
+combined ARM2 residency rose from 68.68% to 72.94% (6.20% relatively).
+The comparison includes the outlined helper samples. All 190 checks,
+100,000 differential instructions, 40,960 PC/PSR state comparisons and
+the identical host replay passed. The original core and baseline firmware
+were restored. Smaller code or fewer source operations alone do not
+establish a gain.
