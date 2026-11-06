@@ -99,3 +99,14 @@ Lander remains near its 50 FPS limit. The change costs 4,700 bytes of code
 RAM and passes 190 CPU checks, 100,000 differential instructions and the
 identical host replay. Host mix reporting now counts unshifted operands:
 20.4% of all Lander instructions and 51.2% of register-operand instructions.
+
+The [block-transfer count experiment](../../esp32arc/docs/block-count-experiment-2026-11-06.md)
+replaced the software 16-bit population count with two byte-table lookups
+in internal RAM. The retained change reduces A440 Lander mean ARM2
+residency from 70.82% to 70.10% and the eight-register LDM/STM loop from
+42.80% to 41.97%. Both remain paced at real time; these are sampled CPU
+cost reductions, not uncapped FPS gains. The cost is 256 bytes of data
+RAM and 18 more bytes of interpreter code. All 190 CPU checks, 100,000
+differential instructions, 262,144 exhaustive helper checks and the
+identical host replay passed; target ELF table contents and internal-RAM
+placement were independently verified.

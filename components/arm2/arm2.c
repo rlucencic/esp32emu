@@ -666,15 +666,21 @@ static INLINE void single_transfer(arm2_t *c, run_t *r, uint32_t op, uint32_t pc
     }
 }
 
-/* The registers in a list (the board's RISC-V has no instruction for it:
- * __builtin_popcount() is a library call there)
+/* Byte population counts: arm2's constants are placed in internal RAM by
+ * linker.lf. The P4 has no scalar popcount instruction.
  */
+#define COUNT2(n) n, n + 1, n + 1, n + 2
+#define COUNT4(n) COUNT2(n), COUNT2(n + 1), COUNT2(n + 1), COUNT2(n + 2)
+#define COUNT6(n) COUNT4(n), COUNT4(n + 1), COUNT4(n + 1), COUNT4(n + 2)
+static const uint8_t s_count8[256] = { COUNT6(0), COUNT6(1), COUNT6(1), COUNT6(2) };
+#undef COUNT6
+#undef COUNT4
+#undef COUNT2
+
+/* The registers in a 16-bit list, without a software popcount sequence. */
 static inline int count16(uint32_t v)
 {
-    v = v - ((v >> 1) & 0x5555);
-    v = (v & 0x3333) + ((v >> 2) & 0x3333);
-    v = (v + (v >> 4)) & 0x0F0F;
-    return (int)((v + (v >> 8)) & 0x1F);
+    return s_count8[v & 0xFF] + s_count8[(v >> 8) & 0xFF];
 }
 
 /* LDM, STM (`load`, bit 20, a constant where it's inlined). The words are
