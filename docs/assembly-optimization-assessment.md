@@ -270,3 +270,23 @@ ring overflow and live writes; a 4,000-frame BASIC SOUND replay also has
 identical WAV bytes, screenshots and instruction counts. ARM2 source is
 unchanged. Linker address changes and whole-machine timing prevent
 attributing every saved cycle solely to the mixer arithmetic.
+
+Reusing the machine's existing
+[VIDC palette lookup tables](../../esp32arc/docs/palette-cache-experiment-2026-11-06.md)
+is also retained. Separate validity bits for 4-bit paired pixels and
+8-bit colours are cleared by every palette write and reset; each copied
+frame still owns its tables. On the sound-optimized baseline, A440 Lander
+frame-call cost falls 0.524% versus the initial control and 0.577% versus
+a freshly restored control, with guest instruction counts within 0.002%.
+All five candidate windows are below all ten control windows, while
+all builds maintain approximately 50 FPS. A one-byte validity variable
+adds eight aligned BSS bytes and eight padding bytes in this link; the
+affected VIDC functions grow by 94 bytes (128 linked flash-text bytes). Original
+and candidate state/render traces match under UBSan across 131,072
+palette-write cases and 548,864 snapshots, including mode changes,
+resets and delayed copies. A 6,000-frame host replay also matches all
+seven screenshots, device state and instruction counts. A fresh A3020
+comparison also reduces frame-call cost by 0.200%, with guest instruction
+counts within 0.0031% and all three candidate windows below all three
+baseline windows. Both retain approximately 50 FPS. ARM2 and sound source
+are unchanged; whole-machine results include linker effects.
