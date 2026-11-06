@@ -256,3 +256,17 @@ checks, 100,000 Unicorn instructions, 4,718,592 offset-helper reference
 comparisons under UBSan and identical 2,000-frame host desktop output.
 The source and saved baseline firmware were restored; the small timing
 differences do not establish a precise regression.
+
+The next retained change is in the machine's
+[VIDC sound integration](../../esp32arc/docs/sound-accumulator-experiment-2026-11-06.md):
+32-bit accumulators replace unnecessary 64-bit arithmetic, with a proven
+maximum magnitude of 258,998,272. A440 Lander frame-call cost falls 0.329%
+and 0.479% in two fresh-boot paired comparisons (0.429% pooled), while
+both builds retain approximately 50 FPS. The longer pair has identical
+guest instruction totals. P4 `sound_run` shrinks by 84 bytes and private
+state by eight bytes. Baseline/candidate PCM and sound state match under
+UBSan across extreme samples, all frequency settings, DMA transitions,
+ring overflow and live writes; a 4,000-frame BASIC SOUND replay also has
+identical WAV bytes, screenshots and instruction counts. ARM2 source is
+unchanged. Linker address changes and whole-machine timing prevent
+attributing every saved cycle solely to the mixer arithmetic.
