@@ -110,3 +110,14 @@ RAM and 18 more bytes of interpreter code. All 190 CPU checks, 100,000
 differential instructions, 262,144 exhaustive helper checks and the
 identical host replay passed; target ELF table contents and internal-RAM
 placement were independently verified.
+
+The [contiguous-register copy experiment](../../esp32arc/docs/block-copy-experiment-2026-11-06.md)
+then measured the block-transfer lists used by Lander. STM `{R0-R9}`
+accounts for 41.3% of its stores; short R0-prefix lists also occur often.
+The retained direct-page path recognizes contiguous lists starting at R0,
+excluding PC, and copies them with a counted loop. A440 Lander mean ARM2
+residency falls from 69.88% to 68.50% (1.97% relatively) while both builds
+hold 50 FPS; `arm2_run` shrinks by 42 bytes. All 190 CPU checks, 100,000
+Unicorn instructions, 8,192 targeted baseline comparisons and the
+identical deterministic replay pass. Host mix reporting now lists the
+most frequent LDM and STM masks to guide further workload-based changes.

@@ -730,10 +730,17 @@ static INLINE void block_transfer(arm2_t *c, run_t *r, uint32_t op, uint32_t pc,
             if (wb_first) {
                 c->r[rn] = final;
             }
-#pragma GCC unroll 15
-            for (int i = 0; i < 15; i++) {
-                if (list & (1u << i)) {
+            if (!(list & (list + 1)) && !(list & 0x8000)) {
+                /* A contiguous R0..Rn list needs no per-register bit tests. */
+                for (int i = 0; i < n; i++) {
                     *p++ = c->r[i];
+                }
+            } else {
+#pragma GCC unroll 15
+                for (int i = 0; i < 15; i++) {
+                    if (list & (1u << i)) {
+                        *p++ = c->r[i];
+                    }
                 }
             }
             if (list & 0x8000) {
@@ -786,6 +793,12 @@ static INLINE void block_transfer(arm2_t *c, run_t *r, uint32_t op, uint32_t pc,
                 if (list & (1u << i)) {
                     *user_reg(c, i) = *p++;
                 }
+            }
+            return;
+        }
+        if (!(list & (list + 1)) && !(list & 0x8000)) {
+            for (int i = 0; i < n; i++) {
+                c->r[i] = *p++;
             }
             return;
         }
