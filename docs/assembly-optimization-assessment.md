@@ -360,3 +360,39 @@ retained frame calls average 12.960 ms on A440 and 18.629 ms on A3020 at
 percentage-complete estimate or guaranteed remaining speedup. Physical
 speaker/input validation and unsupported-machine/device features are
 separate from this performance pass.
+
+The [normal post-indexed transfer trial](../../esp32arc/docs/postindexed-transfer-experiment-2026-11-06.md)
+is rejected. Eight additional P=0/W=0 handlers pass all CPU checks,
+100,000 Unicorn cases, 2,883,584 UBSan reference comparisons and the
+identical host replay, but add 5,012 interpreter bytes (4,992 internal
+code bytes including padding). The usual fixed-delay launch first fails
+to reach Lander; a fresh retry with extended startup reaches the game.
+Against a matched extended-startup restored control, frame-call cycles
+rise 109.072% and FPS falls from 49.999 to 25.731, with guest instructions
+per frame within 0.065%. All six matched captures are valid at 360 MHz.
+Generated code, layout/register allocation and BSS placement are coupled;
+no individual root cause is established. A440 performance is not tested.
+The original committed pre-indexed core and saved firmware are restored;
+a rebuild matches all 6,244 baseline functions at identical addresses/bytes.
+
+A subsequent 32,000-sample A3020 scout on that retained build still places
+95.891% of periodic samples in ARM2. The hottest PC, `0x4ff025d8`, is the
+shared NEXT guest-opcode load. One burst is not an exact utilization or
+speed comparison and does not justify reviving prior rejected fetch/dispatch
+variants. The currently identified CPU micro-optimization trials are done;
+broader workload/regression coverage is next, with a further bounded CPU
+trial conditional on a distinct profile-supported hypothesis.
+
+## Atari STE hardware follow-up (2026-11-06)
+
+The first Tab5 scout used TOS 1.62 monochrome GEM with continuous cursor
+motion: core 0 sampled 4.2% PSG synthesis versus 1.1% planar rendering;
+core 1 sampled 8.1% `slow_read16`, 6.1% Musashi execution and 52.7% idle.
+A fixed-volume PSG cache passed differential output/state checks and native
+three-resolution desktop replays but was rejected: P4 kernel measurements
+saved 3.37% on 64-sample fixed-volume calls while one-sample calls regressed
+13–29% and envelope-only calls also regressed. Original STE source and
+firmware were restored. Profile animated four-plane software before planar
+work; profile active music and event-split call lengths before further PSG
+work. These are workload-specific P4 findings, with no S3 result. See the
+[STE test report](../../esp32ste/docs/optimization-tests-2026-11-06.md).
