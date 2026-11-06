@@ -165,3 +165,14 @@ page table remained internal; the precise cause of the large target
 regression was not isolated. The committed core and firmware were
 restored. Host reporting now counts nonzero immediate rotations: 36.4%
 of Lander's immediate operands, with 63.6% using zero rotation.
+
+The [branchless rotate check](../../esp32arc/docs/branchless-rotate-experiment-2026-11-06.md)
+then replaced the rotate-zero conditional with explicitly masked shift
+counts. Both forms compile to identical P4 interpreter bytes: 43,154
+bytes, SHA256 `05d946e3fad29dab88f699c4c0a8e4586385e594576d7c7d1598809a8b33940d`.
+No speedup is possible from this source rewrite in the tested build, so
+the original source was restored without flashing the equivalent build.
+The candidate passed 190 CPU checks, 100,000 Unicorn instructions, 18,270
+rotate cases under UBSan, 24,576 immediate/carry cases and the identical
+host replay. Compiler output should be checked before further attempts
+to optimize this helper's zero-count handling.
