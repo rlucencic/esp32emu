@@ -290,3 +290,18 @@ comparison also reduces frame-call cost by 0.200%, with guest instruction
 counts within 0.0031% and all three candidate windows below all three
 baseline windows. Both retain approximately 50 FPS. ARM2 and sound source
 are unchanged; whole-machine results include linker effects.
+
+A [write-refreshed VIDC line-timing cache](../../esp32arc/docs/line-cache-experiment-2026-11-06.md)
+is retained next. Reset, HCR/control writes and IOEB clock writes now
+refresh the whole-tick/remainder values, removing four dependency checks
+from every timing query. A440 Lander frame-call cost falls 0.439% versus
+the initial baseline and 0.222% versus a restored control; baseline means
+vary by 0.218%, so the small gain should not be treated as a precise
+general speedup. All candidate windows are below both controls. A fresh
+A3020 pair is effectively tied: 0.097% lower mean cycles/frame is within
+capture variation, with no demonstrated throughput gain. The timing
+reader shrinks from 258 to 52 bytes, total linked flash-text size stays
+unchanged and BSS shrinks by 16 bytes. UBSan timing/raster traces and a
+6,000-frame host mode-switch replay match exactly. New timing-input
+writers must refresh the cache; repeated timing writes now recalculate
+at the write. ARM2, sound and palette sources are otherwise unchanged.
