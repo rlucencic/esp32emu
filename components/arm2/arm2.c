@@ -610,15 +610,15 @@ static INLINE void swap(arm2_t *c, run_t *r, uint32_t op, uint32_t pc)
 }
 
 /* LDR, STR: `load` (bit 20), `byte` (22) and `reg` (25, the offset a
- * register) constants where it's inlined
+ * register), plus the common P=1/W=0 form, constants where it's inlined
  */
 static INLINE void single_transfer(arm2_t *c, run_t *r, uint32_t op, uint32_t pc, const bool load, const bool byte,
-                                   const bool reg)
+                                   const bool reg, const bool pre_no_wb)
 {
     unsigned rn = RN4(op);
     unsigned rd = RD4(op);
-    bool pre = (op >> 24) & 1, up = (op >> 23) & 1;
-    bool wb = (op >> 21) & 1;
+    bool pre = pre_no_wb || ((op >> 24) & 1), up = (op >> 23) & 1;
+    bool wb = !pre_no_wb && ((op >> 21) & 1);
     uint32_t off = reg ? offset_register(c, op, pc) : op & 0xFFF;
     uint32_t base = rn == R15_4 ? (pc + 8) & ARM2_PC : REG(c, rn);
     uint32_t moved = up ? base + off : base - off;
@@ -912,7 +912,10 @@ static INLINE void coprocessor(arm2_t *c, run_t *r, uint32_t op, uint32_t pc)
                         DP_PAIR(orr, form), DP_PAIR(mov, form), DP_PAIR(bic, form), DP_PAIR(mvn, form)
 #define ST_8(form)      &&str_##form, &&ldr_##form, &&str_##form, &&ldr_##form, \
                         &&strb_##form, &&ldrb_##form, &&strb_##form, &&ldrb_##form
-#define ST_ROW(form)    ST_8(form), ST_8(form), ST_8(form), ST_8(form)
+/* P=1, W=0: fixed pre-indexing without base writeback. */
+#define ST_PRE_8(form)  &&str_##form##_pre, &&ldr_##form##_pre, &&str_##form, &&ldr_##form, \
+                        &&strb_##form##_pre, &&ldrb_##form##_pre, &&strb_##form, &&ldrb_##form
+#define ST_ROW(form)    ST_8(form), ST_8(form), ST_PRE_8(form), ST_PRE_8(form)
 #define X2(l)           &&l, &&l
 #define X4(l)           X2(l), X2(l)
 #define X8(l)           X4(l), X4(l)
@@ -985,10 +988,16 @@ void arm2_host_hook(arm2_t *c);         /* host builds: tracing */
         DP_REGISTER(opcode, true); NEXT();
 
 #define ST(name, load, byte)                                                    \
-    name##_i: single_transfer(c, r, op, PC, load, byte, false); NEXT();         \
-    name##_r:                                                                   \
+    name##_i:                                                                  \
+        single_transfer(c, r, op, PC, load, byte, false, false); NEXT();         \
+    name##_r:                                                                  \
         if (UNLIKELY(op & 0x10)) goto undefined;                                \
-        single_transfer(c, r, op, PC, load, byte, true); NEXT();
+        single_transfer(c, r, op, PC, load, byte, true, false); NEXT();          \
+    name##_i_pre:                                                              \
+        single_transfer(c, r, op, PC, load, byte, false, true); NEXT();          \
+    name##_r_pre:                                                              \
+        if (UNLIKELY(op & 0x10)) goto undefined;                                \
+        single_transfer(c, r, op, PC, load, byte, true, true); NEXT();
 
 #define COND_PASSES()   ((c->cond_mask >> (op >> 28)) & 1)
 

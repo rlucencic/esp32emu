@@ -333,3 +333,30 @@ The table's smaller footprint does not improve this workload. The extra
 address dependency, register pressure and code-layout changes are not
 isolated. Signed offset range would also require an enforced check for
 other builds. Original core and saved firmware were restored.
+
+The subsequent [pre-indexed transfer dispatch experiment](../../esp32arc/docs/preindexed-transfer-experiment-2026-11-06.md)
+is retained. The existing table selects eight additional LDR/STR handlers
+only for P=1/W=0, eliminating dynamic indexing/user-transfer/writeback
+checks for that form. Direction and offset decoding remain unchanged.
+A3020 Lander frame-call cycles fall 2.622% against the initial baseline and
+2.429% against a restored control; A440 falls 2.270% and 2.498%, respectively.
+Baseline means differ by -0.198% and +0.233%. All five candidate windows
+are below all ten baseline windows on each model, with nearly unchanged
+guest instruction counts and paced frame rates near 50 FPS. This compares
+whole firmware and does not isolate individual removed checks from layout
+or register-allocation effects. Interpreter code grows 2,550 bytes and
+allocated internal code including padding grows 2,560; table/data and total
+BSS sizes are unchanged. All 190 CPU checks, 100,000 Unicorn instructions,
+2,883,584 UBSan baseline comparisons and the identical 6,000-frame host
+mode-switch replay pass. The formatted source rebuild matches all 6,244
+measured candidate functions at identical addresses and bytes.
+
+The [current Acorn status and bounded remainder](../../esp32arc/docs/optimization-status-2026-11-06.md)
+sets the remaining pass to normal post-indexed transfer specialization,
+one fresh profile and at most one further distinct profile-supported CPU
+candidate, followed by broader workload/regression coverage. Lander's
+retained frame calls average 12.960 ms on A440 and 18.629 ms on A3020 at
+360 MHz; outside-call runtime work is additional. There is no supported
+percentage-complete estimate or guaranteed remaining speedup. Physical
+speaker/input validation and unsupported-machine/device features are
+separate from this performance pass.
