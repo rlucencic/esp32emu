@@ -408,3 +408,16 @@ tradeoff; P4 renderer code grows 272 bytes plus a 32-byte table. All
 347,680 UBSan scanline comparisons and the identical three-resolution
 native desktop pixel/audio replays pass. Both full firmware targets build;
 S3 runtime/performance and animated real-software coverage remain open.
+
+The [one-/two-plane follow-up](../../esp32ste/docs/one-two-plane-experiment-2026-11-06.md)
+retains direct monochrome bit extraction and two-plane nibble expansion
+using the same table. Relative to the committed four-plane build, P4
+isolated rendering costs fall 53.840% (medium) and 54.937% (monochrome),
+with four-plane cost effectively unchanged. Medium renderer residency
+falls from 13.6–13.7% to 6.6–6.8%; monochrome from 21.6–22.1% to
+11.4–11.6% in three periodic full-firmware captures per build/mode. These
+synthetic workloads do not establish game or whole-emulator speedups.
+All 609,824 UBSan scanline comparisons and identical native three-mode
+pixel/audio replays pass; both full firmware targets build. Renderer code
+grows another 124 P4 bytes, reusing the same 32-byte table. S3 hardware,
+animated real software and displayed update-rate coverage remain open.
