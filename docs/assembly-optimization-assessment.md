@@ -142,3 +142,14 @@ higher). The candidate passed 190 CPU checks, 100,000 Unicorn instructions,
 identical host replay. It was rejected and the committed core, header
 and firmware were restored. Host reporting now counts condition fields;
 34.8% of Lander instructions use a checked condition.
+
+The [constant-condition dispatch experiment](../../esp32arc/docs/condition-dispatch-experiment-2026-11-06.md)
+then selected fixed condition-mask bits through the dispatch table, while
+retaining eager flag-cache updates. Both variants were rejected: A440
+Lander mean ARM2 residency was 71.68% for all fourteen checked conditions
+and 70.30% for EQ/NE alone, versus 68.70% baseline (4.34% and 2.33%
+relatively higher). Interpreter code shrank by 834 and 2,072 bytes,
+respectively. Both passed 190 CPU checks, 100,000 Unicorn instructions,
+1,536 exhaustive condition cases and the identical host replay. The P4
+disassembly confirmed shorter constant-bit checks, but the compiled game
+workload regressed. The committed core and firmware were restored.
