@@ -153,3 +153,15 @@ respectively. Both passed 190 CPU checks, 100,000 Unicorn instructions,
 1,536 exhaustive condition cases and the identical host replay. The P4
 disassembly confirmed shorter constant-bit checks, but the compiled game
 workload regressed. The committed core and firmware were restored.
+
+The [immediate-operand table experiment](../../esp32arc/docs/immediate-table-experiment-2026-11-06.md)
+then predecoded all 4,096 byte/rotation combinations into a 16 KB internal
+RAM table. It passed 190 CPU checks, 100,000 Unicorn instructions, 24,576
+exhaustive value/carry checks, target ELF table verification and the
+identical host replay. It was rejected: Tab5 A440 Lander fell to 23.170
+FPS (46.340% real time), while the baseline held approximately 50 FPS.
+Startup was also much slower. CPU frequency remained 360 MHz and the
+page table remained internal; the precise cause of the large target
+regression was not isolated. The committed core and firmware were
+restored. Host reporting now counts nonzero immediate rotations: 36.4%
+of Lander's immediate operands, with 63.6% using zero rotation.
