@@ -214,3 +214,13 @@ PC/PSR state comparisons and the deterministic replay pass. More tails
 and smaller code together still do not establish a gain; the measurement
 does not isolate prediction, register allocation or layout. Original core
 and saved baseline firmware restored; see the same experiment document.
+
+The [block-copy follow-up](../../esp32arc/docs/block-copy-experiment-2026-11-06.md)
+then extended contiguous copies to lists starting above R0, preserving the
+accepted prefix path. It was rejected: A440 Lander mean ARM2 residency
+rose from 68.62% to 69.90% (1.87% relatively), with 204 more code bytes
+and both builds holding 50 FPS. All 190 checks, 100,000 Unicorn cases,
+65,536 exhaustive list classifications, 222,720 block-transfer state
+comparisons and the identical replay passed. The original core and exact
+baseline firmware were restored; the accepted R0-prefix optimization
+remains. Added detection and compiler layout effects were not isolated.
