@@ -79,3 +79,12 @@ All 190 checks, 100,000 differential instructions and the identical host
 replay passed. The workload is near its 50 FPS cap, and the small observed
 gain varies between runs. Fetch/dispatch is the next target: a merged
 dispatch tail accounted for 8.46% of a separate baseline core 1 profile.
+
+The [dispatch-tail compiler experiments](../../esp32arc/docs/dispatch-tail-experiment-2026-11-05.md)
+then tested `-fno-crossjumping -fno-gcse` and `-fno-crossjumping` alone.
+Both increased code and were rejected: Lander reached 95.753% and 99.628%
+real time versus 100.009% for the baseline. The paced ADD/CMP/BNE loop
+used 63.4% and 59.7% mean `arm2_run` residency versus 56.8% after restoring
+the committed settings. Both passed CPU checks, differential tests and
+the host replay; the restored firmware's interpreter exactly matches the
+baseline. More dispatch sites did not improve these P4 workloads.
