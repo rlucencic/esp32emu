@@ -319,3 +319,17 @@ A subsequent 32,000-sample restored-baseline scout still places 68.881%
 of all core-1 samples in ARM2, with approximately 28.1% idle. The hottest
 ARM2 PC is the shared tail's guest-opcode load; IOC arithmetic remains a
 lower priority. This single profile is not a before/after speed comparison.
+
+The subsequent [compact relative-dispatch experiment](../../esp32arc/docs/relative-dispatch-experiment-2026-11-06.md)
+was also reverted. A checked P4 table replaces 4,096 absolute pointers
+with signed 16-bit byte displacements, saving 8,192 static RAM bytes while
+interpreter code grows 190 bytes. Every encoded entry matches the full-width
+relocation address. Wider-relative host logic passes 190 CPU checks,
+100,000 Unicorn comparisons under UBSan and the identical 6,000-frame
+mode-switch replay; this is separate from the target-width ELF check.
+A3020 Lander frame cost rises 5.007% against the initial baseline and
+4.868% against a restored control, whose means differ by 0.132%.
+The table's smaller footprint does not improve this workload. The extra
+address dependency, register pressure and code-layout changes are not
+isolated. Signed offset range would also require an enforced check for
+other builds. Original core and saved firmware were restored.
