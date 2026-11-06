@@ -235,3 +235,13 @@ checks, 100,000 Unicorn instructions, 222,720 extended block-transfer
 state comparisons (including mode changes and newly enabled interrupts)
 and the identical replay. The original source and freshly rebuilt
 baseline firmware were restored. Details are in the block-copy document.
+
+An opt-in [whole machine-frame cycle capture](../../esp32arc/docs/frame-cycle-measurement-2026-11-06.md)
+now supplements PC sampling without instrumenting ARM2 instructions.
+It times `arc_run_frame`, including device work and any preemption, while
+excluding runtime pacing. Re-testing the single-register paths with this
+hook raises mean cost from 4.815 to 4.855 million cycles/frame (+0.835%),
+with guest instruction counts within 0.038%. This supports the rejection
+using a different metric; the percentages are not interchangeable with
+sampled CPU residency. The CPU rewrite was reverted and the timing tool
+retained for future comparisons.
