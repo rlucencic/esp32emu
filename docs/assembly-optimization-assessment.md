@@ -194,3 +194,13 @@ The comparison includes the outlined helper samples. All 190 checks,
 the identical host replay passed. The original core and baseline firmware
 were restored. Smaller code or fewer source operations alone do not
 establish a gain.
+
+Isolating PSR-only outlining also failed in two follow-ups: sharing
+`run_write_psr` alone raised combined ARM2 residency from 68.68% to 73.62%,
+and sharing only inner `write_psr` while retaining inline refresh raised
+it to 71.52% (7.19% and 4.14% relatively). Interpreter plus helper code
+shrank by 12,114 and 8,630 bytes, respectively. Both passed 190 checks,
+100,000 Unicorn instructions, 40,960 PC/PSR state comparisons and the
+identical host replay. These variants still alter dispatch-tail merging;
+the measurements do not isolate call overhead. Both were rejected and
+the baseline restored. Details are in the same experiment document.
