@@ -366,12 +366,15 @@ uint8_t arm2_peek8(const arm2_t *c, uint32_t addr)
 /* Operand 2's forms: an immediate (bit 25), a register shifted by a
  * constant, or by a register (bit 4)
  */
-enum { OP2_IMM, OP2_SHIFT_IMM, OP2_SHIFT_REG };
+enum { OP2_IMM, OP2_SHIFT_IMM, OP2_SHIFT_REG, OP2_PLAIN };
 
 /* Operand 2 of a data processing instruction (`form` a constant where
  * it's inlined); *carry its carry out. `pc` the instruction's address.
+ * For OP2_SHIFT_IMM, dispatch supplies nonzero bits 4-11 in `shift`,
+ * with bit 4 clear: plain Rm and register-specified shifts are separate.
  */
-static INLINE uint32_t operand2(arm2_t *c, run_t *r, uint32_t op, uint32_t pc, uint32_t *carry, const int form)
+static INLINE uint32_t operand2(arm2_t *c, run_t *r, uint32_t op, uint32_t pc, uint32_t *carry,
+                                const int form, unsigned shift)
 {
     if (form == OP2_IMM) {
         unsigned rot = (op >> 7) & 0x1E;
@@ -380,6 +383,10 @@ static INLINE uint32_t operand2(arm2_t *c, run_t *r, uint32_t op, uint32_t pc, u
         return v;
     }
     unsigned rm = RM4(op);
+    if (form == OP2_PLAIN) {
+        *carry = (c->psr >> 29) & 1;
+        return rm == R15_4 ? ((pc + 8) & ARM2_PC) | c->psr : REG(c, rm);
+    }
     unsigned type = (op >> 5) & 3;
     uint32_t v;
     unsigned amount;
@@ -414,14 +421,9 @@ static INLINE uint32_t operand2(arm2_t *c, run_t *r, uint32_t op, uint32_t pc, u
         }
     }
     v = rm == R15_4 ? ((pc + 8) & ARM2_PC) | c->psr : REG(c, rm);
-    /* Type and immediate count share bits 5-11; zero is plain Rm (LSL #0). */
-    unsigned shift = (op >> 5) & 0x7F;
-    if (LIKELY(shift == 0)) {
-        *carry = (c->psr >> 29) & 1;
-        return v;
-    }
-    type = shift & 3;
-    amount = shift >> 2;
+    /* Dispatch supplies bits 4-11: nonzero, with bit 4 clear. */
+    type = (shift >> 1) & 3;
+    amount = shift >> 3;
     if (type == 0) {
         *carry = (v >> (32 - amount)) & 1;
         return v << amount;
@@ -479,12 +481,12 @@ static inline uint32_t sub_flags(uint32_t a, uint32_t b, uint32_t r, uint32_t ca
  * has one for each, but for the rare shifts by a register)
  */
 static INLINE void data_processing(arm2_t *c, run_t *run, uint32_t op, uint32_t pc, const unsigned opcode,
-                                   const int form, const bool s)
+                                   const int form, const bool s, unsigned shift)
 {
     unsigned rd = RD4(op);
     unsigned rn = RN4(op);
     uint32_t carry;
-    uint32_t b = operand2(c, run, op, pc, &carry, form);
+    uint32_t b = operand2(c, run, op, pc, &carry, form, shift);
     /* As Rn, R15 is the PC alone (+ 12 with a register-specified shift) */
     uint32_t a = rn == R15_4 ? (pc + (form == OP2_SHIFT_REG ? 12 : 8)) & ARM2_PC : REG(c, rn);
     uint32_t r, flags = 0;
@@ -940,18 +942,28 @@ void arm2_host_hook(arm2_t *c);         /* host builds: tracing */
  */
 #define PC              (r->pc - 4)
 
+/* Bits 4-11 together identify plain Rm before either kind of shift. */
+#define DP_REGISTER(opcode, s)                                                  \
+    do {                                                                        \
+        unsigned shift = (op >> 4) & 0xFF;                                      \
+        if (LIKELY(shift == 0)) {                                               \
+            data_processing(c, r, op, PC, opcode, OP2_PLAIN, s, 0);             \
+        } else {                                                                \
+            if (UNLIKELY(shift & 1)) goto dp_shift_reg;                         \
+            data_processing(c, r, op, PC, opcode, OP2_SHIFT_IMM, s, shift);     \
+        }                                                                       \
+    } while (0)
+
 /* Dispatch encodes S too, so unused flag calculations disappear at compile time. */
 #define DP(name, opcode)                                                        \
     dp_##name##_i:                                                              \
-        data_processing(c, r, op, PC, opcode, OP2_IMM, false); NEXT();            \
+        data_processing(c, r, op, PC, opcode, OP2_IMM, false, 0); NEXT();       \
     dp_##name##_i_s:                                                            \
-        data_processing(c, r, op, PC, opcode, OP2_IMM, true); NEXT();             \
+        data_processing(c, r, op, PC, opcode, OP2_IMM, true, 0); NEXT();        \
     dp_##name##_r:                                                              \
-        if (UNLIKELY(op & 0x10)) goto dp_shift_reg;                             \
-        data_processing(c, r, op, PC, opcode, OP2_SHIFT_IMM, false); NEXT();     \
+        DP_REGISTER(opcode, false); NEXT();                                     \
     dp_##name##_r_s:                                                            \
-        if (UNLIKELY(op & 0x10)) goto dp_shift_reg;                             \
-        data_processing(c, r, op, PC, opcode, OP2_SHIFT_IMM, true); NEXT();
+        DP_REGISTER(opcode, true); NEXT();
 
 #define ST(name, load, byte)                                                    \
     name##_i: single_transfer(c, r, op, PC, load, byte, false); NEXT();         \
@@ -1054,9 +1066,9 @@ dp_shift_reg:
         goto multiply_swap;
     }
     if (op & (1u << 20)) {
-        data_processing(c, r, op, PC, (op >> 21) & 15, OP2_SHIFT_REG, true);
+        data_processing(c, r, op, PC, (op >> 21) & 15, OP2_SHIFT_REG, true, 0);
     } else {
-        data_processing(c, r, op, PC, (op >> 21) & 15, OP2_SHIFT_REG, false);
+        data_processing(c, r, op, PC, (op >> 21) & 15, OP2_SHIFT_REG, false, 0);
     }
     NEXT();
 

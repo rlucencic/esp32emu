@@ -88,3 +88,14 @@ used 63.4% and 59.7% mean `arm2_run` residency versus 56.8% after restoring
 the committed settings. Both passed CPU checks, differential tests and
 the host replay; the restored firmware's interpreter exactly matches the
 baseline. More dispatch sites did not improve these P4 workloads.
+
+The [unshifted-register experiment](../../esp32arc/docs/unshifted-register-experiment-2026-11-06.md)
+then combined bits 4–11 into one dispatch check and reused that decoded
+field for shifted operands. The retained refinement reduces register-loop
+mean `arm2_run` residency from 62.5% to 59.9%. On supported 8 MHz A440
+Lander, where idle time makes headroom measurable, it reduces sampled
+interpreter residency from 71.2% to 70.6%; both maintain real time. A3020
+Lander remains near its 50 FPS limit. The change costs 4,700 bytes of code
+RAM and passes 190 CPU checks, 100,000 differential instructions and the
+identical host replay. Host mix reporting now counts unshifted operands:
+20.4% of all Lander instructions and 51.2% of register-operand instructions.
