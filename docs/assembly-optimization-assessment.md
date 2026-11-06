@@ -176,3 +176,15 @@ The candidate passed 190 CPU checks, 100,000 Unicorn instructions, 18,270
 rotate cases under UBSan, 24,576 immediate/carry cases and the identical
 host replay. Compiler output should be checked before further attempts
 to optimize this helper's zero-count handling.
+
+The [fetch and register-selection experiments](../../esp32arc/docs/arm2-fetch-register-experiments-2026-11-06.md)
+followed instruction-address profiling on A3020 Lander (95.59% of core-1
+samples in ARM2). All three candidates were rejected. A cached host fetch
+pointer raised A440 Lander mean ARM2 residency from 68.52% to 71.50%,
+with 932 more code bytes. Loading Rn before the R15 check raised residency
+from 68.70% to 71.40% with an unlikely hint and 70.60% without it; code
+changed by +346 and -366 bytes. Each passed the existing 190 checks,
+100,000 differential instructions, focused PC/register cases and the
+identical host replay. The baseline core and firmware were restored.
+The next candidate is sharing rare data-processing PC/PSR write paths;
+smaller code or fewer source operations alone do not establish a gain.
