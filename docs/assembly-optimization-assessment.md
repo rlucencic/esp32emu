@@ -482,3 +482,17 @@ the CPU gain, without a visible-update or general application speed claim.
 Next investigate rendering/presentation with the faster writes and real
 software on copied disks; LC indexed/RGB555 conversion is still a local
 candidate. OS/application, physical input and audio coverage remains open.
+
+The [presentation counter follow-up](../../esp32mac2/docs/presentation-followup-2026-11-07.md)
+clarifies that tradeoff. With temporary machine-local wrappers, the fast
+RGB fill raises source-row drawing calls from 552.46 to 841.21/s (+52.3%),
+while changed-screen passes fall from 12.649 to 10.302/s. Converter time
+per call stays near 42 microseconds. Inserting three guest NOPs per write
+matches the reference write rate to 0.103%; pass frequency returns to
+12.659/s and drawing row calls to 555.27/s. More changed-row work per pass,
+rather than slower conversion, explains the lower counter. This is not a
+panel FPS or smoothness result. No further production code is retained.
+Next target: shared `scale_row` / `blend565` and vertical RGB565 blending;
+preserve exact pixels and unchanged-row skipping, then run the shared
+build matrix for any retained runtime change. Real-software coverage on
+copied disks and LC converters remain open.
