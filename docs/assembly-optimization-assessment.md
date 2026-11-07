@@ -62,8 +62,11 @@ now retains paired SCREEN 7/8 VRAM reads: isolated P4 row costs fall
 pixels. S3 and P4 builds pass; only P4 hardware was measured. The
 [SCREEN 6 follow-up](../../esp32msx/docs/screen6-palette-experiment-2026-11-07.md)
 now retains a separate four-color helper: mixed-row cost falls 37.9–39.5%,
-with exact pixels and lower combined renderer sample share. Next investigate
-sixteen-color row palettes for SCREEN 5/7.
+with exact pixels and lower combined renderer sample share. The
+[SCREEN 5/7 follow-up](../../esp32msx/docs/screen57-palette-experiment-2026-11-07.md)
+retains a sixteen-color helper: isolated P4 row costs fall 20.6–26.7% /
+24.2–28.3%, with exact LCD output and lower combined renderer shares.
+Next profile VDP command fill/copy workloads before selecting a change.
 Representative software on copied disks, physical input and audio coverage
 remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
@@ -702,3 +705,23 @@ or general application-speed claim is made. No new global table/heap
 allocation or shared source change. Next measure sixteen-color row
 palettes for SCREEN 5/7; VDP commands need their own workload, and S3
 runtime/game/input/audio coverage remains open.
+
+The [MSX2 SCREEN 5/7 palette trial](../../esp32msx/docs/screen57-palette-experiment-2026-11-07.md)
+retains a separate sixteen-color row helper. It copies the palette and
+resolves index zero's backdrop/TP rule once per row, preserving masked
+VRAM reads and paired-bank ordering. P4 row cost falls 20.6–26.7% in
+SCREEN 5 and 24.2–28.3% in SCREEN 7; SCREEN 6/8 isolated controls stay
+within 0.2%. Combined renderer text shrinks 286 bytes. SCREEN 5/7 uses
+sixteen more stack bytes during its helper call, while the maximum across
+bitmap paths stays 80 bytes; there is no new global table or allocation.
+All 262,144 ASan/UBSan differential rows, 32,768 independent oracle rows,
+ten host pictures, four full P4 LCD comparisons and S3/P4 builds pass.
+Comparable core-1 renderer shares fall from 25.5–26.5% to 23.6–23.8% in
+SCREEN 5 and from 37.0–37.2% to 33.6–33.9% in SCREEN 7. Idle rises in
+both; SCREEN 6/8 controls remain similar. Core-0 SCREEN 7 idle is slightly
+lower (77.4–79.5% versus 76.0–78.1%), with presentation share 3.1–3.4%
+versus 3.4%; no presentation benefit or cause is established. Throughput
+stays about 59.9 emulated FPS near its cap, so no general application
+speedup is claimed. Next profile generated VDP command fill/copy workloads
+before choosing a command optimization. Shared source is unchanged;
+S3 runtime, representative software, physical input and audio remain open.
