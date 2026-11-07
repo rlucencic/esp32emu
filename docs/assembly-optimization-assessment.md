@@ -421,3 +421,27 @@ All 609,824 UBSan scanline comparisons and identical native three-mode
 pixel/audio replays pass; both full firmware targets build. Renderer code
 grows another 124 P4 bytes, reusing the same 32-byte table. S3 hardware,
 animated real software and displayed update-rate coverage remain open.
+
+## Macintosh LC / II hardware follow-up (2026-11-06)
+
+The [first Mac2 video trials](../../esp32mac2/docs/video-optimization-experiment-2026-11-06.md)
+use isolated, diskless synthetic guest fills. LC converter residency is
+11.0% at 8 bits and 14.9% at 16 bits; shared presentation takes 41.2%
+and 37.0%. The II converter is a stronger local target: 23.2% at 8 bits,
+40.6% at 24 bits. Its 24-bit CPU writes also spend substantial time in
+the slow memory path. No original disk images are mounted or changed.
+
+An early 8-bit-only prefix is rejected for large 4-/24-bit regressions.
+Moving the entire mode switch outside the pixel loop is retained in C:
+isolated P4 converter costs fall 5.755%, 14.312%, 16.489%, 27.787% and
+13.262% for 1/2/4/8/24 bits. Repeated full-firmware renderer residency
+falls from 23.2–23.4% to 17.8–18.6% at 8 bits, and 39.2–40.5% to
+36.6–37.4% at 24 bits. The short 24-bit captures stay around 33 emulated
+FPS; these are not whole-emulator or System performance gains.
+
+All 100,960 UBSan scanline/canary comparisons and identical native LC/II
+ROM-boot pixels pass; full P4 test and production builds pass. The converter
+shrinks 56 bytes without added tables or allocation. Mac2 is P4-only.
+Next: separately measure packed RGB-to-RGB565 conversion and the II's
+slow packed writes; LC paired indexed reads / RGB555 conversion remain
+candidates. OS/application, physical input and audio-by-ear coverage is open.
