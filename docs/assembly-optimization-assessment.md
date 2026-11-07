@@ -66,7 +66,12 @@ with exact pixels and lower combined renderer sample share. The
 [SCREEN 5/7 follow-up](../../esp32msx/docs/screen57-palette-experiment-2026-11-07.md)
 retains a sixteen-color helper: isolated P4 row costs fall 20.6–26.7% /
 24.2–28.3%, with exact LCD output and lower combined renderer shares.
-Next profile VDP command fill/copy workloads before selecting a change.
+The [command follow-up](../../esp32msx/docs/command-stride-experiment-2026-11-07.md)
+retains byte-stride HMMV/HMMM iteration: large-command isolated P4 costs
+fall 14.6–67.2%, with exact VRAM/state/LCD output and faster synthetic
+stress programs. YMMM controls cost 1.3–2.5% more, and the common register
+writer adds 104 text bytes and sixteen stack bytes. Next investigate
+logical-command pixel work using the measured controls.
 Representative software on copied disks, physical input and audio coverage
 remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
@@ -725,3 +730,26 @@ stays about 59.9 emulated FPS near its cap, so no general application
 speedup is claimed. Next profile generated VDP command fill/copy workloads
 before choosing a command optimization. Shared source is unchanged;
 S3 runtime, representative software, physical input and audio remain open.
+
+The [MSX2 command-stride trial](../../esp32msx/docs/command-stride-experiment-2026-11-07.md)
+retains HMMV/HMMM loops that advance directly between packed-byte accesses,
+removing intervening pixel iterations and their remainder test. Direction,
+clipping, partial/default widths, wrapping, overlap order and complete
+command/register/status behavior match reference. All 65,248 ASan/UBSan
+full-VRAM/state/canary comparisons, 58,224 independent byte-command
+oracles, eighteen host pictures, four full P4 LCD comparisons and S3/P4
+builds pass. Eight large-command isolated P4 costs fall 14.6–67.2%; reverse
+partial/overlap cases fall 37.9–61.8%. Logical controls improve 2.5–6.7%
+in this build, while unchanged YMMM controls cost 1.3–2.5% more. P4
+`reg_write` grows 104 text bytes and its common frame grows from 112 to
+128 stack bytes, with no new persistent state/allocation. Synthetic
+SCREEN 6 fill throughput rises from about 1.13 to 3.29 emulated FPS;
+SCREEN 7 copy rises from 0.53 to 0.80. These deliberately overloaded
+programs remain command-bound and are not representative software speed
+results. Short low-frame-count windows limit precision. More guest frames
+also increase presentation work; no panel-FPS benefit is claimed. Commands
+still complete synchronously, preserving existing emulation timing rather
+than adding hardware accuracy. Shared source is unchanged. Next investigate
+logical-command `pset`/`point` work using existing controls, with exhaustive
+operation/transparency and ordered-overlap coverage. S3 runtime, games,
+physical input and speaker checks remain open.
