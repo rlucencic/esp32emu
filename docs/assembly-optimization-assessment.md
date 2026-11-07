@@ -59,8 +59,11 @@ MSX2 graphics next. The
 [MSX2 bank-pair trial](../../esp32msx/docs/bitmap-banks-experiment-2026-11-07.md)
 now retains paired SCREEN 7/8 VRAM reads: isolated P4 row costs fall
 18.5–21.8% / about 38.5%, with increased core-1 idle headroom and exact
-pixels. S3 and P4 builds pass; only P4 hardware was measured. Next
-investigate SCREEN 6's four-color palette expansion.
+pixels. S3 and P4 builds pass; only P4 hardware was measured. The
+[SCREEN 6 follow-up](../../esp32msx/docs/screen6-palette-experiment-2026-11-07.md)
+now retains a separate four-color helper: mixed-row cost falls 37.9–39.5%,
+with exact pixels and lower combined renderer sample share. Next investigate
+sixteen-color row palettes for SCREEN 5/7.
 Representative software on copied disks, physical input and audio coverage
 remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
@@ -679,3 +682,23 @@ Shared source is unchanged, S3 runtime and real-software coverage remain
 open. Next try row-level effective palette entries for SCREEN 6's four
 colors, keeping backdrop/transparency exact; command workloads need their
 own profile.
+
+
+The [MSX2 SCREEN 6 palette trial](../../esp32msx/docs/screen6-palette-experiment-2026-11-07.md)
+retains a separate no-inline helper that resolves zero/backdrop/TP once
+per row, then decodes through four local colors. Mixed P4 row cost falls
+37.9–39.5%, flat-byte cases 15.6–29.1%; three isolated controls remain
+within 0.13%. An initially inlined form is rejected after increasing
+SCREEN 5/7 kernel costs 2.34%/0.94% and enlarging the common stack frame.
+The selected helper keeps that frame at 64 bytes, adding 16 stack bytes
+only while SCREEN 6 executes; combined P4 text shrinks 318 bytes. All
+262,144 ASan/UBSan differential rows, 16,384 independent oracle rows,
+ten host pictures, four full P4 LCD comparisons and S3/P4 builds pass.
+The comparable core-1 renderer share (`vdp_line` plus helper) falls from
+33.9–34.4% to 27.6–27.9%, idle rises from 37.5–38.8% to 43.2–44.9%, and
+emulated FPS stays about 59.9. Full-firmware control shares vary, including
+lower SCREEN 5 idle despite similar renderer share; no zero-cost control
+or general application-speed claim is made. No new global table/heap
+allocation or shared source change. Next measure sixteen-color row
+palettes for SCREEN 5/7; VDP commands need their own workload, and S3
+runtime/game/input/audio coverage remains open.
