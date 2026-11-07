@@ -50,7 +50,12 @@ speed increase is established. The subsequent
 reduces large-copy host cost about 65–67% and core-1 blitter sample share
 from 19.6% to 7.0–7.1%, preserving guest timing. The OCS control measures
 0.28–0.72% lower throughput; this tradeoff is retained and documented.
-Next profile representative Amiga minterm usage before extending dispatch.
+The [software follow-up](../../esp32ami/docs/software-profile-2026-11-07.md)
+checks 96 games at 672 picture checkpoints and compares 230 final
+disk/package files; all match baseline. Nine longer three-build runs also
+match. The actual Aerial Racers race profile puts complete blitter work at
+only 0.1–0.3% of core 1, so defer further blitter specialization and profile
+MSX2 graphics next.
 Representative software on copied disks, physical input and audio coverage
 remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
@@ -631,3 +636,21 @@ reverse-order repeat. Retain for copy headroom with that measured cost;
 no general application-speed increase is claimed. Shared runtime source
 is unchanged. Next profile cookie-cut/minterm usage on representative
 copied-disk software before adding more guarded paths.
+
+
+The [Amiga software follow-up](../../esp32ami/docs/software-profile-2026-11-07.md)
+compares both recent optimizations with the pre-planar/pre-copy host build.
+All 96 games reach 7,000 frames; all 672 paired picture checkpoints and
+230 final disk/package files match. Nine selected titles reach 15,000
+frames on baseline, optimized and temporary census builds with identical
+pictures at all 27 three-way checkpoints, including Aerial Racers' race.
+The host census finds substantial cookie-cut word shares, including shifted
+ABCD and A-disabled configurations. Word counts are not execution costs:
+on the Tab5 race, complete blitter `start` accounts for only 0.1–0.3% of
+core-1 samples, versus 14.6–15.1% instruction reads, 12.2–12.8% CPU dispatch,
+8.1–8.6% display fetching and 7.0–7.9% audio-line work. Core-0 `render`
+accounts for 24.6–25.9%, with 52.8–54.3% idle. These are optimized-build
+profiles, not A/B speed comparisons. Defer another Amiga blitter fast path;
+continue with MSX2 bitmap rendering/VDP commands. No production probe or
+source change is retained from the census. Game/menu checkpoint agreement
+does not establish complete gameplay, physical-input or audio correctness.
