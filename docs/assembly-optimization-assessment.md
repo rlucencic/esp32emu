@@ -45,7 +45,12 @@ CPU-speed tradeoffs recorded separately from the frame cap. The
 retains split 32-bit expansion entries: complete-row cost falls 3.1–12.5%
 in active-plane cases, with 80 fewer P4 text bytes and unchanged table size.
 Full synthetic throughput remains within 0.2% of reference; no application
-speed increase is established. Next investigate guarded blitter copy work.
+speed increase is established. The subsequent
+[blitter copy trial](../../esp32ami/docs/blitter-copy-experiment-2026-11-07.md)
+reduces large-copy host cost about 65–67% and core-1 blitter sample share
+from 19.6% to 7.0–7.1%, preserving guest timing. The OCS control measures
+0.28–0.72% lower throughput; this tradeoff is retained and documented.
+Next profile representative Amiga minterm usage before extending dispatch.
 Representative software on copied disks, physical input and audio coverage
 remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
@@ -608,3 +613,21 @@ claimed. Amiga signatures are content hashes, not update counters. Local
 P4-only source changes leave shared runtime unchanged. Next investigate
 an unshifted blitter A-to-D copy fast path with exact masks, overlap,
 wrapping and busy timing; representative software coverage remains open.
+
+
+The [Amiga blitter copy trial](../../esp32ami/docs/blitter-copy-experiment-2026-11-07.md)
+retains a guarded A-only, unshifted A-to-D path. Word-by-word access preserves
+masks, direction, overlap, chip wrapping and register side effects; original
+busy/interrupt/steal scheduling is unchanged. Large-copy P4 kernel cost
+falls 65–67%, tiny 2×2 copies 31%; measured fallbacks show no slowdown.
+All 100,000 ASan/UBSan memory/register/timing-state comparisons, fourteen
+generated-disk host pixel comparisons, timing/pattern regressions, two
+full LCD comparisons and P4 builds pass. Added text in blitter `start`:
+302 bytes, no table/allocation. Full-firmware copy sample share falls from
+19.6% to 7.0–7.1% of core 1, idle rises from 47.7% to about 60%, while copy
+throughput remains about 474/475 copies/s and 49.9 emulated FPS. OCS control
+throughput is 0.72% lower initially and 0.28% lower in the fresh-boot
+reverse-order repeat. Retain for copy headroom with that measured cost;
+no general application-speed increase is claimed. Shared runtime source
+is unchanged. Next profile cookie-cut/minterm usage on representative
+copied-disk software before adding more guarded paths.
