@@ -31,6 +31,20 @@ Suggested bounded first experiments: STE planar conversion, Amiga bitplane /
 blitter kernels, common mac2/mac3 color conversion. The user selected Acorn
 Archimedes for the first actual hardware investigation instead.
 
+## Current checkpoint (2026-11-07)
+
+Hardware investigations now cover Acorn, STE and Mac2. The latest Mac2
+work retains paired indexed reads and a full-row RGB555 fast path; its
+[LC report](../../esp32mac2/docs/lc-video-experiment-2026-11-07.md) records
+converter savings, exact pixels and the small CPU-throughput tradeoffs.
+Next profile Mac3's LC II/III converters independently, including Sonora
+strides, bounds and blanking. Representative software on copied disks,
+physical input and audio coverage remain open. Shared S3 paths have been
+built; the P4 measurements do not establish S3 runtime performance.
+
+All percentages below describe individual trials against their stated
+reference builds. They are not cumulative whole-emulator speed gains.
+
 ## Measurement method
 
 - Capture baseline and candidate with the same compiler, settings, workload,
@@ -540,3 +554,18 @@ or general application-speed claim. All 245,760 cropped row/canary checks,
 and 24 sibling builds pass. P4 adds 344 text bytes, no tables or allocation.
 S3 timing is unmeasured. Next: LC paired indexed reads and RGB555 conversion,
 plus representative software on copied disks.
+
+The [LC converter follow-up](../../esp32mac2/docs/lc-video-experiment-2026-11-07.md)
+retains paired 8-bit source reads and a full-row RGB555 bounds fast path,
+keeping the original partial-row fallback. Isolated P4 cost falls
+23.1–23.3% at 8 bits and 37.3–39.2% at RGB555; 1/2/4-bit controls stay
+within 0.13%. All 317,280 native row/canary cases per candidate, four
+LC/II host ROM-boot pixel comparisons, full LCD captures and P4 builds pass.
+Full-firmware converter sample shares fall from 11.9–12.9% to 10.1–10.6%
+at 8 bits, and 15.1–15.8% to 9.8–10.2% at RGB555. Signature observations
+rise 7.05%/6.28%, with CPU-frame throughput −0.18%/−0.33%. These are graphics
+tradeoffs, not panel-FPS or general application-speed gains. Cost: 68 P4
+text bytes, no table or allocation. Shared runtime source is unchanged;
+Mac2 is P4-only. Next profile the Mac3 LC II/III converter independently,
+preserving Sonora row strides and whole-row bounds/blanking semantics.
+Copied-disk software, physical input and audio coverage remain open.
