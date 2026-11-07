@@ -465,3 +465,20 @@ Screen-signature increments rise from about 10.549/s to 12.837–12.882/s
 (21.9% higher), a presentation-change proxy rather than panel FPS. Retained
 for rendering, with that small observed CPU-throughput tradeoff; no broad
 statistical confidence or application performance claim.
+
+The [packed CPU-write follow-up](../../esp32mac2/docs/packed-write-experiment-2026-11-07.md)
+on 2026-11-07 handles aligned slot-9 RGB longwords as one three-byte store.
+The original unused byte lane, partial final pixel and dirty-flag behavior
+are preserved; other accesses retain their fallback. The differential
+source fixture passes 5,345,760 writes under UBSan and repeats successfully
+with heap-backed VRAM under ASan plus UBSan. LC/II native ROM-boot pixels
+match, and P4 test and production builds pass. Added text is 176 bytes,
+with no table or allocation and no shared runtime source change.
+Profiler-free RGB fill throughput rises from 32.785 to 51.536 emulated FPS
+(+57.2%); indexed control stays at 60.15 FPS. There is a presentation
+tradeoff: screen-change signature increments fall from 12.848 to 10.420/s
+(−18.9%). These are dirty-screen detections, not panel FPS. Retained for
+the CPU gain, without a visible-update or general application speed claim.
+Next investigate rendering/presentation with the faster writes and real
+software on copied disks; LC indexed/RGB555 conversion is still a local
+candidate. OS/application, physical input and audio coverage remains open.
