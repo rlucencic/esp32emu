@@ -435,6 +435,36 @@ static PRESENT_HOT void scale_row(const uint16_t *src, uint16_t *dst, const tap_
     }
 }
 
+/* Exact 3:2 pixel-centre taps: 26/16/5 in the interior, clamped at
+ * both ends. The selector guarantees an even source width of at least two.
+ * The first tap carries the cropped source origin.
+ */
+static PRESENT_HOT __attribute__((noinline)) void scale_row_3_2(const uint16_t *src,
+                                                              uint16_t *dst,
+                                                              const tap_t *taps, int n)
+{
+    int sw = (n / 3) * 2;
+    src += taps[0].pos;
+    uint16_t p = src[0], q = src[1];
+    dst[0] = p;
+    dst[1] = (p & q) + (((p ^ q) & 0xF7DE) >> 1);
+    for (int i = 2; i < sw; i += 2) {
+        p = src[i];
+        uint16_t next = src[i + 1];
+        dst[2] = blend565(q, p, 5);
+        dst[3] = blend565(q, p, 26);
+        dst[4] = (p & next) + (((p ^ next) & 0xF7DE) >> 1);
+        q = next;
+        dst += 3;
+    }
+    dst[2] = q;
+}
+
+static bool use_3_2_scaler(int src, int dst, bool smooth)
+{
+    return smooth && src >= 2 && dst * 2 == src * 3;
+}
+
 static PRESENT_HOT uint32_t line_hash(const uint16_t *line, int width)
 {
     const uint32_t *p = (const uint32_t *)line;
@@ -472,6 +502,7 @@ static PRESENT_HOT void present_task(void *arg)
     const int default_w = emu_view_width();
     const int max_w = MAX_VIEW_W(default_w);
     const bool smooth = M->scale == EMU_SCALE_SMOOTH;
+    bool scale_3_2 = false;
     uint16_t *src = heap_caps_malloc(MAX_SOURCE_WIDTH * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
     uint16_t *rows[2] = {
         heap_caps_malloc(max_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
@@ -518,6 +549,7 @@ static PRESENT_HOT void present_task(void *arg)
             vh = mode.view_h;
             vx = (BOARD_LCD_H_RES - vw) / 2;
             vy = (VIEW_H - vh) / 2;
+            scale_3_2 = use_3_2_scaler(mode.src_w, vw, smooth);
             make_taps(xtaps, vw, mode.src_w, smooth);
             for (int x = 0; x < vw; x++) {
                 xtaps[x].pos += mode.src_x;
@@ -576,7 +608,11 @@ static PRESENT_HOT void present_task(void *arg)
                     continue;
                 }
                 M->render_line(need[k], src);
-                scale_row(src, rows[k], xtaps, vw);
+                if (scale_3_2) {
+                    scale_row_3_2(src, rows[k], xtaps, vw);
+                } else {
+                    scale_row(src, rows[k], xtaps, vw);
+                }
                 have[k] = need[k];
             }
             const uint16_t *line = rows[0];

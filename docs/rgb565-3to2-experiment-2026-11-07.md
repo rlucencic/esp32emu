@@ -167,3 +167,8 @@ coverage remain open.
 
 Scratch fixtures, logs and firmware stay outside the repositories under
 `/tmp/rgb565-3to2-2026-11-07`.
+
+The subsequent [direct-dispatch trial](rgb565-direct-dispatch-experiment-2026-11-07.md)
+keeps the general scaler inline and retains the specialization. Its
+non-3:2 control stays within 0.05% of the reference; the eligible RGB path
+still has a separately measured CPU-throughput tradeoff.

@@ -527,3 +527,16 @@ only documentation. No panel-FPS or general application gain is claimed.
 Next try direct conditional dispatch preserving the old inlined general
 loop; LC paired indexed reads and RGB555 conversion remain local targets.
 Real-software tests on copied disks and S3 hardware timing remain open.
+
+The [direct-dispatch follow-up](rgb565-direct-dispatch-experiment-2026-11-07.md)
+retains a boolean geometry selector and direct specialized call while the
+compiler preserves the general loop inline. The P4 fallback control stays
+within 0.05% of the reference, avoiding the measured indirect-version cost.
+Two eligible RGB runs show +11.13% dirty-screen signature increments and
+−1.13% emulated CPU-frame throughput; indexed CPU throughput stays about
+60.15 FPS. Retained for graphics, with that CPU tradeoff and no panel-FPS
+or general application-speed claim. All 245,760 cropped row/canary checks,
+48,776 dispatch/fallback checks, full RGB/indexed/fallback LCD comparisons
+and 24 sibling builds pass. P4 adds 344 text bytes, no tables or allocation.
+S3 timing is unmeasured. Next: LC paired indexed reads and RGB555 conversion,
+plus representative software on copied disks.
