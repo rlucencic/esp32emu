@@ -33,7 +33,7 @@ Archimedes for the first actual hardware investigation instead.
 
 ## Current checkpoint (2026-11-07)
 
-Hardware investigations now cover Acorn, STE, Mac2, Mac3 and Amiga. The latest Mac2
+Hardware investigations now cover Acorn, STE, Mac2, Mac3, Amiga and MSX2. The latest Mac2
 work retains paired indexed reads and a full-row RGB555 fast path; its
 [LC report](../../esp32mac2/docs/lc-video-experiment-2026-11-07.md) records
 converter savings, exact pixels and the small CPU-throughput tradeoffs.
@@ -55,7 +55,12 @@ checks 96 games at 672 picture checkpoints and compares 230 final
 disk/package files; all match baseline. Nine longer three-build runs also
 match. The actual Aerial Racers race profile puts complete blitter work at
 only 0.1–0.3% of core 1, so defer further blitter specialization and profile
-MSX2 graphics next.
+MSX2 graphics next. The
+[MSX2 bank-pair trial](../../esp32msx/docs/bitmap-banks-experiment-2026-11-07.md)
+now retains paired SCREEN 7/8 VRAM reads: isolated P4 row costs fall
+18.5–21.8% / about 38.5%, with increased core-1 idle headroom and exact
+pixels. S3 and P4 builds pass; only P4 hardware was measured. Next
+investigate SCREEN 6's four-color palette expansion.
 Representative software on copied disks, physical input and audio coverage
 remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
@@ -654,3 +659,23 @@ profiles, not A/B speed comparisons. Defer another Amiga blitter fast path;
 continue with MSX2 bitmap rendering/VDP commands. No production probe or
 source change is retained from the census. Game/menu checkpoint agreement
 does not establish complete gameplay, physical-input or audio correctness.
+
+
+The [MSX2 paired-bank trial](../../esp32msx/docs/bitmap-banks-experiment-2026-11-07.md)
+retains a two-byte loop for SCREEN 7/8: compute the physical row base once,
+then alternate matching offsets in the two 64 KB VRAM banks. Palette,
+transparency, byte masking, sprites, commands and dirty-frame control are
+unchanged. All 262,144 ASan/UBSan pixel/canary cases, 262,144 independent
+address checks, ten host pictures and four full P4 LCD comparisons pass.
+S3, P4 test and normal P4 builds pass. Isolated P4 row cost falls 18.5–21.8%
+in SCREEN 7 and about 38.5% in SCREEN 8. Full core-1 `vdp_line` shares fall
+40.7–41.7% to 38.5–38.8% and 34.4–34.7% to 27.7–28.2%, respectively;
+idle rises. Unchanged SCREEN 5/6 controls show about half a percentage
+point higher `vdp_line` share with overlapping idle ranges; isolated
+SCREEN 6 cost rises 0.47%, SCREEN 5 falls 3.85%. Added P4 function text:
+398 bytes, no new table/allocation. SCREEN 8 remains at about 59.9 emulated
+FPS, near its cap: no panel-FPS or application-speed gain is claimed.
+Shared source is unchanged, S3 runtime and real-software coverage remain
+open. Next try row-level effective palette entries for SCREEN 6's four
+colors, keeping backdrop/transparency exact; command workloads need their
+own profile.
