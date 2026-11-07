@@ -116,7 +116,7 @@ VRAM window and grayscale palette. Pooled throughput is 60.145/60.149 FPS;
 the signature proxy is 10.318/10.552 per second (+2.27%). No indexed CPU
 speed improvement is claimed.
 
-Three separate 32,000-sample core-0 captures at 25 microseconds resolve
+Three separate 32,000-sample core-0 captures at 20 kHz (50 microseconds) resolve
 against the exact flashed ELF. Reference presenter-body residency is
 18.2–18.3%. Candidate presenter body is 15.9–16.1%, plus 1.5–1.6% in the
 new helper. These exclusive sample shares are consistent with less blend

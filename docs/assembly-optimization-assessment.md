@@ -37,10 +37,14 @@ Hardware investigations now cover Acorn, STE and Mac2. The latest Mac2
 work retains paired indexed reads and a full-row RGB555 fast path; its
 [LC report](../../esp32mac2/docs/lc-video-experiment-2026-11-07.md) records
 converter savings, exact pixels and the small CPU-throughput tradeoffs.
-Next profile Mac3's LC II/III converters independently, including Sonora
-strides, bounds and blanking. Representative software on copied disks,
-physical input and audio coverage remain open. Shared S3 paths have been
-built; the P4 measurements do not establish S3 runtime performance.
+The subsequent [Mac3 converter trial](../../esp32mac3/docs/video-optimization-experiment-2026-11-07.md)
+retains paired indexed reads and masked RGB555 arithmetic with original
+Sonora/V8 bounds and blanking. Converter costs fall, with measured adaptive
+CPU-speed tradeoffs recorded separately from the frame cap. Next establish
+an Amiga bitplane/blitter baseline before selecting its optimization target.
+Representative software on copied disks, physical input and audio coverage
+remain open. Shared S3 paths have been built; the P4 measurements do not
+establish S3 runtime performance.
 
 All percentages below describe individual trials against their stated
 reference builds. They are not cumulative whole-emulator speed gains.
@@ -569,3 +573,18 @@ text bytes, no table or allocation. Shared runtime source is unchanged;
 Mac2 is P4-only. Next profile the Mac3 LC II/III converter independently,
 preserving Sonora row strides and whole-row bounds/blanking semantics.
 Copied-disk software, physical input and audio coverage remain open.
+
+The [Mac3 video converter trial](../../esp32mac3/docs/video-optimization-experiment-2026-11-07.md)
+retains paired 8-bit native reads and simpler RGB555 masks; the pre-existing
+whole-row bounds checks, Sonora packed strides and blanking are unchanged.
+P4 kernel costs fall 23–29% at 8 bits and about 19% at RGB555; other-depth
+controls stay within 0.05%. All 1,246,912 ASan/UBSan row/canary cases per
+candidate, four host ROM-boot pixel comparisons, four full LCD comparisons
+and P4 builds pass. Added text: ten bytes, no table/allocation. Converter
+sample shares fall in all four workloads. Primary signature rates rise
+9.35% (LC II indexed) and 7.67% (LC III RGB555); separate thirty-second
+windows show mean adaptive CPU speed 0.58% and 1.77% lower. The near-60 FPS
+cap is not a CPU-speed result, and signatures are not panel FPS. Retained
+as a graphics tradeoff, without a general application-speed claim. Mac3
+is P4-only and shared runtime source is unchanged. Next profile Amiga
+bitplanes/blitter work; Mac3 CPU/MMU needs separate, representative tests.
