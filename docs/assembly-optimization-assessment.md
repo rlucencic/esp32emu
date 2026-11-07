@@ -445,3 +445,23 @@ shrinks 56 bytes without added tables or allocation. Mac2 is P4-only.
 Next: separately measure packed RGB-to-RGB565 conversion and the II's
 slow packed writes; LC paired indexed reads / RGB555 conversion remain
 candidates. OS/application, physical input and audio-by-ear coverage is open.
+
+The [paired packed-RGB follow-up](../../esp32mac2/docs/packed-rgb-experiment-2026-11-07.md)
+on 2026-11-07 retains three native word reads per pair of RGB pixels.
+Relative to the committed mode-selection build, isolated P4 24-bit converter
+cost falls 40.108%; indexed medians stay within 0.1% of the reference.
+Three full-firmware captures reduce converter residency from 36.3–36.8%
+to 26.7–27.8%, without an overall FPS claim. All 153,453 UBSan scanline /
+canary cases pass, including every RGB color in both pixel positions, mixed
+pairs, two-byte alignment and VRAM boundaries. LC/II native ROM-boot
+pixels match; P4 test and production builds pass. Cost: 122 extra bytes
+outside IRAM, no table or allocation. Next measure the guest's packed
+writes; the renderer change leaves that slow CPU memory path intact.
+
+A profiler-free follow-up to the paired-RGB trial records two matched
+30-second windows per build. Emulated throughput is 32.977–32.980 FPS for
+the reference and 32.821–32.823 for the candidate (0.474% lower pooled).
+Screen-signature increments rise from about 10.549/s to 12.837–12.882/s
+(21.9% higher), a presentation-change proxy rather than panel FPS. Retained
+for rendering, with that small observed CPU-throughput tradeoff; no broad
+statistical confidence or application performance claim.
