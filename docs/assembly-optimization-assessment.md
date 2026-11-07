@@ -33,15 +33,19 @@ Archimedes for the first actual hardware investigation instead.
 
 ## Current checkpoint (2026-11-07)
 
-Hardware investigations now cover Acorn, STE and Mac2. The latest Mac2
+Hardware investigations now cover Acorn, STE, Mac2, Mac3 and Amiga. The latest Mac2
 work retains paired indexed reads and a full-row RGB555 fast path; its
 [LC report](../../esp32mac2/docs/lc-video-experiment-2026-11-07.md) records
 converter savings, exact pixels and the small CPU-throughput tradeoffs.
 The subsequent [Mac3 converter trial](../../esp32mac3/docs/video-optimization-experiment-2026-11-07.md)
 retains paired indexed reads and masked RGB555 arithmetic with original
 Sonora/V8 bounds and blanking. Converter costs fall, with measured adaptive
-CPU-speed tradeoffs recorded separately from the frame cap. Next establish
-an Amiga bitplane/blitter baseline before selecting its optimization target.
+CPU-speed tradeoffs recorded separately from the frame cap. The
+[Amiga planar trial](../../esp32ami/docs/planar-expansion-experiment-2026-11-07.md)
+retains split 32-bit expansion entries: complete-row cost falls 3.1–12.5%
+in active-plane cases, with 80 fewer P4 text bytes and unchanged table size.
+Full synthetic throughput remains within 0.2% of reference; no application
+speed increase is established. Next investigate guarded blitter copy work.
 Representative software on copied disks, physical input and audio coverage
 remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
@@ -588,3 +592,19 @@ cap is not a CPU-speed result, and signatures are not panel FPS. Retained
 as a graphics tradeoff, without a general application-speed claim. Mac3
 is P4-only and shared runtime source is unchanged. Next profile Amiga
 bitplanes/blitter work; Mac3 CPU/MMU needs separate, representative tests.
+
+
+The [Amiga planar expansion trial](../../esp32ami/docs/planar-expansion-experiment-2026-11-07.md)
+retains split 32-bit lookup halves, avoiding unnecessary variable 64-bit
+shift work on RV32. Complete-row costs fall 3.1–12.5% for active planes;
+zero-plane control stays within 0.11%. Render text shrinks 80 bytes and the
+lookup remains 2 KB. All 163,328 ASan/UBSan full draw/index/canary comparisons,
+524,288 independent word/plane oracle cases, fourteen generated-disk host
+picture comparisons, existing timing/pattern checks and three full LCD
+comparisons pass. P4 firmware and host floppy/chip-bus checks pass. Renderer
+profile share falls in all three hardware modes. Profiler-free OCS/AGA
+frame throughput changes −0.047%/−0.161%, with no whole-emulator speed gain
+claimed. Amiga signatures are content hashes, not update counters. Local
+P4-only source changes leave shared runtime unchanged. Next investigate
+an unshifted blitter A-to-D copy fast path with exact masks, overlap,
+wrapping and busy timing; representative software coverage remains open.
