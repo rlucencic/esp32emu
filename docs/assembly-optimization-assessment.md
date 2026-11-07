@@ -74,9 +74,14 @@ writer adds 104 text bytes and sixteen stack bytes. The
 [logical-pixel trial](../../esp32msx/docs/logical-pixel-experiment-2026-11-07.md)
 rejects two packed-bit rewrites: exhaustive checks pass, but selective wins
 come with common COPY/NOT regressions. The retained implementation is
-restored. Next profile representative MSX software before specializing more.
-Representative software on copied disks, physical input and audio coverage
-remain open. Shared S3 paths have been built; the P4 measurements do not
+restored. The [MSX software follow-up](../../esp32msx/docs/software-profile-2026-11-07.md)
+now compares six real-software replays: all 114 pictures, eighteen visible
+memory/VRAM snapshots and six supported-audio captures match the original
+VDP. Lilly's first-level SCREEN 4 gameplay stays near 60 FPS in both P4
+builds, with slightly lower retained core-1 idle. Tiles/sprites occupy
+about 41% of core 1; host command counts are zero after frame 3000 in the
+tested replays. Next investigate tile expansion and sprites. Broader software,
+physical input and speaker coverage remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
 
 All percentages below describe individual trials against their stated
@@ -777,3 +782,31 @@ and Tab5 BASIC are restored to the retained implementation. Next profile
 representative MSX software on copied images, with generated fixtures as
 controls, before choosing more command specialization. S3 runtime,
 physical input and speaker checks remain open.
+
+The [MSX real-software follow-up](../../esp32msx/docs/software-profile-2026-11-07.md)
+compares the pre-optimization VDP (`c486454`) with the retained one
+(`5fc331a`), using the same host machine/runtime sources. Four official
+releases produce six MSX1/MSX2 cases: Lilly's Saga, Zevimodoki's disk,
+The Menace from Triton and Tales of Popolon. All 114 picture pairs,
+eighteen visible-CPU-memory/VRAM checkpoints, periodic state logs and six
+supported-audio WAVs match. A temporary host counter build matches those
+outputs too. Lilly, Zevimodoki and Popolon reach gameplay; Triton's replay
+covers intro/galaxy menu only. Zevimodoki's 64 KB ROM returns to BASIC in
+both builds; the disk works. This boot limitation predates the VDP changes.
+
+After frame 3000, host counters record SCREEN 4 rows for the two MSX2
+titles, SCREEN 2 for the MSX1 controls and no VDP command/pixel operations
+in any case. Lilly uses SCREEN 5 and launches twenty HMMV / 43 HMMM before
+that interval, so previous kernel savings are relevant to presentation
+work without establishing a gameplay speedup. On Tab5, original/retained
+Lilly first-level entry pictures and visible 64 KB memory match exactly.
+Both stay near 60 FPS (pooled 59.928/59.959); retained core-1 renderer share
+is slightly higher (40.5–41.2% versus 41.2–41.9%) and idle lower
+(34.8–35.4% versus 33.0–34.6%). Record this control tradeoff; short runs do
+not isolate its cause or establish application throughput differences.
+All twelve 32,000-sample captures have the requested count/core labels.
+Core-0 presentation is 3.0–3.2% in both builds. Next measure SCREEN 4 tile
+expansion (`pattern8`) and sprites, preserving the real-game replay and
+bitmap/command controls. No production code changes. The temporary board
+cartridge is removed and retained MSX2 BASIC restored. Later levels,
+MSX-Music, physical controls/speaker output and S3 runtime remain open.
