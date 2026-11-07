@@ -512,3 +512,18 @@ is claimed. All 24 sibling builds pass (10 S3, 14 P4); S3 timing remains
 unmeasured.
 Next investigate exact 3:2 horizontal scaling with fixed tap weights and
 clamped/cropped edges; LC converters and real-software coverage remain open.
+
+The [exact 3:2 horizontal RGB565 trial](rgb565-3to2-experiment-2026-11-07.md)
+is rejected at integration. Its final P4 kernel reduces isolated row cost
+about 46% on mixed colors and 35% on flat colors. Actual-source ASan/UBSan
+checks pass 245,760 cropped row/canary cases and 48,776 dispatch/fallback
+cases; full RGB, indexed and fallback LCD captures match. All 24 candidate
+builds pass. However, two full RGB runs show +8.08% dirty-screen signature
+increments and −1.56% CPU-frame throughput. Two non-3:2 fallback runs also
+lose 1.27% CPU throughput, despite never using the new kernel. Indexed
+CPU throughput stays at 60.159 FPS. Correct pixels and faster eligible rows
+do not justify that general-path cost. Restore runtime `784bba1`; retain
+only documentation. No panel-FPS or general application gain is claimed.
+Next try direct conditional dispatch preserving the old inlined general
+loop; LC paired indexed reads and RGB555 conversion remain local targets.
+Real-software tests on copied disks and S3 hardware timing remain open.

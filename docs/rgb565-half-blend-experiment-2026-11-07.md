@@ -172,3 +172,8 @@ general fallback. No such change is included in this trial.
 
 Scratch fixtures, full logs, firmware and disassembly stay outside the
 repositories under `/tmp/rgb565-blend-2026-11-07`.
+
+The subsequent [exact 3:2 horizontal trial](rgb565-3to2-experiment-2026-11-07.md)
+tests that next target but rejects its integration after repeated CPU
+throughput losses in both 3:2 and non-3:2 controls. The runtime stays at
+this committed half-weight implementation.
