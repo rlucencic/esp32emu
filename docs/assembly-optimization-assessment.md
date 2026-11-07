@@ -70,8 +70,11 @@ The [command follow-up](../../esp32msx/docs/command-stride-experiment-2026-11-07
 retains byte-stride HMMV/HMMM iteration: large-command isolated P4 costs
 fall 14.6–67.2%, with exact VRAM/state/LCD output and faster synthetic
 stress programs. YMMM controls cost 1.3–2.5% more, and the common register
-writer adds 104 text bytes and sixteen stack bytes. Next investigate
-logical-command pixel work using the measured controls.
+writer adds 104 text bytes and sixteen stack bytes. The
+[logical-pixel trial](../../esp32msx/docs/logical-pixel-experiment-2026-11-07.md)
+rejects two packed-bit rewrites: exhaustive checks pass, but selective wins
+come with common COPY/NOT regressions. The retained implementation is
+restored. Next profile representative MSX software before specializing more.
 Representative software on copied disks, physical input and audio coverage
 remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
@@ -752,4 +755,25 @@ still complete synchronously, preserving existing emulation timing rather
 than adding hardware accuracy. Shared source is unchanged. Next investigate
 logical-command `pset`/`point` work using existing controls, with exhaustive
 operation/transparency and ordered-overlap coverage. S3 runtime, games,
+physical input and speaker checks remain open.
+
+The [MSX2 logical-pixel trial](../../esp32msx/docs/logical-pixel-experiment-2026-11-07.md)
+rejects two packed-bit rewrites of `pset`; no production code is retained.
+Both pass 25,165,824 ASan/UBSan independent packed-byte/pixel cases,
+67,296 complete VRAM/state/canary command comparisons, 58,224 byte-command
+oracles and 49,920 CPU-transfer checkpoints. The first form also matches
+eighteen host pictures and builds as a full P4 test app. Its ordinary
+OR/XOR copies cost about 1.9–7.2% less, but several COPY/NOT paths cost
+about 1% more and transparent-zero fills regress up to 4%. A revised form
+delays physical addressing until after the transparency return: those
+zero fills cost 55.0–61.3% less, but ordinary COPY costs up to 7.1% more
+and SCREEN 6 NOT fill costs 8.5% more. Each form reduces combined measured
+P4 helper/dispatcher text by 56 bytes without stack growth; smaller code
+does not establish faster common paths. The revised form is kernel/object
+and native-tested only; neither rejected form receives S3 or candidate
+full-firmware timing/LCD comparisons. All fifteen reference profiles have
+the requested 32,000 samples/core. Production source, normal P4/host builds
+and Tab5 BASIC are restored to the retained implementation. Next profile
+representative MSX software on copied images, with generated fixtures as
+controls, before choosing more command specialization. S3 runtime,
 physical input and speaker checks remain open.
