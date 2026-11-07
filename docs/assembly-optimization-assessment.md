@@ -772,8 +772,10 @@ OR/XOR copies cost about 1.9–7.2% less, but several COPY/NOT paths cost
 about 1% more and transparent-zero fills regress up to 4%. A revised form
 delays physical addressing until after the transparency return: those
 zero fills cost 55.0–61.3% less, but ordinary COPY costs up to 7.1% more
-and SCREEN 6 NOT fill costs 8.5% more. Each form reduces combined measured
-P4 helper/dispatcher text by 56 bytes without stack growth; smaller code
+and SCREEN 6 NOT fill costs 8.5% more. The first linked form reduces combined
+P4 helper/dispatcher text by 56 bytes; comparable component objects show
+a 96-byte reduction for the revised form, without stack growth. Earlier
+mixed object/linked accounting was corrected on 2026-11-08; smaller code
 does not establish faster common paths. The revised form is kernel/object
 and native-tested only; neither rejected form receives S3 or candidate
 full-firmware timing/LCD comparisons. All fifteen reference profiles have
@@ -810,3 +812,27 @@ expansion (`pattern8`) and sprites, preserving the real-game replay and
 bitmap/command controls. No production code changes. The temporary board
 cartridge is removed and retained MSX2 BASIC restored. Later levels,
 MSX-Music, physical controls/speaker output and S3 runtime remain open.
+
+The [MSX doubled-tile follow-up](../../esp32msx/docs/tile-pairs-experiment-2026-11-08.md)
+replaces each doubled RGB565 tile pixel's two halfword stores with an
+aligned word copy, outlining and unrolling the eight-pixel helper. P4
+aligned tile kernels cost 17.4–26.3% less; the halfword-only fallback is
+about 12% slower, while normal framebuffer rows are word-aligned. Linked
+text grows 314 bytes and the common line frame 32 bytes. The first inline
+variant gives mixed results and is not selected. Retain the second variant.
+Native tile/pattern and
+bitmap checks, all six real-software replays and S3/P4 builds pass.
+
+Lilly's valid Tab5 repeat lowers combined core-1 renderer share from
+41.3–42.1% to 38.8–39.1%, counting the new `pattern8` helper. Core-0
+presentation stays 3.1–3.3%; pooled frame rates remain about 59.93 FPS,
+with no established FPS gain at the 60 Hz cap. An earlier stale-LCD run
+had no presenter samples and is excluded, not counted as a speedup.
+The report records its unresolved cause and subsequent display checks.
+SCREEN 6/8 static LCD pixels match exactly; dynamic control renderer
+shares show no consistent regression, with one lower-idle SCREEN 8 sample.
+The temporary cartridge is removed; the normal app is restored to MSX2
+BASIC and its LCD verified. No shared production code changes.
+Next profile sprite scanning and
+compositing, preserving priority, overflow and collision semantics.
+S3 runtime, later stages, MSX-Music and physical input/audio remain open.
