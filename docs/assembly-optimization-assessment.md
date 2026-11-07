@@ -496,3 +496,19 @@ Next target: shared `scale_row` / `blend565` and vertical RGB565 blending;
 preserve exact pixels and unchanged-row skipping, then run the shared
 build matrix for any retained runtime change. Real-software coverage on
 copied disks and LC converters remain open.
+
+The [uniform half-weight RGB565 trial](rgb565-half-blend-experiment-2026-11-07.md)
+retains an isolated vertical averaging loop selected once per row. On P4,
+960-pixel half-weight rows cost about 51–52% less for mixed/palette colors
+and 14% less for equal colors, with measured other-weight controls within
+0.02%. One-multiply and per-pixel half-weight variants were rejected.
+Actual-source ASan/UBSan checks pass 18,504,256 color/weight cases,
+12,194 horizontal rows and 7,260 vertical row/canary cases; full P4 LCD
+captures match exactly in RGB and indexed modes. Added P4 text: 72 bytes,
+no table or allocation. Two full RGB runs show a +3.63% dirty-screen
+signature proxy and −0.31% emulated CPU-frame throughput; indexed CPU
+throughput remains at 60.15 FPS. No panel-FPS or general application gain
+is claimed. All 24 sibling builds pass (10 S3, 14 P4); S3 timing remains
+unmeasured.
+Next investigate exact 3:2 horizontal scaling with fixed tap weights and
+clamped/cropped edges; LC converters and real-software coverage remain open.

@@ -384,6 +384,20 @@ static inline uint16_t blend565(uint16_t a, uint16_t b, int w)
     return (uint16_t)(c | (c >> 16));
 }
 
+/* The vertical weight is uniform across a row. Keep this loop separate
+ * so its simpler arithmetic does not change the general blend loop.
+ * Clearing each channel's low bit before shifting prevents channel mixing.
+ */
+static PRESENT_HOT __attribute__((noinline)) void blend_half_row(const uint16_t *a,
+                                                                const uint16_t *b,
+                                                                uint16_t *dst, int n)
+{
+    for (int x = 0; x < n; x++) {
+        uint16_t p = a[x], q = b[x];
+        dst[x] = (p & q) + (((p ^ q) & 0xF7DE) >> 1);
+    }
+}
+
 typedef struct {
     uint16_t pos;               /* source pixel */
     uint8_t w;                  /* weight of the next one, 0..32 */
@@ -567,8 +581,12 @@ static PRESENT_HOT void present_task(void *arg)
             }
             const uint16_t *line = rows[0];
             if (w) {
-                for (int x = 0; x < vw; x++) {
-                    out[x] = blend565(rows[0][x], rows[1][x], w);
+                if (w == 16) {
+                    blend_half_row(rows[0], rows[1], out, vw);
+                } else {
+                    for (int x = 0; x < vw; x++) {
+                        out[x] = blend565(rows[0][x], rows[1][x], w);
+                    }
                 }
                 line = out;
             }
