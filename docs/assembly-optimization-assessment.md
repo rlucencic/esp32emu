@@ -901,3 +901,21 @@ C64/C128 40-/80-column title controls match, all 36 new full-app captures are
 complete, and Tab5 is restored to its previous MSX firmware/settings. Next
 obtain real C64 game coverage or S3 runtime timing before another low-level
 optimization; hashing is a much smaller cost in this workload.
+
+The [ARE-TYPE game follow-up](../../esp32cbm/docs/aretype-validation-2026-11-08.md)
+compares the original VIC, collision-span build and final conversion build.
+Three 6,000-frame host runs match pictures, full visible memory, PCM and CPU
+status through gameplay, game over and restarts. Two fixed P4 checkpoints
+match all three builds' memory and pixels. Live sessions stay near 50 FPS;
+original draw/idle ranges are 35.0–51.1% / 17.8–39.7%, versus final
+17.9–21.4% / 47.8–51.9%. Scene/state timing varies, so these support observed
+game headroom without a precise kernel-speed ratio. The collision-only and
+final ranges overlap: no additional game-wide conversion gain is isolated.
+Final inline attribution places `char_pixels` at 4.73–10.71%, within graphics
+generation's 5.29–11.82%. Select its multicolor mask/palette expansion for the
+next bounded portable-C experiment, separating arithmetic from VRAM access
+before considering assembly. All 21 new board captures are complete; no
+production code changes in this validation. Broader games and S3 runtime
+remain open.
+The attached Tab5 is restored to its saved MSX firmware/settings, with flash
+hash verification and matching guest/LCD captures.
