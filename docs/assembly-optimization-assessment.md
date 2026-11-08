@@ -884,3 +884,20 @@ line commit at 18.67–18.80%: profile `commit_line`'s hash and RGB565
 conversion next. Shared production C is unchanged. S3 runtime and real-game
 performance remain unmeasured; the attached Tab5 is restored to its pre-test
 MSX firmware/settings.
+
+The [Commodore row-conversion follow-up](../../esp32cbm/docs/vic-conversion-experiment-2026-11-08.md)
+attributes about 89% of line-commit samples to RGB565 conversion and 10% to
+hashing. Advancing pointers and processing eight pixels per iteration cuts
+changed-row P4 kernel cycles by 29.65–30.06%, at +74 text bytes with no stack
+frame or new RAM. Two- and four-pixel loops save about 19% and 26%.
+73,760 native oracle/differential cases per variant, the existing collision
+regression, seven exact host replay pairs and S3/P4 builds pass. A fixed
+hardware checkpoint matches all 64 KB of CPU-visible memory and guest pixels.
+The generated workload stays near the 50 FPS PAL cap: line commit falls
+from 18.5–19.3% to 15.1–15.3% of core 1, and idle rises from 30.6–32.2% to
+34.4–35.3%. This supports headroom in this synthetic case, without a game-wide
+or S3 runtime claim. Shared production code is unchanged.
+C64/C128 40-/80-column title controls match, all 36 new full-app captures are
+complete, and Tab5 is restored to its previous MSX firmware/settings. Next
+obtain real C64 game coverage or S3 runtime timing before another low-level
+optimization; hashing is a much smaller cost in this workload.
