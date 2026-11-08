@@ -31,9 +31,10 @@ Suggested bounded first experiments: STE planar conversion, Amiga bitplane /
 blitter kernels, common mac2/mac3 color conversion. The user selected Acorn
 Archimedes for the first actual hardware investigation instead.
 
-## Current checkpoint (2026-11-07)
+## Current checkpoint (2026-11-08)
 
-Hardware investigations now cover Acorn, STE, Mac2, Mac3, Amiga and MSX2. The latest Mac2
+Hardware investigations now cover Acorn, STE, Mac2, Mac3, Amiga, MSX2
+and Commodore. The latest Mac2
 work retains paired indexed reads and a full-row RGB555 fast path; its
 [LC report](../../esp32mac2/docs/lc-video-experiment-2026-11-07.md) records
 converter savings, exact pixels and the small CPU-throughput tradeoffs.
@@ -856,3 +857,16 @@ baseline/candidate runs both include these fixes; older runtime timings
 are not directly compared. Before further assembly work, obtain S3 timing
 or profile another emulator's real workload; later MSX game stages,
 MSX-Music and physical input/speaker coverage remain open.
+
+The [Commodore baseline](../../esp32cbm/docs/profile-baseline-2026-11-08.md)
+continues the survey with C64/C128 controls and an original animated
+character/eight-sprite/three-voice C64 workload. The generated case runs
+at 48.77–48.85 FPS on Tab5; DWARF inline-frame attribution places
+44.88–45.03% of core 1 in VIC `sprite_collisions`, versus 11.72–12.32% in
+graphics conversion and 16.19–16.50% in line commit. These nested source
+shares come from separate complete captures; do not add them to flat
+symbol shares. SID synthesis stays much smaller on core 0. Select a
+bounded collision-scan C experiment before assembly or shared CPU changes,
+with independent collision/IRQ oracles and later real-software replay.
+No production emulator change is made in this baseline. The generated
+workload is reproducible but does not represent ordinary game costs.
