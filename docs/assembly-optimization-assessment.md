@@ -870,3 +870,17 @@ bounded collision-scan C experiment before assembly or shared CPU changes,
 with independent collision/IRQ oracles and later real-software replay.
 No production emulator change is made in this baseline. The generated
 workload is reproducible but does not represent ordinary game costs.
+
+The [Commodore collision-span follow-up](../../esp32cbm/docs/sprite-collision-experiment-2026-11-08.md)
+retains clipped active descriptors for the VIC collision pass. Full-width
+P4 kernel cost falls 43–96%; eight dense sprites over four pixels cost
+7.8% more. The linked draw function adds 170 text bytes and 80 stack bytes.
+819,200 native differential/oracle cases, 16,384 split-call properties,
+seven host replay pairs, S3/P4 builds and C64/C128 board controls pass.
+The generated workload rises from 48.71–48.75 to 50.05–50.17 FPS, with
+31–32% core-1 idle. This is a synthetic gain, not a game-wide speed claim.
+Fresh candidate inline attribution puts collision work at 5.49–7.01% and
+line commit at 18.67–18.80%: profile `commit_line`'s hash and RGB565
+conversion next. Shared production C is unchanged. S3 runtime and real-game
+performance remain unmeasured; the attached Tab5 is restored to its pre-test
+MSX firmware/settings.
