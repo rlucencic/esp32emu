@@ -581,7 +581,6 @@ static PRESENT_HOT void present_task(void *arg)
             M->render_line(y, src);
             uint32_t h = line_hash(src, mode.width);
             changed[y] = redraw || h != hashes[y];
-            hashes[y] = h;
         }
         redraw = false;
 
@@ -608,6 +607,9 @@ static PRESENT_HOT void present_task(void *arg)
                     continue;
                 }
                 M->render_line(need[k], src);
+                /* Cache the snapshot actually scaled: the machine may
+                 * change a row after the change-detection pass. */
+                hashes[need[k]] = line_hash(src, mode.width);
                 if (scale_3_2) {
                     scale_row_3_2(src, rows[k], xtaps, vw);
                 } else {

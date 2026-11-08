@@ -101,6 +101,13 @@ void lcd_flush(int y0, int y1)
     if (y0 >= y1) {
         return;
     }
+    /* IDF 5.5's SRM workaround checks the unrotated dimensions (DIG-734).
+     * With our 1280-wide RGB565 source, eight-row strips keep the rotated
+     * DMA tail above the FIFO threshold for either macroblock size.
+     * Expand both ends together: source rows and destination columns
+     * retain their coordinates, including the neighboring rows. */
+    y0 &= ~7;
+    y1 = (y1 + 7) & ~7;
     xSemaphoreTake(s_lock, portMAX_DELAY);
     esp_err_t err = rotate(y0, y1);
     xSemaphoreGive(s_lock);

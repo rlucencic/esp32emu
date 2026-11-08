@@ -563,3 +563,14 @@ and the cores.
   the session on the board: say so first.
 - Keep their private data (WiFi name, IP, SD card contents) out of anything
   meant for publishing.
+
+## Display regression checks (2026-11-08)
+
+`docs/display-reliability-2026-11-08.md` records a JTAG-confirmed Tab5 PPA
+completion stall and an independently reproduced presenter snapshot/hash
+race. Flushes now expand to eight-row boundaries; hashes describe the
+source snapshot actually scaled. Run `python3 tools/test_tab5_flush.py`
+and `python3 tools/test_presenter_snapshots.py` for ASan/UBSan checks of
+the actual functions. All 24 project/board builds pass. Fresh MSX sprite
+baseline/candidate measurements use both fixes; old timings across the
+runtime change are not directly comparable. S3 runtime remains untested.

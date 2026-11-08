@@ -80,7 +80,7 @@ memory/VRAM snapshots and six supported-audio captures match the original
 VDP. Lilly's first-level SCREEN 4 gameplay stays near 60 FPS in both P4
 builds, with slightly lower retained core-1 idle. Tiles/sprites occupy
 about 41% of core 1; host command counts are zero after frame 3000 in the
-tested replays. Next investigate tile expansion and sprites. Broader software,
+tested replays. Tile and sprite follow-ups are recorded below. Broader software,
 physical input and speaker coverage remain open. Shared S3 paths have been built; the P4 measurements do not
 establish S3 runtime performance.
 
@@ -836,3 +836,23 @@ BASIC and its LCD verified. No shared production code changes.
 Next profile sprite scanning and
 compositing, preserving priority, overflow and collision semantics.
 S3 runtime, later stages, MSX-Music and physical input/audio remain open.
+
+The [MSX sprite bounds trial](../../esp32msx/docs/sprite-bounds-experiment-2026-11-08.md)
+bounds the final 256-pixel composite pass while retaining sprite scanning,
+priority, combine, collision and overflow handling. More than two million
+native differential/oracle cases, six software replay pairs and S3/P4
+builds pass. Captured P4 rows cost 10.55% less; sparse rows save 31–34%,
+spread rows gain little, and empty lists regress 1.44%. Cost is +62 bytes
+text with unchanged stack. Fresh Lilly gameplay has overlapping renderer
+shares (38.4–38.8% / 37.7–38.5%) and stays near 60 FPS. Retain it for the
+kernel result, without claiming a significant whole-app speedup or S3 gain.
+
+That trial also exposes a JTAG-confirmed Tab5 PPA completion wait and an
+independently reproduced presenter hash/snapshot race. The shared
+[display fixes](display-reliability-2026-11-08.md) use eight-row flush
+boundaries and cache the hash of the source actually scaled. Actual-source
+ASan/UBSan regressions and all 24 project/board builds pass. New sprite
+baseline/candidate runs both include these fixes; older runtime timings
+are not directly compared. Before further assembly work, obtain S3 timing
+or profile another emulator's real workload; later MSX game stages,
+MSX-Music and physical input/speaker coverage remain open.
