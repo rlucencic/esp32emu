@@ -36,8 +36,13 @@ Archimedes for the first actual hardware investigation instead.
 Hardware investigations now cover Acorn, STE, Mac2, Mac3, Amiga, MSX2
 and Commodore. The latest [VIC character trial](../../esp32cbm/docs/char-pixels-experiment-2026-11-08.md)
 retains a 15–17% multicolor row-kernel saving and 24 fewer P4 text bytes,
-without an established whole-app gain. Next profile Apple IIgs active-voice
-audio and CPU work. The Mac2
+without an established whole-app gain. The subsequent
+[Apple IIgs baseline](../../esp32gs/docs/profile-baseline-2026-11-08.md)
+finds DOC waveform-pointer calculation at 8.38–9.93% of core 1 in dense
+synthetic cases. Try equivalent portable-C address arithmetic there next;
+SHR expansion/hash work is smaller in the animated control. All seven cases
+remain near 60 FPS, so this is a headroom target, not an observed speedup.
+The Mac2
 work retains paired indexed reads and a full-row RGB555 fast path; its
 [LC report](../../esp32mac2/docs/lc-video-experiment-2026-11-07.md) records
 converter savings, exact pixels and the small CPU-throughput tradeoffs.
@@ -940,3 +945,20 @@ with Apple IIgs active-voice audio and 65C816 profiling before another local
 C64 kernel experiment; broader games and S3 timing remain open.
 Tab5 is restored from a fresh full-flash backup with hash verification;
 final guest/LCD captures match MSX Disk BASIC outside the cursor area.
+
+The [Apple IIgs DOC/SHR baseline](../../esp32gs/docs/profile-baseline-2026-11-08.md)
+adds original 0/1/8/32-voice free-running fixtures and animated 320-/640-mode
+controls. Six native cases pass twice with exact PCM/VRAM/RGB565 hashes;
+Tab5 guest GLU readbacks and full source-pixel checks pass. Seven cases run
+59.17–59.76 FPS, with zero additional missing speaker frames in fourteen
+steady timing windows. All 48 captures contain 32,000 samples each.
+32-voice DOC scan/advance/mix occupies 34.5–35.5% of core 1 in the static
+case. Separate inline captures put waveform-pointer calculation at
+8.38–8.65% static and 9.18–9.93% animated, within oscillator advancement;
+SHR expansion is 2.34–2.39% in animated-640. Select equivalent portable-C
+waveform-address arithmetic next, followed by mode/IRQ/state differential
+coverage and hardware A/B before retaining a change. Normal S3/P4 builds
+pass; S3 runtime and real software remain open. No production change is
+made in this baseline.
+Tab5 is restored from its fresh full-flash MSX backup with hash verification;
+MSX Disk BASIC guest and LCD captures exactly match the restored control.
