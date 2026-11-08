@@ -33,18 +33,20 @@ Archimedes for the first actual hardware investigation instead.
 
 ## Current checkpoint (2026-11-08)
 
-Hardware investigations now cover Acorn, STE, Mac2, Mac3, Amiga, MSX2
-and Commodore. The latest [VIC character trial](../../esp32cbm/docs/char-pixels-experiment-2026-11-08.md)
+Hardware investigations now cover Acorn, STE, Mac2, Mac3, Amiga, MSX2,
+Commodore and Apple IIgs. The latest
+[IIgs pointer integration](../../esp32gs/docs/doc-pointer-integration-2026-11-08.md)
+retains equivalent mask-select C after exact native/state checks and P4
+reference/candidate/reference validation. Dense static core-1 idle rises
+27.0–27.4% to 31.4–33.4%, animated 7.3–7.8% to 12.8–13.8%, near the 60 FPS cap.
+The two linked P4 hot functions save 50 text bytes and the oscillator drops
+its 16-byte frame. S3 runtime and real-program speed remain unmeasured.
+Next test bit-exact normalization lookup in `clem_ensoniq_voices`, at
+10.74–10.88% of core 1; preserve float/PCM results and measure the 1 KB table's
+cache/footprint cost before assembly. The earlier
+[VIC character trial](../../esp32cbm/docs/char-pixels-experiment-2026-11-08.md)
 retains a 15–17% multicolor row-kernel saving and 24 fewer P4 text bytes,
-without an established whole-app gain. The subsequent
-[Apple IIgs baseline](../../esp32gs/docs/profile-baseline-2026-11-08.md)
-finds DOC waveform-pointer calculation at 8.38–9.93% of core 1 in dense
-synthetic cases. The subsequent
-[pointer arithmetic trial](../../esp32gs/docs/doc-pointer-experiment-2026-11-08.md)
-selects an equivalent C mask merge (13.28–13.30% fewer P4 kernel cycles).
-Next run full-emulator PCM/state/pixel replay and P4 A/B before retaining it;
-SHR expansion/hash work is smaller in the animated control. All seven cases
-remain near 60 FPS, so this is a headroom target, not an observed speedup.
+without an established whole-app gain.
 The Mac2
 work retains paired indexed reads and a full-row RGB555 fast path; its
 [LC report](../../esp32mac2/docs/lc-video-experiment-2026-11-07.md) records
@@ -979,3 +981,24 @@ PCM/state/pixel replay, full S3/P4 builds and P4 sparse/dense/animated A/B
 before retaining the candidate. No whole-app or S3 runtime gain is claimed.
 Tab5 is restored from a fresh full-flash MSX backup with hash verification;
 MSX Disk BASIC guest/LCD controls match outside the cursor rectangle.
+
+The [IIgs pointer integration](../../esp32gs/docs/doc-pointer-integration-2026-11-08.md)
+retains the selected mask merge. Six native reference/candidate replays match
+PCM, video RAM, RGB565, CPU fields, DOC state and full RAM; the actual
+production module passes historical-reference sanitized mode/IRQ/mixing tests
+and the bit oracle. Normal S3/P4 and isolated P4 builds pass. Ten fixed board
+checkpoints match VRAM/pixels; all 42 captures are complete and all 24 timing
+windows have zero additional missing speaker frames. Reference-bracketed
+static-32 idle is 27.0–27.4% versus candidate 31.4–33.4%; animated-640 is
+7.3–7.8% versus 12.8–13.8%. FPS stays capped near 60: this is synthetic
+headroom, not a real-application or S3 runtime speed claim. Linked P4 hot
+functions save 50 text bytes and oscillator stack falls 16 to 0 bytes;
+S3 object text saves 18 bytes with its frame unchanged. Fresh candidate
+inline samples put pointer calculation at 7.27–7.39% and voice mixing at
+10.74–10.88%. Next test bit-exact float normalization lookup in
+`clem_ensoniq_voices`; disassembly has two per-voice P4 FP divides and two S3
+software-division call sites. Measure the 1 KB table/cache tradeoff and keep
+exact float/PCM checks before retention. Broader software and S3 runtime
+remain open.
+Tab5 is restored from a fresh full-flash MSX backup with hash verification;
+MSX Disk BASIC guest and LCD captures exactly match the restored controls.
