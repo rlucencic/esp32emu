@@ -34,7 +34,10 @@ Archimedes for the first actual hardware investigation instead.
 ## Current checkpoint (2026-11-08)
 
 Hardware investigations now cover Acorn, STE, Mac2, Mac3, Amiga, MSX2
-and Commodore. The latest Mac2
+and Commodore. The latest [VIC character trial](../../esp32cbm/docs/char-pixels-experiment-2026-11-08.md)
+retains a 15–17% multicolor row-kernel saving and 24 fewer P4 text bytes,
+without an established whole-app gain. Next profile Apple IIgs active-voice
+audio and CPU work. The Mac2
 work retains paired indexed reads and a full-row RGB555 fast path; its
 [LC report](../../esp32mac2/docs/lc-video-experiment-2026-11-07.md) records
 converter savings, exact pixels and the small CPU-throughput tradeoffs.
@@ -919,3 +922,21 @@ production code changes in this validation. Broader games and S3 runtime
 remain open.
 The attached Tab5 is restored to its saved MSX firmware/settings, with flash
 hash verification and matching guest/LCD captures.
+
+The [VIC character-expansion trial](../../esp32cbm/docs/char-pixels-experiment-2026-11-08.md)
+retains four local 16-bit palette-index pairs. Multicolor P4 character cost
+falls 18–21% and full graphics-window cost 15–17%; representative partial
+spans also improve. Small control regressions remain, including 1.52% in
+hires arithmetic and 2.59% in an invalid/display-off full window. Full P4
+draw text shrinks 24 bytes with its 272-byte frame unchanged. Each candidate
+and the selected production source pass 17,039,360 native oracle/differential
+cases; existing replays, ARE-TYPE replays and S3/P4 builds pass. Fixed hardware
+memory/pictures and clean C64/C128 title controls match. A queued-typing
+C128 harness attempt is excluded and rerun with inputs cleared.
+Fresh generated-workload idle ranges overlap (34.6–37.6% / 34.6–37.5%);
+retain for kernel/footprint gains without a whole-app or S3 runtime speed
+claim. All 33 new profile captures are complete. Resume the project survey
+with Apple IIgs active-voice audio and 65C816 profiling before another local
+C64 kernel experiment; broader games and S3 timing remain open.
+Tab5 is restored from a fresh full-flash backup with hash verification;
+final guest/LCD captures match MSX Disk BASIC outside the cursor area.
