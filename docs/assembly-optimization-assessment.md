@@ -39,7 +39,10 @@ retains a 15–17% multicolor row-kernel saving and 24 fewer P4 text bytes,
 without an established whole-app gain. The subsequent
 [Apple IIgs baseline](../../esp32gs/docs/profile-baseline-2026-11-08.md)
 finds DOC waveform-pointer calculation at 8.38–9.93% of core 1 in dense
-synthetic cases. Try equivalent portable-C address arithmetic there next;
+synthetic cases. The subsequent
+[pointer arithmetic trial](../../esp32gs/docs/doc-pointer-experiment-2026-11-08.md)
+selects an equivalent C mask merge (13.28–13.30% fewer P4 kernel cycles).
+Next run full-emulator PCM/state/pixel replay and P4 A/B before retaining it;
 SHR expansion/hash work is smaller in the animated control. All seven cases
 remain near 60 FPS, so this is a headroom target, not an observed speedup.
 The Mac2
@@ -962,3 +965,17 @@ pass; S3 runtime and real software remain open. No production change is
 made in this baseline.
 Tab5 is restored from its fresh full-flash MSX backup with hash verification;
 MSX Disk BASIC guest and LCD captures exactly match the restored control.
+
+The [IIgs pointer arithmetic trial](../../esp32gs/docs/doc-pointer-experiment-2026-11-08.md)
+compares combined-shift arithmetic, XOR masked selection and table masks.
+All pass 6,242,880 independent oracle cases each and complete DOC state,
+IRQ/mixing differential checks across 224 states / 57,344 events per variant
+under ASan/UBSan. 216 P4 ABBA cases select masked selection: 13.28–13.30%
+fewer pointer-kernel cycles in warm internal RAM/PSRAM, versus about 10% for
+the others. Normal project flags yield 50 fewer P4 audio-module object text
+bytes and a 16-to-0-byte oscillator frame; S3 text falls 18 bytes with stack
+unchanged. Production remains unchanged. Next run full-emulator native
+PCM/state/pixel replay, full S3/P4 builds and P4 sparse/dense/animated A/B
+before retaining the candidate. No whole-app or S3 runtime gain is claimed.
+Tab5 is restored from a fresh full-flash MSX backup with hash verification;
+MSX Disk BASIC guest/LCD controls match outside the cursor rectangle.
