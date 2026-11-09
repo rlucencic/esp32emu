@@ -31,10 +31,20 @@ Suggested bounded first experiments: STE planar conversion, Amiga bitplane /
 blitter kernels, common mac2/mac3 color conversion. The user selected Acorn
 Archimedes for the first actual hardware investigation instead.
 
-## Current checkpoint (2026-11-08)
+## Current checkpoint (2026-11-09)
+
+The [DOC helper integration](../../esp32gs/docs/doc-helper-scope-integration-2026-11-09.md)
+is retained after full-app P4 validation (dense sampled DOC cost about
+26–33% lower), exact native checks and S3/P4 builds. The subsequent
+[metadata-layout trial](../../esp32gs/docs/doc-metadata-layout-experiment-2026-11-09.md)
+is deferred: smaller code regresses the dense P4 scanline kernel about 3%.
+Production layout remains unchanged. Next inspect shared 65C816 fetch/fetch16;
+S3 runtime gains remain unmeasured.
+
+Earlier checkpoint:
 
 Hardware investigations now cover Acorn, STE, Mac2, Mac3, Amiga, MSX2,
-Commodore and Apple IIgs. The latest
+Commodore and Apple IIgs. The earlier
 [normalization integration](../../esp32gs/docs/doc-normalization-integration-2026-11-08.md)
 retains a 1 KB shared float table after exact native/state checks and P4
 reference/candidate/reference validation. Dense static idle rises
@@ -1135,3 +1145,22 @@ and removed.
 
 The fresh full MSX backup is restored and independently digest-verified;
 Disk BASIC guest/LCD captures match exactly after the final restart.
+
+### IIgs DOC metadata-layout trial (2026-11-09)
+
+The metadata-first DOC layout is deferred. With the retained local helper,
+normal-flags audio text saves 238 P4 / 190 S3 bytes, but P4 dense scanline
+kernel calls regress about 3.0%, and eight-oscillator sync regresses
+2.2–2.5%; short calls improve. S3 scheduler stack grows 16 bytes and runtime
+is unmeasured. All 378 ABBA groups / 1,512 timings agree on canonical state.
+New field-based snapshots cover all fourteen DOC fields with exact float
+payloads and explicit byte order, allowing different native layouts to be
+compared. Both layouts pass fail-fast ASan/UBSan state/boundary/IRQ checks,
+six complete-core native fixtures and a 21,601-frame Tour replay with exact
+PCM/CPU/DOC/RAM/VRAM/pixel/media output. Only test tools change; production
+layout and shared runtime source stay unchanged. Next investigate shared
+65C816 fetch/fetch16, with bus/timing/IRQ equivalence before any code change.
+See [the report](../../esp32gs/docs/doc-metadata-layout-experiment-2026-11-09.md).
+
+The fresh full MSX backup is restored and digest-verified; guest and LCD
+captures match the known Disk BASIC controls exactly.
