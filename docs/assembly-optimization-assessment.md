@@ -1077,3 +1077,21 @@ See [the report](../../esp32gs/docs/doc-scheduler-experiment-2026-11-09.md).
 
 Tab5 MSX firmware/settings are restored with a verified full-flash digest
 and exact guest/LCD captures. Original SD media is untouched.
+
+
+### IIgs DOC span integration (2026-11-09)
+
+Retain span after exact native fixture/Tour replays, sanitized production
+state/IRQ/boundary checks, normal S3/P4 builds and P4 A/B with dense references
+before/after. Ten fixed checkpoints and five Tour source pairs/final LCD pair
+match. Across 42 complete captures / 32 timing windows, no new speaker misses
+occur in the observed windows. Scheduler share drops 7.0–7.2% to 5.0–5.3%
+static dense, 7.5–8.0% to 5.8–5.9% animated, and 7.1–9.1% to 5.1–5.7% in
+Tour music. Idle varies, including overlapping ROM/quiet controls; capped
+FPS is unchanged. P4 text grows 36 bytes and stack 32; S3 text grows 14 and
+stack 16, runtime unmeasured. Next inspect oscillator metadata/address loads
+(12.5–14.3% of core 1 in dense candidate cases) before adding derived caches.
+See [the report](../../esp32gs/docs/doc-span-integration-2026-11-09.md).
+
+Original SD media is untouched, test copies are removed, and the full MSX
+backup is digest-verified with exact restored guest/LCD captures.
