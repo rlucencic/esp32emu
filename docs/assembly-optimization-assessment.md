@@ -1095,3 +1095,20 @@ See [the report](../../esp32gs/docs/doc-span-integration-2026-11-09.md).
 
 Original SD media is untouched, test copies are removed, and the full MSX
 backup is digest-verified with exact restored guest/LCD captures.
+
+
+### IIgs local oscillator-helper trial (2026-11-09)
+
+The oscillator helper has one internal caller. Local scope lets GCC 14.2
+inline it, saving 78 P4 / 57 S3 audio text bytes and 48 P4 / 16 S3 scheduler
+stack bytes. Sanitized state/boundary/IRQ checks, six native fixture pairs
+and a real Tour replay pass exactly. Across 378 P4 ABBA cases, complete DOC
+scanline kernel savings are 37.5–37.7% dense, 24.1–25.4% eight active and
+7.3–7.5% one active; short/quiet medians improve too. Production remains
+unchanged. Next full-app A/B with inline-aware profiling; full-app and S3
+runtime gains are unmeasured. Metadata relocation saves more code in an
+isolated probe but needs canonical state snapshots and separate validation.
+See [the report](../../esp32gs/docs/doc-helper-scope-experiment-2026-11-09.md).
+
+The full MSX backup is restored and digest-verified, with exact guest/LCD
+captures. Original SD media is unmounted throughout the kernel trial.
