@@ -1039,3 +1039,19 @@ writes and controlled P4 checkpoints, before more local arithmetic. Real
 software throughput, S3 runtime and listening assessment remain open.
 Tab5 is restored from its fresh full-flash MSX backup with hash verification;
 MSX Disk BASIC guest and LCD captures exactly match restored controls.
+
+
+### IIgs real-software DOC validation (2026-11-09)
+
+The Tour boot/music replays 21,601 native frames against audio code before
+both retained optimizations. PCM, final CPU/DOC/RAM/pixels and disposable
+media bytes match exactly; up to 16 audible oscillators at frame boundaries.
+Three candidate Tab5 music captures total 96,000 core-1 samples: scheduler
+8.7–9.0%, oscillator 2.8–4.1%, mixer 2.6–3.2%, idle 38.2–39.3%. Five observed
+speaker checkpoints add no misses; this does not cover boot's earlier gaps.
+No matched real-software speedup or S3 runtime is established. Next investigate
+DOC scheduling with an independent slot/cycle oracle and real-software replay
+before a matched board trial. Production code is unchanged in this step.
+Original SD media is unchanged, the test copy is removed, and the full MSX
+backup and exact guest/LCD captures are restored.
+See [the report](../../esp32gs/docs/doc-software-replay-2026-11-09.md).
