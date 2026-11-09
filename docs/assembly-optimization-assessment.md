@@ -1055,3 +1055,25 @@ before a matched board trial. Production code is unchanged in this step.
 Original SD media is unchanged, the test copy is removed, and the full MSX
 backup and exact guest/LCD captures are restored.
 See [the report](../../esp32gs/docs/doc-software-replay-2026-11-09.md).
+
+
+### IIgs DOC scheduler trial and IRQ queue repair (2026-11-09)
+
+Expanded scheduling checks reveal an existing full-queue IRQ bug: after an
+acknowledgement, a duplicated tail can make the next enqueue write outside
+the array. Production now clears the vacated tail. An independent FIFO
+regression passes 18,000 native sanitizer and P4 events, while the committed
+code fails; legacy DOC and real Tour replay still match. Normal S3/P4 builds
+pass. Sanitizer runs now halt on errors.
+
+Two scheduler experiments remain outside production. Both pass 245,760
+boundary calls and real-software replay. Across 756 P4 ABBA kernel cases,
+span saves 12.9–13.0% dense and 21–30% sparse with scanline deltas; it costs
+stack (+32 bytes P4 / +16 S3) and regresses short/quiet controls. All 821,738
+active scheduler calls in the instrumented native Tour advance 32–63 slots.
+Next run full-app span A/B, including real music and quiet controls. No
+full-app speedup or S3 runtime result is established.
+See [the report](../../esp32gs/docs/doc-scheduler-experiment-2026-11-09.md).
+
+Tab5 MSX firmware/settings are restored with a verified full-flash digest
+and exact guest/LCD captures. Original SD media is untouched.
