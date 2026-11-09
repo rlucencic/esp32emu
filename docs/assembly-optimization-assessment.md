@@ -35,18 +35,17 @@ Archimedes for the first actual hardware investigation instead.
 
 Hardware investigations now cover Acorn, STE, Mac2, Mac3, Amiga, MSX2,
 Commodore and Apple IIgs. The latest
+[normalization integration](../../esp32gs/docs/doc-normalization-integration-2026-11-08.md)
+retains a 1 KB shared float table after exact native/state checks and P4
+reference/candidate/reference validation. Dense static idle rises
+31.0–33.2% to 35.4–37.5%, animated 12.8–13.4% to 16.7–17.6%, near the frame
+cap. Mixer frame grows 16 bytes on both targets; S3 runtime remains
+unmeasured. Next replay real software playing DOC audio using throwaway
+media before another local arithmetic trial. The earlier
 [IIgs pointer integration](../../esp32gs/docs/doc-pointer-integration-2026-11-08.md)
-retains equivalent mask-select C after exact native/state checks and P4
-reference/candidate/reference validation. Dense static core-1 idle rises
-27.0–27.4% to 31.4–33.4%, animated 7.3–7.8% to 12.8–13.8%, near the 60 FPS cap.
-The two linked P4 hot functions save 50 text bytes and the oscillator drops
-its 16-byte frame. S3 runtime and real-program speed remain unmeasured.
-The subsequent
-[normalization trial](../../esp32gs/docs/doc-normalization-experiment-2026-11-08.md)
-selects a 1 KB shared float table after exact native/P4 checks and about 43%
-fewer 32-voice mixer-kernel cycles. It adds 16 stack bytes; full-app cache
-pressure and S3 runtime remain unmeasured. Next run full-emulator P4 A/B and
-normal S3/P4 builds before retaining the normalization change. The earlier
+retains equivalent mask-select C, saving 50 linked P4 hot-function text bytes
+and removing the oscillator's 16-byte frame, with exact native/state and
+reference-bracketed P4 validation. The earlier
 [VIC character trial](../../esp32cbm/docs/char-pixels-experiment-2026-11-08.md)
 retains a 15–17% multicolor row-kernel saving and 24 fewer P4 text bytes,
 without an established whole-app gain.
@@ -1021,4 +1020,22 @@ in an isolated candidate, then exact replay, normal S3/P4 builds and full P4
 reference/candidate/reference timing before retention. No full-app or S3
 runtime gain is claimed; real software audio remains open.
 Tab5 is restored from a fresh full-flash MSX backup with hash verification;
+MSX Disk BASIC guest and LCD captures exactly match restored controls.
+
+The [IIgs normalization integration](../../esp32gs/docs/doc-normalization-integration-2026-11-08.md)
+retains the shared 1 KB table. Six native reference/candidate PCM, CPU, DOC,
+RAM and pixel replays match exactly; the complete production mixer passes
+524,288 exhaustive float cases and historical-reference sanitized mode/IRQ
+checks. Full S3/P4 builds and ten fixed board checkpoints pass. All 42
+captures are complete; all 24 timing windows have zero additional missing
+speaker frames. Reference-bracketed static-32 idle rises 31.0–33.2% to
+35.4–37.5%, animated-640 12.8–13.4% to 16.7–17.6%. Voice mixing's animated
+inline share falls 10.69–10.82% to 6.37–6.60%. FPS stays near its 60 Hz cap;
+this is synthetic headroom, not a real-program or S3 runtime speed claim.
+The linked P4 binary grows 1024 bytes, and mixer frames grow 16 bytes on
+both targets; S3 object text saves 25 bytes. Next validate actual software
+playing DOC audio on throwaway media, including exact native PCM/state/media
+writes and controlled P4 checkpoints, before more local arithmetic. Real
+software throughput, S3 runtime and listening assessment remain open.
+Tab5 is restored from its fresh full-flash MSX backup with hash verification;
 MSX Disk BASIC guest and LCD captures exactly match restored controls.
