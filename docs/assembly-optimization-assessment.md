@@ -1112,3 +1112,26 @@ See [the report](../../esp32gs/docs/doc-helper-scope-experiment-2026-11-09.md).
 
 The full MSX backup is restored and digest-verified, with exact guest/LCD
 captures. Original SD media is unmounted throughout the kernel trial.
+
+### IIgs local oscillator-helper integration (2026-11-09)
+
+The local helper is retained after exact native fixtures, sanitized DOC/IRQ
+checks, a 21,601-frame real Tour replay, normal S3/P4 builds and full-app P4
+reference/candidate/reference validation. Inline-aware DOC kernel attribution
+avoids confusing the inlined oscillator body with scheduler overhead. Across
+42 full captures (1,344,000 samples), static dense DOC share falls from
+17.66–17.95% to 12.68–13.17%, animated from 19.84–20.41% to 13.34–13.62%.
+Idle rises to 44.6–44.8% / 24.9–26.1%; live Tour cost also falls. All ten
+fixture checkpoints and six Tour image pairs match, and all 32 observed
+timing windows add no missing-speaker frames. Sparse one-voice cost does not
+improve; FPS remains capped, and S3 runtime is unmeasured. Audio text saves
+78 P4 / 57 S3 bytes and scheduler stack saves 48 / 16 bytes. Shared runtime
+source is unchanged. Next inspect remaining metadata/address loads in the
+inlined scheduler; layout experiments need canonical field-based snapshots.
+See [the report](../../esp32gs/docs/doc-helper-scope-integration-2026-11-09.md).
+
+Original SD media remains unmounted; both test copies are verified unchanged
+and removed.
+
+The fresh full MSX backup is restored and independently digest-verified;
+Disk BASIC guest/LCD captures match exactly after the final restart.
