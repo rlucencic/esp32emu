@@ -257,12 +257,8 @@ static refill_t NOINLINE W65816_HOT refill(w65816_t *c, const uint8_t *ip, uint3
 }
 
 /* The program counter wraps in its bank (refill() does it) */
-INLINE uint8_t fetch(w65816_t *c, regs_t *r)
+static uint8_t NOINLINE fetch_slow(w65816_t *c, regs_t *r)
 {
-    if (__builtin_expect(r->ip != r->ip_end, 1)) {
-        r->left--;
-        return *r->ip++;
-    }
     refill_t f = refill(c, r->ip, r->pbr, r->left);
     r->ip = f.ip;
     r->ip_end = f.ip_end;
@@ -270,8 +266,24 @@ INLINE uint8_t fetch(w65816_t *c, regs_t *r)
     return f.v;
 }
 
+INLINE __attribute__((always_inline)) uint8_t fetch(w65816_t *c, regs_t *r)
+{
+    if (__builtin_expect(r->ip != r->ip_end, 1)) {
+        r->left--;
+        return *r->ip++;
+    }
+    return fetch_slow(c, r);
+}
+
 INLINE uint16_t fetch16(w65816_t *c, regs_t *r)
 {
+    /* Both bytes are directly mapped: no callback or page/bank crossing. */
+    if (__builtin_expect(r->ip_end - r->ip >= 2, 1)) {
+        const uint8_t *ip = r->ip;
+        r->ip = ip + 2;
+        r->left -= 2;
+        return (uint16_t)ip[0] | (uint16_t)ip[1] << 8;
+    }
     uint32_t lo = fetch(c, r);
     return lo | (uint32_t)fetch(c, r) << 8;
 }

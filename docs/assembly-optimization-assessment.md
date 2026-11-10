@@ -33,13 +33,23 @@ Archimedes for the first actual hardware investigation instead.
 
 ## Current checkpoint (2026-11-09)
 
+The [65C816 full-app A/B](../../esp32gs/docs/cpu-fetch-integration-2026-11-09.md)
+shows static idle 44.9–45.2% → 50.1–50.2%, animated 25.4–25.9% → 33.5–33.9%,
+and live Tour CPU share ~30.5% → 26.9–27.2%. The exact combined candidate is
+applied for validation; all 24 production project/board builds and actual host
+replays pass. Final reference C and MSX restoration are pending because Tab5
+has disappeared from USB, though Wi-Fi still responds. The full backup is
+preserved; final drift/restoration and S3 runtime passes are not claimed.
+
+Earlier [fetch trial](../../esp32gs/docs/cpu-fetch-experiment-2026-11-09.md):
+P4 mixed-code CPU kernel savings 18.7–20.3%, bus-only regression about 1.8%.
+
 The [DOC helper integration](../../esp32gs/docs/doc-helper-scope-integration-2026-11-09.md)
 is retained after full-app P4 validation (dense sampled DOC cost about
 26–33% lower), exact native checks and S3/P4 builds. The subsequent
 [metadata-layout trial](../../esp32gs/docs/doc-metadata-layout-experiment-2026-11-09.md)
 is deferred: smaller code regresses the dense P4 scanline kernel about 3%.
-Production layout remains unchanged. Next inspect shared 65C816 fetch/fetch16;
-S3 runtime gains remain unmeasured.
+Production DOC layout remains unchanged. S3 runtime gains remain unmeasured.
 
 Earlier checkpoint:
 
@@ -1164,3 +1174,40 @@ See [the report](../../esp32gs/docs/doc-metadata-layout-experiment-2026-11-09.md
 
 The fresh full MSX backup is restored and digest-verified; guest and LCD
 captures match the known Disk BASIC controls exactly.
+
+### IIgs / shared 65C816 fetch trial (2026-11-09)
+
+The combined paired-word and split-byte fetch candidate is selected for
+full-app validation. It preserves the original fallback at page/bank ends
+and callbacks; only the small cached byte-fetch wrapper is forced inline.
+All candidates pass 129,748 sanitized frozen-core comparisons with exact
+CPU/RAM and ordered callback traces, debugger register edits, the existing
+IRQ suite, six complete-IIgs fixtures and a 21,601-frame Tour replay.
+Across 672 P4 ABBA groups / 2,688 timings, combined mixed-code kernel cycles
+fall 18.7–20.3%, 16-bit immediate 27.1–27.4%; bus-only costs about 1.8% more.
+CPU text grows 1,020 P4 / 926 S3 bytes, reported run/fetch-helper frames stay
+unchanged. Both target objects compile; S3 runtime and whole-app cache effects
+remain unmeasured. Shared runtime stays unchanged. Next full-app A/B/C,
+real Tour audio, inline-aware attribution and the required project/board build
+matrix before retaining the CPU change.
+See [the report](../../esp32gs/docs/cpu-fetch-experiment-2026-11-09.md).
+
+The fresh full MSX backup is restored and digest-verified; final guest/LCD
+captures match Disk BASIC controls exactly. Original SD media is untouched.
+
+### IIgs / shared 65C816 full-app A/B — USB pending (2026-11-09)
+
+The combined fetch candidate is applied byte-for-byte for production checks.
+All 24 project/board builds pass, including GS through the shared CPU source;
+other project working trees are unchanged. The actual production host object
+also matches six fixtures and a 21,601-frame Tour replay. Source-based CPU
+profiling is verified against exact linked CPU text ranges, avoiding duplicate
+helper names in machine callbacks. Completed A/B results: static idle
+44.9–45.2% → 50.1–50.2%, animated 25.4–25.9% → 33.5–33.9%; Tour CPU share
+~30.5% → 26.9–27.2%. Eight fixture checkpoints and six live Tour image pairs
+match; 36 captures / 28 observed timing windows add no missing-speaker frames.
+All disposable media is verified unchanged and removed. Final reference C
+and MSX restoration remain pending USB reconnection; the fresh full backup
+is safe outside the repositories. No final drift or restoration pass is
+claimed. Frame rate is capped and S3 runtime is unmeasured.
+See [the report](../../esp32gs/docs/cpu-fetch-integration-2026-11-09.md).
