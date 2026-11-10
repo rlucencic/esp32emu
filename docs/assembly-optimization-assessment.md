@@ -43,6 +43,13 @@ and the MSX backup. The MSX was rebuilt and fully flashed instead (NVS kept,
 Disk BASIC at 60 fps). No closing drift bracket or S3 runtime is claimed.
 Keep future backups and work folders outside `/tmp`.
 
+The [Amiga instruction fetch trial](../../esp32ami/docs/fetch-experiment-2026-11-10.md)
+(2026-11-10, local to esp32ami) retains the 68EC020's next word through a
+pointer: the fetch's share of the CPU emulation in Aerial Racers' race
+34.0–34.1% → 32.4%, the A500 unchanged. Inlining the fetch into Musashi was
+measured and rejected. Next: the Amiga 68000's `bus_cycle()`, 28% of core 1
+on an A500 screen.
+
 Earlier [fetch trial](../../esp32gs/docs/cpu-fetch-experiment-2026-11-09.md):
 P4 mixed-code CPU kernel savings 18.7–20.3%, bus-only regression about 1.8%.
 
@@ -1216,3 +1223,26 @@ saved settings and Disk BASIC came back at 60 fps. No drift bracket or
 byte-identical restore is claimed. Frame rate is capped and S3 runtime is
 unmeasured.
 See [the report](../../esp32gs/docs/cpu-fetch-integration-2026-11-09.md).
+
+### Amiga 68EC020 instruction fetch (2026-11-10)
+
+Local to esp32ami (`components/amiga/mem.c`); Musashi and the shared
+runtime are unchanged. The 68EC020's words in a row come through a pointer
+to the next one (same bank of plain memory, cleared on any map change), the
+instruction cache's and chip waits' timing exactly as before: 22/36/48 P4
+instructions (a longword's second word, a cached first word, a miss) become
+19/28/39. Host: 96 RP9 games, 540 pictures of nine 15000-frame runs and
+four 300 s recordings identical. Tab5, Aerial Racers' race, three 32,000-PC
+captures a run: the fetch's share of the CPU emulation 34.0/34.1%
+(two reference runs bracketing the others) → 32.4%; fetch plus execute
+30.3% → 29.1% of core 1. Kick Off 2 (A500): idle 16.2/16.6% → 16.6%.
+
+Measured and rejected: inlining the fetch into Musashi's prefetch through a
+machine header (fetch plus execute 30.3% → 30.8%: the time moved into
+`m68k_execute` and the flash-resident `m68ki_read_imm_16`; on the P4 a call
+is two instructions, the inlined copies cost as many as the function); the
+68000 tested after the 68EC020's fast path (the 68EC020 at 30.1%, but A500
+idle 16.2% → 13.4%); a pointer pair for the 68000 too (A500 idle 13.3%).
+Next: the 68000's `bus_cycle()` (in flash, ~50 P4 instructions an access,
+every 68000 access), 28% of core 1 on Kick Off 2's credits screen.
+See [the report](../../esp32ami/docs/fetch-experiment-2026-11-10.md).
