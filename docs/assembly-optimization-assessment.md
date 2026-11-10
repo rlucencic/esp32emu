@@ -31,15 +31,17 @@ Suggested bounded first experiments: STE planar conversion, Amiga bitplane /
 blitter kernels, common mac2/mac3 color conversion. The user selected Acorn
 Archimedes for the first actual hardware investigation instead.
 
-## Current checkpoint (2026-11-09)
+## Current checkpoint (2026-11-10)
 
 The [65C816 full-app A/B](../../esp32gs/docs/cpu-fetch-integration-2026-11-09.md)
 shows static idle 44.9–45.2% → 50.1–50.2%, animated 25.4–25.9% → 33.5–33.9%,
 and live Tour CPU share ~30.5% → 26.9–27.2%. The exact combined candidate is
-applied for validation; all 24 production project/board builds and actual host
-replays pass. Final reference C and MSX restoration are pending because Tab5
-has disappeared from USB, though Wi-Fi still responds. The full backup is
-preserved; final drift/restoration and S3 runtime passes are not claimed.
+retained in shared source; all 24 production project/board builds and actual
+host replays pass. Reference C was never run: the host reboot that brought
+Tab5 back to USB cleared `/tmp`, with the isolated images, fixtures, scripts
+and the MSX backup. The MSX was rebuilt and fully flashed instead (NVS kept,
+Disk BASIC at 60 fps). No closing drift bracket or S3 runtime is claimed.
+Keep future backups and work folders outside `/tmp`.
 
 Earlier [fetch trial](../../esp32gs/docs/cpu-fetch-experiment-2026-11-09.md):
 P4 mixed-code CPU kernel savings 18.7–20.3%, bus-only regression about 1.8%.
@@ -1195,7 +1197,7 @@ See [the report](../../esp32gs/docs/cpu-fetch-experiment-2026-11-09.md).
 The fresh full MSX backup is restored and digest-verified; final guest/LCD
 captures match Disk BASIC controls exactly. Original SD media is untouched.
 
-### IIgs / shared 65C816 full-app A/B — USB pending (2026-11-09)
+### IIgs / shared 65C816 full-app A/B (2026-11-09, closed 2026-11-10)
 
 The combined fetch candidate is applied byte-for-byte for production checks.
 All 24 project/board builds pass, including GS through the shared CPU source;
@@ -1206,8 +1208,11 @@ helper names in machine callbacks. Completed A/B results: static idle
 44.9–45.2% → 50.1–50.2%, animated 25.4–25.9% → 33.5–33.9%; Tour CPU share
 ~30.5% → 26.9–27.2%. Eight fixture checkpoints and six live Tour image pairs
 match; 36 captures / 28 observed timing windows add no missing-speaker frames.
-All disposable media is verified unchanged and removed. Final reference C
-and MSX restoration remain pending USB reconnection; the fresh full backup
-is safe outside the repositories. No final drift or restoration pass is
-claimed. Frame rate is capped and S3 runtime is unmeasured.
+All disposable media is verified unchanged and removed. Reference C was not
+run: the host reboot that restored USB (2026-11-10) cleared `/tmp`, losing
+the isolated images, fixtures, scripts and the 16 MB MSX backup. The MSX
+was rebuilt from esp32msx `631fe27` and fully flashed, NVS untouched; its
+saved settings and Disk BASIC came back at 60 fps. No drift bracket or
+byte-identical restore is claimed. Frame rate is capped and S3 runtime is
+unmeasured.
 See [the report](../../esp32gs/docs/cpu-fetch-integration-2026-11-09.md).
