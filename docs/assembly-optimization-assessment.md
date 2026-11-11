@@ -47,8 +47,10 @@ The [Amiga instruction fetch trial](../../esp32ami/docs/fetch-experiment-2026-11
 (2026-11-10, local to esp32ami) retains the 68EC020's next word through a
 pointer: the fetch's share of the CPU emulation in Aerial Racers' race
 34.0–34.1% → 32.4%, the A500 unchanged. Inlining the fetch into Musashi was
-measured and rejected. Next: the Amiga 68000's `bus_cycle()`, 28% of core 1
-on an A500 screen.
+measured and rejected. The [Amiga 68000 bus cycle trial](../../esp32ami/docs/bus-cycle-experiment-2026-11-10.md)
+(local too) works the 68000's bus cycles out inline in the memory
+callbacks, exactly as before: Kick Off 2's credits core 1 16.7 → 9.9 ms a
+frame, Kid Pool's title from 94% speed to 100%.
 
 Earlier [fetch trial](../../esp32gs/docs/cpu-fetch-experiment-2026-11-09.md):
 P4 mixed-code CPU kernel savings 18.7–20.3%, bus-only regression about 1.8%.
@@ -1243,6 +1245,34 @@ machine header (fetch plus execute 30.3% → 30.8%: the time moved into
 is two instructions, the inlined copies cost as many as the function); the
 68000 tested after the 68EC020's fast path (the 68EC020 at 30.1%, but A500
 idle 16.2% → 13.4%); a pointer pair for the 68000 too (A500 idle 13.3%).
-Next: the 68000's `bus_cycle()` (in flash, ~50 P4 instructions an access,
-every 68000 access), 28% of core 1 on Kick Off 2's credits screen.
 See [the report](../../esp32ami/docs/fetch-experiment-2026-11-10.md).
+
+### Amiga 68000 bus cycles (2026-11-10)
+
+Local to esp32ami (`components/amiga/mem.c`); Musashi and the shared
+runtime are unchanged. The memory callbacks saved five registers on every
+access to call `bus_cycle()` in flash, which mostly found nothing to wait
+for: 89 P4 instructions a chip RAM word. Now the callbacks work an access
+to plain memory out inline, with no stack frame. Off the chip bus, or with
+no DMA in the line, they only count (29 instructions; 26 from the ROM).
+With only taken slots in the way, the slots' table gives the wait (55; was
+~101). A blit, the CIAs and the chips' registers still go through
+`bus_cycle()`, tail-called. The table is kept up to date as slots are
+taken, instead of being worked out again (~1,000 instructions) after every
+change. The bank pointers lose the bank's address (no mask), which also
+shortens the 68EC020's data accesses (~43 → 19).
+
+Host: 96 RP9 games, 540 pictures and four 300 s recordings identical; new
+ROM-free checks compare the inline levels with `bus_cycle()` and both with
+the slot model. Tab5 results:
+
+- **Kick Off 2's credits (A500):** core 1 16.7 → 9.9 ms a frame (two
+  reference runs 35 minutes apart).
+- **Kid Pool's title:** from 94–95% speed with core 1 at 100% to 100–102%
+  with 5% idle.
+- **Aerial Racers' race:** the data callbacks 5.3% → 3.9% of core 1.
+
+On the P4 a call anywhere in a function costs every path its frame. GCC
+tail-calls only a function returning the same type: with `uint16_t`
+helpers it kept the frame.
+See [the report](../../esp32ami/docs/bus-cycle-experiment-2026-11-10.md).
