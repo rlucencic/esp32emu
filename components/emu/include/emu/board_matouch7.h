@@ -10,6 +10,7 @@
 
 #define BOARD_NAME              "Makerfabs MaTouch ESP32-S3 7\""
 #define BOARD_SHORT_NAME        "MaTouch"
+#define BOARD_HAS_BATTERY       0       /* USB powered only */
 
 /* ---- LCD: 1024x600 IPS, RGB565 parallel ---- */
 #define BOARD_LCD_H_RES         1024

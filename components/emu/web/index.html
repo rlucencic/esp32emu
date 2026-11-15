@@ -93,6 +93,7 @@
   .drive .detail.offer { color: var(--warn); }
   .drive button { padding: 2px 10px; font-size: 13px; }
   .dim { color: var(--dim); }
+  svg.icon { vertical-align: -3px; margin-right: 6px; }
   .msg { color: var(--warn); }
   .dev { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; }
   .dev + .dev { border-top: 1px solid var(--bg); }
@@ -166,6 +167,33 @@ const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;",
 const kv = rows => rows.filter(Boolean).map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("");
 const bar = (pct, warn = 75, bad = 90) =>
   `<div class="bar"><i class="${pct >= bad ? "bad" : pct >= warn ? "warn" : ""}" style="width:${Math.min(100, pct)}%"></i></div>`;
+
+/* The board's battery as its setup screen shows it: the icon filled to the
+ * level (red, orange, green), a bolt while it charges
+ */
+function battery(bt) {
+  const p = bt.state === "none" ? 0 : bt.percent;
+  const fill = p <= 15 ? "--bad" : p <= 40 ? "--warn" : "--ok";
+  const icon = '<svg class="icon" width="34" height="16" viewBox="0 0 34 16">' +
+    '<rect x="1" y="1" width="28" height="14" rx="3" style="fill:none;stroke:var(--text);stroke-width:2"/>' +
+    '<rect x="30" y="5" width="3" height="6" rx="1" style="fill:var(--text)"/>' +
+    `<rect x="4" y="4" width="${(22 * p / 100).toFixed(1)}" height="8" rx="1" style="fill:var(${fill})"/></svg>`;
+  const bolt = '<svg class="icon" width="12" height="16" viewBox="0 0 12 16">' +
+    '<path d="M7 0 0 9h5l-1 7 8-10H7z" style="fill:var(--ok)"/></svg>';
+  const volts = `<span class="dim">${(bt.mv / 1000).toFixed(2)} V</span>`;
+  /* the charger's enable line as read back from the board */
+  const c = bt.charger;
+  const charger = !c ? "" : c.enabled
+    ? `<br><span class="dim">charger switched on (CHG_EN driven high)${c.step_ma ? `, ${c.step_ma / 1000} A step` : ""}</span>`
+    : '<br><span style="color:var(--bad)">charger off (CHG_EN not driven high)</span>';
+  if (bt.state === "none") return `${icon}<span class="dim">no battery</span> ${volts}${charger}`;
+  const state = {
+    charging: `${bolt}charging, ${bt.ma} mA`,
+    discharging: `on battery, ${-bt.ma} mA`,
+    idle: bt.percent >= 95 ? "charged" : '<span style="color:var(--warn)">not charging</span>',
+  }[bt.state];
+  return `${icon}${bt.percent}% ${volts}, ${state}${charger}`;
+}
 
 function size(n) {
   return n >= 1073741824 ? (n / 1073741824).toFixed(1) + " GB" :
@@ -560,6 +588,7 @@ function showStatus(s) {
     ["Internal RAM", `${kb(b.internal_free)} free <span class="dim">(lowest ${kb(b.internal_min)}, largest block ${kb(b.internal_largest)})</span>`],
     ["PSRAM", `${mb(b.psram_free)} free of ${mb(b.psram_total)}${bar(100 - b.psram_free * 100 / b.psram_total, 101, 101)}`],
     b.sd_total && ["SD card", `${size(b.sd_free)} free of ${size(b.sd_total)}${bar(100 - b.sd_free * 100 / b.sd_total)}`],
+    b.battery && ["Battery", battery(b.battery)],
   ]);
 
   const kinds = { keyboard: "⌨️", mouse: "🖱️", device: "🔵" };

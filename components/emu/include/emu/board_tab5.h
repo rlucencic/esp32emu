@@ -33,7 +33,14 @@
 #define BOARD_C6_EXPANDER_ADDR  0x44
 #define BOARD_C6_BOOT_MS        2000    /* from power on to its SDIO slave */
 
-/* ---- Battery charger IP2326: CHG_EN on IO expander 0x44 pin 7 ---- */
+/* ---- Battery: an NP-F550 (2S Li-ion, 7.4 V); the IP2326 charger's CHG_EN
+ * on IO expander 0x44 pin 7; an INA226 (0x41) measures the pack's voltage
+ * and its current through a 5 mOhm shunt (battery.h, tab5.c)
+ */
+#define BOARD_HAS_BATTERY       1
+#define BOARD_INA226_ADDR       0x41
+#define BOARD_SHUNT_MOHM        5
+#define BOARD_CHARGER_EXPANDER  0x44    /* pin 7 CHG_EN, 6 CHG_STAT, 5 nCHG_QC_EN */
 
 /* ---- Tab5 Keyboard (optional): Ext.Port1 I2C; the BSP has I2C_NUM_1 ---- */
 #define BOARD_KBD_I2C_PORT      I2C_NUM_0

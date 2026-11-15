@@ -32,6 +32,9 @@
 #include "emu/speaker.h"
 #include "emu/touch.h"
 #include "emu_internal.h"
+#if BOARD_HAS_BATTERY
+#include "battery.h"
+#endif
 
 #define BUF_LINES           60
 #if CONFIG_EMU_AUTOSTART
@@ -58,6 +61,7 @@
 #define COLOR_DIM           lv_color_hex(0x8A94A6)
 #define COLOR_OK            lv_color_hex(0x4CC38A)
 #define COLOR_WARN          lv_color_hex(0xE5A54B)
+#define COLOR_LOW           lv_color_hex(0xE5534B)
 #define COLOR_ROW           lv_color_hex(0x283143)
 #define COLOR_ROW_PRESSED   lv_color_hex(0x34405A)
 
@@ -77,6 +81,9 @@ static struct {
     int64_t countdown_end;          /* 0 = not counting */
     lv_obj_t *status_screen, *list_screen, *pass_screen, *bt_screen, *pair_screen;
     lv_obj_t *wifi_label, *time_label, *countdown_label, *start_label, *message_label;
+    lv_obj_t *battery_box, *battery_fill, *battery_percent, *battery_state;    /* (boards with one) */
+    int battery_fill_max;
+    int64_t battery_next;
     lv_obj_t *list, *scan_label;
     bool scan_pending;
     lv_obj_t *pass_title, *pass_field;
@@ -458,6 +465,122 @@ static void show_disks(lv_event_t *e);
 static void show_bluetooth(lv_event_t *e);
 #endif
 
+#if BOARD_HAS_BATTERY
+/* The battery at the right of the status card's first two lines: an icon
+ * filled to its level (red, orange, green, as wmbus_beacon's T-Deck shows
+ * it) and the percentage beside the WiFi line, charging or not beside the
+ * time's; hidden while it can't be read
+ */
+static void make_battery(lv_obj_t *card, int gap)
+{
+    int line = lv_font_get_line_height(lv_obj_get_style_text_font(ui.wifi_label, LV_PART_MAIN));
+    lv_obj_t *box = ui.battery_box = lv_obj_create(card);
+    lv_obj_remove_style_all(box);
+    lv_obj_add_flag(box, LV_OBJ_FLAG_FLOATING | LV_OBJ_FLAG_HIDDEN);
+    lv_obj_set_size(box, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
+    lv_obj_set_flex_flow(box, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(box, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_END, LV_FLEX_ALIGN_END);
+    lv_obj_set_style_pad_row(box, gap, 0);
+    lv_obj_align(box, LV_ALIGN_TOP_RIGHT, 0, 0);
+
+    lv_obj_t *row = lv_obj_create(box);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_size(row, LV_SIZE_CONTENT, line);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_column(row, SX(10), 0);
+
+    /* the body (a border, the fill inside it) and its cap */
+    int w = SX(40), h = line * 5 / 8, border = 2, cap = SX(4);
+    lv_obj_t *icon = lv_obj_create(row);
+    lv_obj_remove_style_all(icon);
+    lv_obj_set_size(icon, w + cap, h);
+    lv_obj_t *body = lv_obj_create(icon);
+    lv_obj_remove_style_all(body);
+    lv_obj_set_size(body, w, h);
+    lv_obj_set_style_border_color(body, COLOR_TEXT, 0);
+    lv_obj_set_style_border_width(body, border, 0);
+    lv_obj_set_style_radius(body, 3, 0);
+    ui.battery_fill = lv_obj_create(body);
+    lv_obj_remove_style_all(ui.battery_fill);
+    ui.battery_fill_max = w - 2 * border - 4;
+    lv_obj_set_size(ui.battery_fill, 0, h - 2 * border - 4);
+    lv_obj_set_pos(ui.battery_fill, 2, 2);      /* (inside the border) */
+    lv_obj_set_style_bg_opa(ui.battery_fill, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(ui.battery_fill, 1, 0);
+    lv_obj_t *tip = lv_obj_create(icon);
+    lv_obj_remove_style_all(tip);
+    lv_obj_set_size(tip, cap, h / 2);
+    lv_obj_set_pos(tip, w, h / 4);
+    lv_obj_set_style_bg_color(tip, COLOR_TEXT, 0);
+    lv_obj_set_style_bg_opa(tip, LV_OPA_COVER, 0);
+    lv_obj_set_style_radius(tip, 1, 0);
+
+    ui.battery_percent = lv_label_create(row);
+    lv_obj_set_style_text_color(ui.battery_percent, COLOR_TEXT, 0);
+    lv_label_set_text(ui.battery_percent, "");
+    ui.battery_state = lv_label_create(box);
+    lv_label_set_text(ui.battery_state, "");
+}
+
+static void update_battery(void)
+{
+    int64_t now = esp_timer_get_time();
+    if (ui.battery_box == NULL || now < ui.battery_next) {
+        return;
+    }
+    ui.battery_next = now + 1000000;
+    battery_t b;
+    if (!battery_read(&b)) {
+        lv_obj_add_flag(ui.battery_box, LV_OBJ_FLAG_HIDDEN);
+        return;
+    }
+    lv_obj_remove_flag(ui.battery_box, LV_OBJ_FLAG_HIDDEN);
+    int fill = b.percent * ui.battery_fill_max / 100;
+    lv_obj_set_width(ui.battery_fill, b.percent > 0 && fill < 2 ? 2 : fill);
+    lv_obj_set_style_bg_color(ui.battery_fill,
+                              b.percent <= 15 ? COLOR_LOW : b.percent <= 40 ? COLOR_WARN : COLOR_OK, 0);
+    if (b.state == BATTERY_NONE) {
+        lv_label_set_text(ui.battery_percent, "--");
+    } else {
+        lv_label_set_text_fmt(ui.battery_percent, "%d%%", b.percent);
+    }
+    lv_color_t color = COLOR_DIM;
+    if (b.charger == 0 && b.state != BATTERY_DISCHARGING) {
+        /* the charger's enable line reads low: it can't charge */
+        lv_label_set_text_fmt(ui.battery_state, LV_SYMBOL_WARNING "  Charger off, %d.%02d V", b.mv / 1000,
+                              b.mv % 1000 / 10);
+        lv_obj_set_style_text_color(ui.battery_state, COLOR_LOW, 0);
+        return;
+    }
+    switch (b.state) {
+    case BATTERY_CHARGING:
+        lv_label_set_text_fmt(ui.battery_state, LV_SYMBOL_CHARGE "  Charging, %d mA", b.ma);
+        color = COLOR_OK;
+        break;
+    case BATTERY_DISCHARGING:
+        lv_label_set_text(ui.battery_state, "On battery");
+        break;
+    case BATTERY_IDLE:
+        /* on USB, no current: full, or the charger isn't charging it */
+        if (b.percent >= 95) {
+            lv_label_set_text(ui.battery_state, LV_SYMBOL_USB "  Charged");
+        } else {
+            lv_label_set_text_fmt(ui.battery_state, LV_SYMBOL_WARNING "  Not charging, %d.%02d V", b.mv / 1000,
+                                  b.mv % 1000 / 10);
+            color = COLOR_WARN;
+        }
+        break;
+    case BATTERY_NONE:
+        lv_label_set_text_fmt(ui.battery_state, LV_SYMBOL_WARNING "  No battery, %d.%02d V", b.mv / 1000,
+                              b.mv % 1000 / 10);
+        color = COLOR_WARN;
+        break;
+    }
+    lv_obj_set_style_text_color(ui.battery_state, color, 0);
+}
+#endif
+
 static void build_status_screen(void)
 {
     lv_obj_t *s = ui.status_screen = make_screen();
@@ -485,6 +608,9 @@ static void build_status_screen(void)
 
     ui.wifi_label = lv_label_create(card);
     ui.time_label = lv_label_create(card);
+#if BOARD_HAS_BATTERY
+    make_battery(card, gap);
+#endif
 
     /* The rows' box: as tall as they are, or what the card has left
      * (fit_choices()), then they scroll
@@ -568,6 +694,9 @@ static void build_status_screen(void)
 
 static void update_status(void)
 {
+#if BOARD_HAS_BATTERY
+    update_battery();
+#endif
     char ip[20];
     switch (net_state()) {
     case NET_OFF:

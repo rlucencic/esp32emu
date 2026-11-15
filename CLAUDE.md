@@ -97,7 +97,7 @@ components a project requires get built: MINIMAL_BUILD).
 | `components/emu/usb_hid.c` | Tab5: USB keyboards and mice (boot protocol) on the USB-A port, the same callbacks as BLE's |
 | `components/emu/net.c` | WiFi station + SNTP |
 | `components/emu/lcd.c`, `lcd_tab5.c`, `touch.c`, `sdcard.c`, `speaker.c` | Board drivers; `include/emu/board.h` picks the board's header |
-| `components/emu/tab5.c`, `tab5_keyboard.c` | Tab5: battery charging, the ESP32-C6 (power, esp_hosted, its Bluetooth controller), the Tab5 Keyboard |
+| `components/emu/tab5.c`, `tab5_keyboard.c` | Tab5: battery charging and its state (`battery.h`), the ESP32-C6 (power, esp_hosted, its Bluetooth controller), the Tab5 Keyboard |
 | `components/fatfs/` | ESP-IDF 5.5.4's fatfs with `FF_FS_EXFAT` 1 (from esp32_basic): exFAT SD cards. Overrides ESP-IDF's for every project: update it with ESP-IDF |
 | `components/esp_lcd/` | ESP-IDF 5.5.4's esp_lcd (without test_apps), one change marked `esp32emu` in `rgb/esp_lcd_panel_rgb.c` (+ `emu_lcd_rgb_resyncs` in its header): see the lessons. Overrides ESP-IDF's for every project and both boards (a `reconfigure` picks it up): update it with ESP-IDF |
 | `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings (PSRAM, esp_hosted SDIO pins, NimBLE over VHCI, fonts, speaker on) |
@@ -396,6 +396,26 @@ boards send none of them and their page reads as before.
   so a network another firmware joined is joined again.
 - **Tab5: the battery charges only with CHG_EN** (IO expander 0x44 pin 7)
   high, which nothing else sets (esp32_basic).
+- **Tab5: the battery's state from the INA226** (0x41, M5Unified's way):
+  the pack's voltage, its current through a 5 mOhm shunt that reads
+  charging as negative; charging, discharging or idle by that current
+  (10 mA), the level from the voltage (2S: 3.3-4.15 V a cell, high while
+  charging). The IP2326's status line (0x44 pin 6) reads high whether it
+  charges or not: not used. Shown at the right of the setup screen's
+  WiFi and time lines (an icon filled to the level, as wmbus_beacon's
+  T-Deck draws it, and charging or not) and in the web page's Board card
+  (`board.battery` in the status, with the charger's lines read back from
+  the expander's registers); `BOARD_HAS_BATTERY` 0 on the MaTouch.
+- **Tab5: CHG_EN high wasn't enough: set the charger's other lines as
+  M5Unified does.** The expander driver's reset leaves every pin a
+  floating output with a pull-down; with only CHG_EN driven, the user's
+  flat pack (5.45 V, 2.7 V a cell, too flat to start the board) took 3 mA:
+  not charging. Driving the QC line (pin 5) low and making the status line
+  (pin 6) an input without the pull-down: 50 mA at once (the trickle
+  below 6 V that M5Stack's docs describe), the voltage rising ~2 mV a
+  second (2026-11-15). Which of the two did it wasn't separated. The
+  expander's input register reads 0 for a pin set as an output, driven or
+  not: an output's state is its direction, high-Z and output bits.
 - **Tab5: the RX8130CE RTC (0x32) holds UTC**, like esp32_basic (wmbus_hub
   writes local time: after it the hour is off until the internet time).
   At boot it sets the system clock (`net_time_source()` says `BOARD`, the

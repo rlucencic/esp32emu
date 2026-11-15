@@ -45,6 +45,9 @@
 #include "emu/net.h"
 #include "emu/sdcard.h"
 #include "emu_internal.h"
+#if BOARD_HAS_BATTERY
+#include "battery.h"
+#endif
 
 #define CHUNK           8192
 
@@ -329,6 +332,32 @@ static esp_err_t status_get(httpd_req_t *req)
     emu_json_num(&j, "temperature", info.temperature);
     emu_json_int(&j, "sd_total", sd ? (long long)total : 0);
     emu_json_int(&j, "sd_free", sd ? (long long)free_bytes : 0);
+#if BOARD_HAS_BATTERY
+    battery_t bat;
+    if (battery_read(&bat)) {
+        emu_json_object(&j, "battery");
+        emu_json_str(&j, "state", battery_state_name(bat.state));
+        emu_json_int(&j, "percent", bat.percent);
+        emu_json_int(&j, "mv", bat.mv);
+        emu_json_int(&j, "ma", bat.ma);
+        if (bat.charger >= 0) {
+            emu_json_object(&j, "charger");     /* its lines, read back from the chip */
+            emu_json_bool(&j, "enabled", bat.charger == 1);
+            if (bat.charger_status >= 0) {
+                emu_json_int(&j, "status_line", bat.charger_status);
+            }
+            if (bat.charger_fast >= 0) {
+                emu_json_int(&j, "step_ma", bat.charger_fast ? 1000 : 500);
+            }
+            char regs[40];
+            const uint8_t *r = bat.charger_regs;
+            snprintf(regs, sizeof(regs), "%02x %02x %02x %02x %02x %02x", r[0], r[1], r[2], r[3], r[4], r[5]);
+            emu_json_str(&j, "regs", regs);     /* direction, output, high-Z, pull enable, pull select, input */
+            emu_json_end_object(&j);
+        }
+        emu_json_end_object(&j);
+    }
+#endif
     emu_json_end_object(&j);
 
     /* Bluetooth */
