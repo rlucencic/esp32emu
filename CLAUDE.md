@@ -279,6 +279,21 @@ components a project requires get built: MINIMAL_BUILD).
   reset, `emudbg_suspend()`/`emudbg_resume()` around pauses. The host
   harness ends its setup with `emudbg_host_run("<M>_DEBUG", frame, hz)`.
 
+## The Raspberry Pi side (`../rpi5emu`)
+
+Each esp32* emulator is getting an rpi5* sibling for the Raspberry Pi 5
+(the user's plan, 2026-11-15; `../rpi5zx` first): rpi5emu is this
+runtime's Linux counterpart (SDL 3, the same `emu_machine_t`), and the
+rpi5* projects compile the esp32* machine cores and this repository's CPU
+cores (`components/*`) with CMake. A change to a core or to a machine's
+core reaches the Pi too: build the affected rpi5* project as well
+(`../rpi5emu/CLAUDE.md`). rpi5emu serves this repository's
+`web/index.html` with the same API; the page takes optional fields for a
+host that isn't a board (`/api/info`: `host`, `storage`,
+`storage_title`, `about`; `/api/status`: `board.title`, `board.rows`
+instead of the board's own rows, no `bluetooth`: its card hidden). The
+boards send none of them and their page reads as before.
+
 ## Lessons (from the STE, where most of this code was written)
 
 - **Never block interrupts on core 0 for long.** The LCD has no frame memory;

@@ -102,7 +102,7 @@
 <body>
 <main>
   <h1 id="title">Emulator</h1>
-  <p class="sub">The emulator on the <span id="board-name">MaTouch</span> board, and the disk images on its SD card.</p>
+  <p class="sub" id="about">The emulator on the <span id="board-name">MaTouch</span> board, and the disk images on its SD card.</p>
 
   <div class="grid">
     <section class="card">
@@ -118,10 +118,10 @@
       <div id="drives"></div>
     </section>
     <section class="card">
-      <h3>Board</h3>
+      <h3 id="board-title">Board</h3>
       <dl class="kv" id="board"></dl>
     </section>
-    <section class="card">
+    <section class="card" id="bluetooth-card">
       <h3>Bluetooth</h3>
       <div id="bluetooth"></div>
     </section>
@@ -136,7 +136,7 @@
   </div>
   <ul id="log"></ul>
 
-  <h2><span>On the SD card <small id="free"></small></span>
+  <h2><span><span id="on-storage">On the SD card</span> <small id="free"></small></span>
     <span class="new" id="new" hidden>New blank disk <select id="new-size"></select><button id="new-make">Make</button></span></h2>
   <table><tbody id="disks"><tr><td class="empty">Loading…</td></tr></tbody></table>
 </main>
@@ -145,6 +145,9 @@
 const $ = id => document.getElementById(id);
 let info = { name: "Emulator", short_name: "Machine", disks: { drives: [], extensions: [], sizes: [], max_upload: 0 } };
 let imageRe = /^$/;
+/* What runs it and where the images are (/api/info's host and storage: the
+ * boards leave them out) */
+let host = "board", storage = "SD card";
 
 /* Converters from the machine's script (/machine.js): files with their
  * extensions are turned into disk images here before they're sent */
@@ -195,10 +198,10 @@ async function refresh() {
   try {
     data = await (await fetch("/api/disks")).json();
   } catch (e) {
-    $("disks").innerHTML = '<tr><td class="empty">The board does not answer.</td></tr>';
+    $("disks").innerHTML = `<tr><td class="empty">The ${host} does not answer.</td></tr>`;
     return;
   }
-  $("free").textContent = data.ready ? size(data.free) + " free" : "no SD card";
+  $("free").textContent = data.ready ? size(data.free) + " free" : "no " + storage;
   const rows = data.disks.map(d => {
     const tr = document.createElement("tr");
     const name = document.createElement("td");
@@ -265,7 +268,7 @@ function put(url, body, onProgress) {
     x.upload.onprogress = e => onProgress(e.loaded);
     x.onload = () => x.status >= 200 && x.status < 300 ? resolve(x.responseText)
                                                         : reject(new Error(x.responseText || "HTTP " + x.status));
-    x.onerror = () => reject(new Error("the board does not answer"));
+    x.onerror = () => reject(new Error(`the ${host} does not answer`));
     x.send(body);
   });
 }
@@ -292,15 +295,15 @@ async function upload(name, data) {
     text.textContent = sent < bytes
       ? `Sending ${name}: ${Math.floor(sent * 100 / bytes)}% (${size(sent)} of ${size(bytes)}` +
         (rate ? `, ${size(rate)}/s, ${duration(Math.ceil((bytes - sent) / rate))} left)` : ")")
-      : `Sending ${name}: all ${size(bytes)} sent, the board is writing it to the SD card …`;
+      : `Sending ${name}: all ${size(bytes)} sent, the ${host} is writing it to the ${storage} …`;
   };
   show(0);
   try {
     await put("/disks/" + encodeURIComponent(name), data, show);
-    line.textContent = name + " is on the board (" + size(bytes) + ")";
+    line.textContent = `${name} is on the ${host} (${size(bytes)})`;
     line.className = "ok";
   } catch (e) {
-    line.textContent = name + ": " + (e.message || "the board does not answer");
+    line.textContent = name + ": " + (e.message || `the ${host} does not answer`);
     line.className = "bad";
   }
 }
@@ -544,7 +547,9 @@ function showStatus(s) {
 
   const b = s.board;
   const mb = n => (n / 1048576).toFixed(1) + " MB", kb = n => Math.round(n / 1024) + " KB";
-  $("board").innerHTML = kv([
+  /* A computer that isn't a board (rpi5emu) brings its own title and rows */
+  if (b.title) $("board-title").textContent = b.title;
+  $("board").innerHTML = b.rows ? kv(b.rows.map(([k, v, pct]) => [esc(k), v + (pct !== undefined ? bar(pct) : "")])) : kv([
     b.name && ["Board", esc(b.name)],
     ["WiFi", b.wifi.ssid ? `${esc(b.wifi.ssid)}, ${signal(b.wifi.rssi)}` : '<span class="dim">not connected</span>'],
     b.wifi.ip && ["Address", `${b.wifi.ip}`],
@@ -558,7 +563,8 @@ function showStatus(s) {
   ]);
 
   const kinds = { keyboard: "⌨️", mouse: "🖱️", device: "🔵" };
-  $("bluetooth").innerHTML = s.bluetooth.length ? s.bluetooth.map(dev =>
+  $("bluetooth-card").hidden = !s.bluetooth;    /* none: the computer has its own */
+  if (s.bluetooth) $("bluetooth").innerHTML = s.bluetooth.length ? s.bluetooth.map(dev =>
     `<div class="dev"><span>${kinds[dev.kind] || ""} ${esc(dev.name)}<br>` +
     `<span class="dim">${dev.connected ? "connected" : "not connected"}</span></span>` +
     `<span class="batt">${dev.battery !== null ? "battery " + dev.battery + "%" + bar(dev.battery, 101, 101) : ""}</span></div>`
@@ -574,7 +580,7 @@ async function status() {
     showStatus(await r.json());
   } catch (e) {
     $("state").className = "pill offline";
-    $("state").textContent = "Board not answering";
+    $("state").textContent = host[0].toUpperCase() + host.slice(1) + " not answering";
   }
 }
 
@@ -588,6 +594,10 @@ async function start() {
   $("title").textContent = info.name;
   $("short").textContent = info.short_name;
   if (info.board) $("board-name").textContent = info.board;
+  if (info.host) host = info.host;
+  if (info.storage) storage = info.storage;
+  if (info.about) $("about").textContent = info.about;
+  if (info.storage_title) $("on-storage").textContent = info.storage_title;
   $("disks-title").textContent = info.disks.title || "Disk images";
   const exts = info.disks.extensions.map(e => e.replace(/^\./, "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
   imageRe = new RegExp("\\.(" + exts.join("|") + ")$", "i");
