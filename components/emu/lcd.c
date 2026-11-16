@@ -4,6 +4,7 @@
  * so the CPU can write it directly.
  */
 #include "driver/gpio.h"
+#include "esp_idf_version.h"
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_panel_rgb.h"
 #include "esp_log.h"
@@ -62,7 +63,11 @@ uint16_t *lcd_init(void)
             },
         },
         .data_width = 16,
+#if ESP_IDF_VERSION_MAJOR >= 6
+        .in_color_format = LCD_COLOR_FMT_RGB565,
+#else
         .bits_per_pixel = 16,
+#endif
         .num_fbs = 1,
         .bounce_buffer_size_px = BOARD_LCD_H_RES * 10,
         .dma_burst_size = 64,

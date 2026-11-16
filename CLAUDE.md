@@ -77,6 +77,49 @@ components a project requires get built: MINIMAL_BUILD).
   on the MaTouch), `FONT_BIG` is 34 px on the Tab5, the default font 28.
   Machines' `view_width` is for 600 lines: `emu_view_width()` scales it.
 
+## ESP-IDF 6.1 (branch `idf-6.1`, 2026-11-16)
+
+ESP-IDF 6.1.1 is installed beside 5.5.4 (by Espressif's installer, EIM).
+esp32ste builds with either; the other projects still name `components/`
+and build with 5.5.4 only, until they include `components.cmake`.
+
+- **Environment**: `export.sh` fails (EIM's tools aren't where it looks);
+  source `~/.espressif/tools/activate_idf_v6.1.1.sh`, which refuses to run
+  from a script file, so: `bash -c '. ~/.espressif/tools/activate_idf_v6.1.1.sh
+  >/dev/null 2>&1; unset IDF_COMPONENT_LOCAL_STORAGE_URL; idf.py ...'`. It
+  points the component manager at a local mirror (older versions:
+  esp_codec_dev 1.5.8 instead of 1.5.11): unset it.
+- **Separate everything** from the 5.5.4 builds: build folders
+  (`build-idf6`, `build-tab5-idf6`), `-DSDKCONFIG` in them for both boards,
+  lock files (`dependencies.lock.idf6`, `.esp32p4.idf6`, set in esp32ste's
+  CMakeLists.txt). Never configure two builds of one project at once: they
+  race in `managed_components/` (FileExistsError, missing sources).
+- **Code changes needed**: the two forks (`idf6/`), and `lcd.c`'s
+  `bits_per_pixel` (`in_color_format` on 6). Nothing else in emu, Musashi
+  or the ST core; GCC 15.2 and C23 gave no new warnings, with picolibc and
+  warnings as errors (6.x defaults). The Tab5's BSP 1.3.0, esp_hosted
+  2.12.9, esp_lvgl_port 2.8 (a deprecation warning: `on_refresh_done`) build
+  unchanged.
+- **New defaults** (a fresh sdkconfig; an existing one keeps the old):
+  picolibc (no speed cost, ~7 KB more internal RAM free than newlib),
+  default warnings and orphan sections are errors, FreeRTOS and ring
+  buffers out of IRAM. The last two cost the MaTouch's ST 5 points of real
+  time from PSRAM (TOS 2.06 4 MB high res desktop: 5.5.4 76-77%, 6.1 69-70%,
+  `CONFIG_FREERTOS_IN_IRAM` 73%, + `CONFIG_RINGBUF_IN_IRAM` 73-75%; the
+  console's UART driver uses ring buffers). esp32ste sets both; the ~2
+  points left are GCC 15 or ESP-IDF itself (same flags but
+  `-fzero-init-padding-bits=all`, `-fno-malloc-dce`). Tab5: no change (core
+  1 40-42% on the TOS 1.62 desktop either way).
+- **The RGB fix upstream**: 6.1 resets `bb_eof_count` at each VSYNC
+  restart (the core of our change) but doesn't refill the bounce buffers
+  after a frame out of step; `idf6/esp_lcd` adds that and the counter.
+  MaTouch, `x 5/10/20`: each stall put right at the next VSYNC.
+- **`idf.py flash`** writes only the regions changed since the last flash
+  from that build folder, then verifies; after another project, use
+  `flash -a` (everything).
+- MaTouch internal RAM on 6.1 (both options on, picolibc): ~60 KB free
+  while running against 64.5 KB on 5.5.4; the minimum 39.8 KB (47 KB).
+
 ## Layout
 
 | Path | What |
@@ -105,6 +148,8 @@ components a project requires get built: MINIMAL_BUILD).
 | `components/emu/tab5.c`, `tab5_keyboard.c` | Tab5: battery charging and its state (`battery.h`), the ESP32-C6 (power, esp_hosted, its Bluetooth controller), the Tab5 Keyboard |
 | `components/fatfs/` | ESP-IDF 5.5.4's fatfs with `FF_FS_EXFAT` 1 (from esp32_basic): exFAT SD cards. Overrides ESP-IDF's for every project: update it with ESP-IDF |
 | `components/esp_lcd/` | ESP-IDF 5.5.4's esp_lcd (without test_apps), one change marked `esp32emu` in `rgb/esp_lcd_panel_rgb.c` (+ `emu_lcd_rgb_resyncs` in its header): see the lessons. Overrides ESP-IDF's for every project and both boards (a `reconfigure` picks it up): update it with ESP-IDF |
+| `idf6/esp_lcd/`, `idf6/fatfs/` | The same two for ESP-IDF 6 (6.1.1's, the same changes: `FF_FS_EXFAT` 1 and the guards in `ffconf.h`; the resync check in `lcd_rgb_panel_try_restart_transmission()`). See "ESP-IDF 6.1" |
+| `components.cmake` | A project's `EXTRA_COMPONENT_DIRS`, included before ESP-IDF's `project.cmake`: `components/`, or with ESP-IDF 6 its folders but `esp_lcd` and `fatfs`, plus `idf6/` |
 | `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings (PSRAM, esp_hosted SDIO pins, NimBLE over VHCI, fonts, speaker on) |
 | `components/emu/json.c` | Small JSON builder for the web API |
 | `tools/emu_console.py` | Console client (run with the IDF venv's Python, `-I`); `profile ELF [N [TOP [CORE]]]` runs `p` and names the hottest functions (the ROM's too, from the chip's ROM ELF; a static name in several files gets its file) |
