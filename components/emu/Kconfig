@@ -108,3 +108,23 @@ menu "Emulator board"
             square: 60% shows as 77 there.
 
 endmenu
+
+# Named in the dependency rules of esp_hosted's newer releases (its USB
+# transports, "== 1"), which the component manager reads while solving the
+# Tab5's dependencies; no Kconfig file defined them, and that solve stopped
+# ("Missing required kconfig option after retry"). 0: esp_hosted stays on
+# 2.12.9 (idf_component.yml), without them.
+menu "esp_hosted USB transports (unused)"
+    depends on IDF_TARGET_ESP32P4
+
+    config ESP_HOSTED_HOST_USB_CDC_ACM_MANIFEST
+        int "USB CDC-ACM (unused)"
+        default 0
+    config ESP_HOSTED_HOST_USB_CHERRYUSB_MANIFEST
+        int "CherryUSB (unused)"
+        default 0
+    config ESP_HOSTED_HOST_USB_RNDIS_MANIFEST
+        int "USB RNDIS (unused)"
+        default 0
+
+endmenu

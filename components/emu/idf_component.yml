@@ -3,8 +3,10 @@ dependencies:
     version: ">=5.5"
   lvgl/lvgl:
     version: "~9.4.0"   # 9.4 is what the boards were tested with
+  # 1.14 is what the boards run: 1.15 stops the build when its console CLI
+  # is on (the default) and the console component isn't in the build
   espressif/mdns:
-    version: "^1.8.0"
+    version: "~1.14.0"
     rules:
       - if: "$CONFIG{EMU_WEB} == True"
 

@@ -38,6 +38,11 @@ components a project requires get built: MINIMAL_BUILD).
 ## The two boards
 
 - **MaTouch** (`/dev/cu.usbmodem1101`): `idf.py build`, `sdkconfig`, `build/`.
+  Every MaTouch project has `CONFIG_EMU_SPEAKER` on (2026-11-16, the user's
+  choice: they connect the board's USB-to-UART port): once a machine starts,
+  the console and flashing are on that port (`/dev/cu.wchusbserial*`,
+  921600 baud), the native USB port is gone; at the setup screen the console
+  is still on native USB.
 - **Tab5** (`/dev/cu.usbmodem3101`, ESP32-P4 rev v1.0, ILI9881C + GT911
   version): `idf.py -B build-tab5 -DIDF_TARGET=esp32p4
   -DSDKCONFIG=$PWD/build-tab5/sdkconfig build` (and `-p PORT flash`); its
@@ -295,6 +300,17 @@ instead of the board's own rows, no `bluetooth`: its card hidden). The
 boards send none of them and their page reads as before.
 
 ## Lessons (from the STE, where most of this code was written)
+
+- **Dependency solves broke on registry drift (2026-11-16)**: a project
+  whose lock no longer matched `components/emu/idf_component.yml` re-solved
+  and got mdns 1.15.1, which stops the MaTouch build (its console CLI is on
+  by default and the console component isn't in the build): mdns is pinned
+  `~1.14.0`, what the boards run. A Tab5 solve stopped at "Missing required
+  kconfig option after retry" (`ESP_HOSTED_HOST_USB_*_MANIFEST`, named in
+  newer esp_hosted releases' rules as `== 1`, defined nowhere): the emu
+  component's Kconfig defines them as ints, 0, for the P4 (as bools the
+  manager rejects `== 1`). Changing the manifest re-solves every project's
+  next build, both boards.
 
 - **Never block interrupts on core 0 for long.** The LCD has no frame memory;
   its 10-line bounce buffers are refilled by an interrupt on core 0 with well
