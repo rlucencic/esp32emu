@@ -77,11 +77,17 @@ components a project requires get built: MINIMAL_BUILD).
   on the MaTouch), `FONT_BIG` is 34 px on the Tab5, the default font 28.
   Machines' `view_width` is for 600 lines: `emu_view_width()` scales it.
 
-## ESP-IDF 6.1 (branch `idf-6.1`, 2026-11-16)
+## ESP-IDF 6.1 (2026-11-16)
 
 ESP-IDF 6.1.1 is installed beside 5.5.4 (by Espressif's installer, EIM).
 esp32ste builds with either; the other projects still name `components/`
 and build with 5.5.4 only, until they include `components.cmake`.
+
+**Decision (the user, 2026-11-16): stay on 5.5.4.** The boards run 5.5.4
+builds; esp32ste keeps building with both, as the test case for 6.x. Move
+the others when there's a concrete reason (a component or fix that needs
+6.x, 5.5's end of support), and before that profile the MaTouch's last ~2
+points (below) and its internal RAM.
 
 - **Environment**: `export.sh` fails (EIM's tools aren't where it looks);
   source `~/.espressif/tools/activate_idf_v6.1.1.sh`, which refuses to run
