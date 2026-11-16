@@ -12,7 +12,7 @@ the II's 68881), `../esp32mac3` (Macintosh LC II and LC III, a 68030
 with its MMU), `../esp32arc` (Acorn Archimedes, an ARM2) and `../esp32ami`
 (Amiga 500, 2000, 600 and 1200, a 68000 or a 68EC020), the Tab5 only. It is a library: it isn't built on its own. Build and
 test through one of the projects (each has `EXTRA_COMPONENT_DIRS` pointing
-here). ESP-IDF v5.5.4, C. The 68000 machines use Musashi (the LC and II
+here). ESP-IDF v5.5.6, C. The 68000 machines use Musashi (the LC and II
 as a 68020: `CONFIG_M68K_68020`, with `m68k_set_fpu()`; the LC II and LC
 III as a 68030: `CONFIG_M68K_68030`; the Amiga's 68000 or 68EC020 chosen at
 run time: `CONFIG_M68K_RUNTIME`; a machine that never calls
@@ -77,14 +77,64 @@ components a project requires get built: MINIMAL_BUILD).
   on the MaTouch), `FONT_BIG` is 34 px on the Tab5, the default font 28.
   Machines' `view_width` is for 600 lines: `emu_view_width()` scales it.
 
+## ESP-IDF 5.5.6 (2026-11-16)
+
+Every project builds with 5.5.6 (from 5.5.4; 5.5.4 is still installed).
+The same compiler (esp-14.2.0_20260121).
+
+- **Install**: `/Applications/eim.app/Contents/MacOS/eim install -i v5.5.6
+  -t esp32s3,esp32p4 -p $HOME/.espressif -n true --do-not-track true`
+  (EIM sends usage data unless told not to). The build commands stay as
+  they were (`$IDF_PATH/export.sh`, `IDF_PATH` from `~/.zprofile`, now
+  v5.5.6), with the installer's Python: `tools/python/v5.5.6/venv`.
+- **Build folders made with 5.5.4 must start afresh**: `idf.py` refuses a
+  folder configured with another Python ("Run 'idf.py fullclean'"), and the
+  bootloader sub-build keeps the old ESP-IDF path in its own CMake cache.
+  `fullclean` also deletes `build-tab5/sdkconfig` (it lives in the build
+  folder): keep a copy and put it back.
+- **The two copies** (`components/esp_lcd`, `components/fatfs`) were
+  taken again from 5.5.6, with our changes applied as patches made from
+  the old copies against 5.5.4 (`diff -ru`, `patch -p0`): both applied
+  cleanly. 5.5.6 brought FatFs's exFAT/FAT32 fixes (CVE-2026-6682, -6683,
+  -6685, -6687), and still has the RGB bounce-buffer bug (our change
+  stays; `x 5/10/20` on the MaTouch: each put right at the next VSYNC).
+- **What changed** (5.5.5 and 5.5.6, from the commit titles between the
+  tags; the GitHub notes are short and release-notes.espressif.com needs
+  JavaScript): many Wi-Fi and NimBLE fixes (HID service discovery, bond
+  store, crashes on disconnect, CVEs), Wi-Fi with PSRAM and
+  `SPIRAM_TRY_ALLOCATE_WIFI_LWIP` fixes, SD/FatFs, HTTP server and
+  esp_event security fixes, `esp_timer` races; P4: the second core's branch
+  predictor reaching PSRAM with the cache off, MIPI-DSI signal integrity,
+  PPA/DMA2D races, USB host security fixes.
+- **New defaults**: NimBLE pairing hardening (e.g.
+  `BT_NIMBLE_SMP_REMOVE_BOND_ON_PAIR_FAIL_AS_CENTRAL`: a failed pairing
+  drops the bond). Bluetooth keyboards and mice not tried yet.
+- **Components**: the solve moved only the Tab5's mdns 1.14.0 -> 1.14.1
+  and usb 1.6.0 -> 1.6.1 (esp32ste already had them).
+- **The internal DMA reserve is shared now** (5.5.5): the pool
+  `CONFIG_SPIRAM_MALLOC_RESERVE_INTERNAL` sets aside is added with
+  `MALLOC_CAP_DEFAULT` at its lowest priority (`esp_psram.c`,
+  `esp_psram_extram_reserve_dma_pool()`), so plain `malloc()` takes from
+  it once the rest of internal RAM is short. Measured with esp32ste, TOS
+  2.06 4 MB high res: MaTouch 77-79% of real time (5.5.4: 76-77%),
+  internal RAM free while running 57.3 KB (64.5 KB), minimum 39.5 KB
+  (46.8 KB); during a 720 KB upload and download on the web page the
+  minimum fell to 32.1 KB (5.5.4: unchanged, 46.9 KB). Both transfers
+  worked. Tab5 (TOS 1.62): 100%, core 1 43% (42%), internal minimum 97.7
+  KB. If something runs out of internal or DMA memory on the MaTouch
+  (Wi-Fi, Bluetooth, the SD card), look here first. The other projects
+  were built, not tried on the boards.
+
 ## ESP-IDF 6.1 (2026-11-16)
 
-ESP-IDF 6.1.1 is installed beside 5.5.4 (by Espressif's installer, EIM).
-esp32ste builds with either; the other projects still name `components/`
-and build with 5.5.4 only, until they include `components.cmake`.
+ESP-IDF 6.1.1 is installed beside 5.5.6 and 5.5.4 (by Espressif's
+installer, EIM). esp32ste builds with either; the other projects still
+name `components/` and build with 5.5 only, until they include
+`components.cmake`.
 
-**Decision (the user, 2026-11-16): stay on 5.5.4.** The boards run 5.5.4
-builds; esp32ste keeps building with both, as the test case for 6.x. Move
+**Decision (the user, 2026-11-16): stay on 5.5** (5.5.6 since that day,
+"ESP-IDF 5.5.6" below). The boards run 5.5 builds; esp32ste keeps building
+with both, as the test case for 6.x. Move
 the others when there's a concrete reason (a component or fix that needs
 6.x, 5.5's end of support), and before that profile the MaTouch's last ~2
 points (below) and its internal RAM.
@@ -95,7 +145,7 @@ points (below) and its internal RAM.
   >/dev/null 2>&1; unset IDF_COMPONENT_LOCAL_STORAGE_URL; idf.py ...'`. It
   points the component manager at a local mirror (older versions:
   esp_codec_dev 1.5.8 instead of 1.5.11): unset it.
-- **Separate everything** from the 5.5.4 builds: build folders
+- **Separate everything** from the 5.5 builds: build folders
   (`build-idf6`, `build-tab5-idf6`), `-DSDKCONFIG` in them for both boards,
   lock files (`dependencies.lock.idf6`, `.esp32p4.idf6`, set in esp32ste's
   CMakeLists.txt). Never configure two builds of one project at once: they
@@ -152,8 +202,8 @@ points (below) and its internal RAM.
 | `components/emu/net.c` | WiFi station + SNTP |
 | `components/emu/lcd.c`, `lcd_tab5.c`, `touch.c`, `sdcard.c`, `speaker.c` | Board drivers; `include/emu/board.h` picks the board's header |
 | `components/emu/tab5.c`, `tab5_keyboard.c` | Tab5: battery charging and its state (`battery.h`), the ESP32-C6 (power, esp_hosted, its Bluetooth controller), the Tab5 Keyboard |
-| `components/fatfs/` | ESP-IDF 5.5.4's fatfs with `FF_FS_EXFAT` 1 (from esp32_basic): exFAT SD cards. Overrides ESP-IDF's for every project: update it with ESP-IDF |
-| `components/esp_lcd/` | ESP-IDF 5.5.4's esp_lcd (without test_apps), one change marked `esp32emu` in `rgb/esp_lcd_panel_rgb.c` (+ `emu_lcd_rgb_resyncs` in its header): see the lessons. Overrides ESP-IDF's for every project and both boards (a `reconfigure` picks it up): update it with ESP-IDF |
+| `components/fatfs/` | ESP-IDF 5.5.6's fatfs with `FF_FS_EXFAT` 1 (from esp32_basic): exFAT SD cards. Overrides ESP-IDF's for every project: update it with ESP-IDF |
+| `components/esp_lcd/` | ESP-IDF 5.5.6's esp_lcd (without test_apps), one change marked `esp32emu` in `rgb/esp_lcd_panel_rgb.c` (+ `emu_lcd_rgb_resyncs` in its header): see the lessons. Overrides ESP-IDF's for every project and both boards (a `reconfigure` picks it up): update it with ESP-IDF |
 | `idf6/esp_lcd/`, `idf6/fatfs/` | The same two for ESP-IDF 6 (6.1.1's, the same changes: `FF_FS_EXFAT` 1 and the guards in `ffconf.h`; the resync check in `lcd_rgb_panel_try_restart_transmission()`). See "ESP-IDF 6.1" |
 | `components.cmake` | A project's `EXTRA_COMPONENT_DIRS`, included before ESP-IDF's `project.cmake`: `components/`, or with ESP-IDF 6 its folders but `esp_lcd` and `fatfs`, plus `idf6/` |
 | `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings (PSRAM, esp_hosted SDIO pins, NimBLE over VHCI, fonts, speaker on) |
@@ -369,8 +419,8 @@ boards send none of them and their page reads as before.
   interrupts off) on core 0 caused artefacts and a shifted picture; it's
   read on core 1, on request, at most every 5 s. A flood of log output has a
   similar effect.
-- **ESP-IDF's RGB driver never got back in step** (5.5.4,
-  `CONFIG_LCD_RGB_RESTART_IN_VSYNC=y`): the DMA EOF count chooses the
+- **ESP-IDF's RGB driver never got back in step** (5.5.4, still in
+  5.5.6; 6.1 does half of our fix; `CONFIG_LCD_RGB_RESTART_IN_VSYNC=y`): the DMA EOF count chooses the
   bounce buffer each refill goes to, and that path never reset it, so one
   lost refill interrupt (two EOFs in one ISR) left every later refill a
   buffer out of step: the picture shifted up 10 panel lines (5-7 machine

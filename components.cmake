@@ -3,7 +3,7 @@
 #
 #   include("${CMAKE_CURRENT_LIST_DIR}/../esp32emu/components.cmake")
 #
-# components/esp_lcd and components/fatfs are ESP-IDF 5.5.4's with esp32emu's
+# components/esp_lcd and components/fatfs are ESP-IDF 5.5.6's with esp32emu's
 # changes; with ESP-IDF 6 they don't build, and idf6/esp_lcd and idf6/fatfs
 # (ESP-IDF 6.1.1's, the same changes) take their place. Projects that still
 # name components/ directly build with ESP-IDF 5 only.

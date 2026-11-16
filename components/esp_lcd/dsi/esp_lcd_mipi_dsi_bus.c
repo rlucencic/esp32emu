@@ -1,5 +1,5 @@
 /*
- * SPDX-FileCopyrightText: 2023-2025 Espressif Systems (Shanghai) CO LTD
+ * SPDX-FileCopyrightText: 2023-2026 Espressif Systems (Shanghai) CO LTD
  *
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -11,6 +11,7 @@
 #define MIPI_DSI_DEFAULT_TIMEOUT_CLOCK_FREQ_MHZ 10
 // TxClkEsc frequency must be configured between 2 and 20 MHz
 #define MIPI_DSI_DEFAULT_ESCAPE_CLOCK_FREQ_MHZ  18
+#define MIPI_DSI_DEFAULT_HOST_LP_RX_TIMEOUT_COUNT     0x7FFF
 
 esp_err_t esp_lcd_new_dsi_bus(const esp_lcd_dsi_bus_config_t *bus_config, esp_lcd_dsi_bus_handle_t *ret_bus)
 {
@@ -103,8 +104,8 @@ esp_err_t esp_lcd_new_dsi_bus(const esp_lcd_dsi_bus_config_t *bus_config, esp_lc
 
     // initialize the DSI operation mode: command mode
     mipi_dsi_host_ll_enable_video_mode(hal->host, false);
-    // place the clock lane in low power mode, we will switch to high speed mode later when DPI stream is ready
-    mipi_dsi_host_ll_set_clock_lane_state(hal->host, MIPI_DSI_LL_CLOCK_LANE_STATE_LP);
+    // set clock lane state: force HS keeps clock in high-speed mode continuously, auto lets the DSI host manage transitions
+    mipi_dsi_host_ll_set_clock_lane_state(hal->host, bus_config->flags.clock_lane_force_hs ? MIPI_DSI_LL_CLOCK_LANE_STATE_HS : MIPI_DSI_LL_CLOCK_LANE_STATE_AUTO);
     // Set the time that is required by the clock and data lanes to go from high-speed to low-power and from low-power to high-speed
     mipi_dsi_phy_ll_set_switch_time(hal->host, 50, 104, 46, 128);
 
@@ -118,9 +119,11 @@ esp_err_t esp_lcd_new_dsi_bus(const esp_lcd_dsi_bus_config_t *bus_config, esp_lc
     mipi_dsi_host_ll_set_timeout_clock_division(hal->host, (uint32_t)roundf(bus_config->lane_bit_rate_mbps / 8.0f / MIPI_DSI_DEFAULT_TIMEOUT_CLOCK_FREQ_MHZ));
     // Set the divider to get the TX Escape clock, clock source is the high-speed byte clock
     mipi_dsi_host_ll_set_escape_clock_division(hal->host, (uint32_t)roundf(bus_config->lane_bit_rate_mbps / 8.0f / MIPI_DSI_DEFAULT_ESCAPE_CLOCK_FREQ_MHZ));
-    // set the timeout intervals to zero, means to disable the timeout mechanism
-    mipi_dsi_host_ll_set_timeout_count(hal->host, 0, 0, 0, 0, 0, 0, 0);
-    // DSI host will wait indefinitely for a read response from the DSI device
+    // Enable host timeout detection for command mode transactions.
+    mipi_dsi_host_ll_set_timeout_count(hal->host, 0,
+                                       MIPI_DSI_DEFAULT_HOST_LP_RX_TIMEOUT_COUNT,
+                                       0, 0, 0, 0, 0);
+    // Set the maximum time required to perform a read command, measured in lane byte clock cycles.
     mipi_dsi_phy_ll_set_max_read_time(hal->host, 6000);
     // set how long the DSI host will wait before sending the next transmission
     mipi_dsi_phy_ll_set_stop_wait_time(hal->host, 0x3F);
