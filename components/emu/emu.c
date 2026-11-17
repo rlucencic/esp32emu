@@ -64,7 +64,7 @@ static emu_info_t s_info = { .temperature = NAN };
 static int64_t s_session_start;
 static uint16_t *s_fb;
 static char s_drive_info[96];
-static char s_message[128];
+static char s_message[256];      /* the ROM messages run to ~180 characters */
 
 const emu_machine_t *emu_machine(void)
 {
