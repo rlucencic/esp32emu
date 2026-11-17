@@ -79,7 +79,7 @@ components a project requires get built: MINIMAL_BUILD).
 
 ## ESP-IDF 5.5.6 (2026-11-16)
 
-Every project builds with 5.5.6 (from 5.5.4; 5.5.4 is still installed).
+Every project builds with 5.5.6 (from 5.5.4, since removed).
 The same compiler (esp-14.2.0_20260121).
 
 - **Install**: `/Applications/eim.app/Contents/MacOS/eim install -i v5.5.6
@@ -127,8 +127,8 @@ The same compiler (esp-14.2.0_20260121).
 
 ## ESP-IDF 6.1 (2026-11-16)
 
-ESP-IDF 6.1.1 is installed beside 5.5.6 and 5.5.4 (by Espressif's
-installer, EIM). esp32ste builds with either; the other projects still
+ESP-IDF 6.1.1 is installed beside 5.5.6 (by Espressif's installer,
+EIM). esp32ste builds with either; the other projects still
 name `components/` and build with 5.5 only, until they include
 `components.cmake`.
 
