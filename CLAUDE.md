@@ -663,6 +663,25 @@ and the cores.
 
 ## To do
 
+- **NEXT PLANNED IMPLEMENTATION — Oric Atmos (1984) emulator (`esp32oric`)**
+
+  Develop alongside `rpi5oric` (Raspberry Pi 5) using the existing ESP-IDF
+  sibling-project layout. Use the shared `m6502` core and integrate with
+  `esp32emu` through `emu_machine_t`. Optimize for ESP32-S3 with PSRAM-aware
+  memory management and use the board runtime for LCD display, embedded
+  audio, and keyboard input.
+  Share emulator design concepts, compatibility tests, and technical
+  documentation with `rpi5oric` where practical.
+
+  - MOS 6502A CPU at 1 MHz, 48 KB RAM, 16 KB ROM, and memory banking.
+  - Oric ULA with accurate video attributes, 40×28 text, and 240×200
+    high-resolution graphics.
+  - AY-3-8912 three-channel sound and MOS 6522 VIA with timers and interrupts.
+  - Oric keyboard emulation and cassette support for TAP files. Microdisc
+    floppy disk emulation is optional.
+  - Compatibility with Oric Atmos BASIC 1.1 and testing with original Oric
+    software.
+
 - **README screenshots, from time to time** (the user, 2026-10-21): for
   every emulator, replace them with more spectacular ones as we find them
   (games, demos, desktops at their best), following "README screenshots"
