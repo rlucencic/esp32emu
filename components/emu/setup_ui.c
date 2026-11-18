@@ -1056,8 +1056,14 @@ static void show_disks(lv_event_t *e)
 {
     if (disks_ready()) {
         char text[160];
-        snprintf(text, sizeof(text), "%s from the SD card's \"%s\" folder.",
-                 ui.disks->description, ui.disks->folder);
+        if (ui.disks->cart_extensions != NULL) {
+            /* (one line: the description and both folders don't fit) */
+            snprintf(text, sizeof(text), "Images from the SD card's \"%s\" folder, cartridges from \"%s/roms\".",
+                     ui.disks->folder, ui.disks->folder);
+        } else {
+            snprintf(text, sizeof(text), "%s from the SD card's \"%s\" folder.",
+                     ui.disks->description, ui.disks->folder);
+        }
         set_disk_status(text, COLOR_DIM);
     } else {
         set_disk_status("No SD card: no disk images.", COLOR_WARN);
@@ -1103,8 +1109,8 @@ static void insert_clicked(lv_event_t *e)
     }
 
     lv_label_set_text_fmt(ui.images_title, "Insert into %s", ui.disks->drive_names[d]);
-    lv_label_set_text_fmt(ui.images_count, "%d disk%s", ui.image_count,
-                          ui.image_count == 1 ? "" : "s");
+    lv_label_set_text_fmt(ui.images_count, "%d %s%s", ui.image_count,
+                          disks_cart_drive(d) ? "cartridge" : "disk", ui.image_count == 1 ? "" : "s");
     lv_obj_clean(ui.images_list);
     for (int i = 0; i < ui.image_count; i++) {
         const char *name = ui.images[i];
