@@ -5,8 +5,9 @@ ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 `../esp32zx` (ZX Spectrum 128K, +2, +3), `../esp32cbm` (Commodore 64 and
 128), `../esp32xl` (Atari 800XL and 130XE), `../esp32msx` (MSX1, MSX2),
 `../esp32gs` (Apple IIGS), `../esp32coco` (Tandy Color Computer 2 and 3,
-a 6809 or 6309), `../esp32pc` (IBM PC/XT, an 8088) and `../esp32ql` (Sinclair QL,
-a 68008; since 2026-11-18, in development) on two boards: the Makerfabs
+a 6809 or 6309), `../esp32pc` (IBM PC/XT, an 8088), `../esp32ql` (Sinclair QL,
+a 68008; since 2026-11-18, in development) and `../esp32electron` (Acorn
+Electron, a 6502; since 2026-11-18, in development) on two boards: the Makerfabs
 MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
 (target esp32p4); and `../esp32mac2` (Macintosh LC and II, a 68020 and
 the II's 68881), `../esp32mac3` (Macintosh LC II and LC III, a 68030
@@ -654,7 +655,7 @@ boards send none of them and their page reads as before.
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, `esp32arc`, `esp32pc`, `esp32ami` (public since 2026-10-21), `esp32ql` (public since 2026-11-18, in development), and `esp32emu-vscode` (the debugger's VS Code
+`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, `esp32arc`, `esp32pc`, `esp32ami` (public since 2026-10-21), `esp32ql` (public since 2026-11-18, in development), `esp32electron` (public since 2026-11-18, in development), and `esp32emu-vscode` (the debugger's VS Code
 extension, TypeScript: `npm test`, `npm run test:host` against the demo
 machine, `npm run test:vscode` inside VS Code). The user pushes straight to `main`; commit messages end with the
 `Co-Authored-By` line the session gives. When the user says "commit and
@@ -733,7 +734,9 @@ and the cores.
   - Serial ports: done (2026-11-18), SER1 and SER2 as TCP ports 2301 and
     2302 on both boards; the QL network later, if wanted.
 
-- **Acorn Electron (1983) emulator (`esp32electron`)** follows the Sinclair QL.
+- **IN PROGRESS — Acorn Electron (1983) emulator (`esp32electron`)** (started
+  2026-11-18: both boards, as the QL; its TODO.md has the steps; MOS and
+  BASIC, display, sound, keyboard and the ULA's timing done)
 
   Develop for ESP32-S3 alongside the SDL desktop port, `sdlelectron`. Use the
   shared `m6502` core and the existing `emu_machine_t` interface for LCD
