@@ -711,6 +711,8 @@ and the cores.
   - Floppy disks (the user, 2026-11-18): done through a Miracle Trump Card
     (its ROM's FLP_ driver and Toolkit 2, a WD1772), 720 KB `.img` images
     in FLP1_ and FLP2_ on both boards.
+  - Serial ports: done (2026-11-18), SER1 and SER2 as TCP ports 2301 and
+    2302 on both boards; the QL network later, if wanted.
 
 - **Acorn Electron (1983) emulator (`esp32electron`)** follows the Sinclair QL.
 
