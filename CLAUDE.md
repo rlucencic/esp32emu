@@ -360,7 +360,10 @@ points (below) and its internal RAM.
   from dropped folders, whose paths `dropped()` reads through
   `webkitGetAsEntry`, or a ZIP's, with their folders) are packed together
   into images `[{name, data}]`, named after their common top folder, the
-  ZIP or "FILES". With a packer the file picker takes any file.
+  ZIP or "FILES". With a packer the file picker takes any file. Files are
+  `{path, data, date, extra}`: a ZIP entry's `extra` is its extra field
+  from the central directory (the QL's packer takes each file's QDOS
+  header from there: ID $FB4A; since 2026-11-18).
 - Folders as drives (optional, `disks_config_t.folders`, the PC's): the
   disk folder's subfolders are listed too, as `NAME/`; `insert()` gets the
   path with the slash; `disks_can_insert()` (the web's drive PUT) accepts

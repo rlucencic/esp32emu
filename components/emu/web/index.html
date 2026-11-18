@@ -159,7 +159,9 @@ const converterFor = name => converters.find(c => c.extensions.some(e => name.to
 /* The machine's packer (/machine.js), if it has one: the other files, loose,
  * in dropped folders or in a ZIP file, are put together onto one disk image
  * here. registerPacker({description, pack(name, files, ctx)}): files are
- * [{path, data, date}] (folders and name joined by "/"), it gives [{name, data}] */
+ * [{path, data, date, extra}] (folders and name joined by "/"; extra: a ZIP
+ * entry's extra field, where the QL's zips keep each file's QDOS header), it
+ * gives [{name, data}] */
 let packer = null;
 window.registerPacker = p => { packer = p; };
 
@@ -337,7 +339,8 @@ async function upload(name, data) {
 }
 
 /* The disk images (and files for the converters) in a ZIP file: {disks:
- * [{name, data}], others: [{path, data, date}]} (the rest, for the packer) */
+ * [{name, data}], others: [{path, data, date, extra}]} (the rest, for the
+ * packer; extra: the entry's extra field from the central directory) */
 async function unzip(file) {
   const buf = await file.arrayBuffer();
   const v = new DataView(buf);
@@ -357,6 +360,7 @@ async function unzip(file) {
     const nlen = v.getUint16(p + 28, true), xlen = v.getUint16(p + 30, true), clen = v.getUint16(p + 32, true);
     const local = v.getUint32(p + 42, true);
     const full = new TextDecoder().decode(new Uint8Array(buf, p + 46, nlen));
+    const extra = new Uint8Array(buf, p + 46 + nlen, xlen);
     p += 46 + nlen + xlen + clen;
     const name = full.split("/").pop();
     const disk = imageRe.test(name) || converterFor(name);
@@ -374,7 +378,8 @@ async function unzip(file) {
       continue;
     }
     if (disk) out.push({ name, data });
-    else others.push({ path: full, data, date: new Date(1980 + (d >> 9), ((d >> 5) & 15) - 1, d & 31, t >> 11, (t >> 5) & 63, (t & 31) * 2) });
+    else others.push({ path: full, data, extra,
+                       date: new Date(1980 + (d >> 9), ((d >> 5) & 15) - 1, d & 31, t >> 11, (t >> 5) & 63, (t & 31) * 2) });
   }
   return { disks: out, others };
 }
