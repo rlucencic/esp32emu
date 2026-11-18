@@ -5,7 +5,8 @@ ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 `../esp32zx` (ZX Spectrum 128K, +2, +3), `../esp32cbm` (Commodore 64 and
 128), `../esp32xl` (Atari 800XL and 130XE), `../esp32msx` (MSX1, MSX2),
 `../esp32gs` (Apple IIGS), `../esp32coco` (Tandy Color Computer 2 and 3,
-a 6809 or 6309) and `../esp32pc` (IBM PC/XT, an 8088) on two boards: the Makerfabs
+a 6809 or 6309), `../esp32pc` (IBM PC/XT, an 8088) and `../esp32ql` (Sinclair QL,
+a 68008; since 2026-11-18, in development) on two boards: the Makerfabs
 MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
 (target esp32p4); and `../esp32mac2` (Macintosh LC and II, a 68020 and
 the II's 68881), `../esp32mac3` (Macintosh LC II and LC III, a 68030
@@ -32,7 +33,7 @@ Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core, the
 Archimedes the ARM2 core, the PC the x86 core; the CPC and the +3 share the uPD765.
 
 Changes here affect every emulator: build all of them after any change, the
-ten on both boards and the four for the Tab5 only (24 builds; only the
+eleven on both boards and the four for the Tab5 only (26 builds; only the
 components a project requires get built: MINIMAL_BUILD).
 
 ## The two boards
@@ -613,7 +614,7 @@ boards send none of them and their page reads as before.
 
 Public GitHub repositories, cloned side by side:
 `github.com/rlucencic/esp32emu`, `esp32ste`, `esp32mac`, `esp32cpc`, `esp32zx`,
-`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, `esp32arc`, `esp32pc`, `esp32ami` (public since 2026-10-21), and `esp32emu-vscode` (the debugger's VS Code
+`esp32cbm`, `esp32xl`, `esp32msx`, `esp32gs`, `esp32mac2`, `esp32mac3`, `esp32coco`, `esp32arc`, `esp32pc`, `esp32ami` (public since 2026-10-21), `esp32ql` (public since 2026-11-18, in development), and `esp32emu-vscode` (the debugger's VS Code
 extension, TypeScript: `npm test`, `npm run test:host` against the demo
 machine, `npm run test:vscode` inside VS Code). The user pushes straight to `main`; commit messages end with the
 `Co-Authored-By` line the session gives. When the user says "commit and
@@ -670,7 +671,8 @@ and the cores.
 
 ## To do
 
-- **NEXT PLANNED IMPLEMENTATION — Sinclair QL (1984) emulator (`esp32ql`)**
+- **IN PROGRESS — Sinclair QL (1984) emulator (`esp32ql`)** (started
+  2026-11-18: both boards, the user's call; its TODO.md has the steps)
 
   Develop for ESP32-S3 alongside `rpi5ql` (Raspberry Pi 5). Use the existing
   `emu_machine_t` interface for LCD display, embedded audio, and keyboard
