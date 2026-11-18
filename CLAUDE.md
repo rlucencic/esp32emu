@@ -687,10 +687,13 @@ and the cores.
     and both built-in Microdrives with cartridge image support.
   - Boot QDOS into SuperBASIC and test original software, including loading
     and saving a document in Psion Quill.
+  - Floppy disks (the user, 2026-11-18): done through a Miracle Trump Card
+    (its ROM's FLP_ driver and Toolkit 2, a WD1772), 720 KB `.img` images
+    in FLP1_ and FLP2_ on both boards.
 
 - **Acorn Electron (1983) emulator (`esp32electron`)** follows the Sinclair QL.
 
-  Develop for ESP32-S3 alongside `rpi5electron` (Raspberry Pi 5). Use the
+  Develop for ESP32-S3 alongside the SDL desktop port, `sdlelectron`. Use the
   shared `m6502` core and the existing `emu_machine_t` interface for LCD
   display, embedded audio, and keyboard input. Keep the machine core
   portable so both projects can share it and its compatibility tests.
@@ -700,25 +703,33 @@ and the cores.
   - 32 KB RAM, 32 KB ROM, Acorn MOS, and BBC BASIC.
   - Screen modes 0–6, single-channel sound, and keyboard emulation.
   - Cassette loading from UEF images and compatibility tests with original
-    Electron software. Consider Plus 1 and Plus 3 support after the base
-    machine.
+    Electron software. Consider Plus 1 support after the base machine.
+  - Required floppy support through the Acorn Plus 3 expansion. Emulate the
+    controller, ADFS ROM, and 3½-inch drive, with disk image mounting and
+    read/write support. Test cataloguing, loading, and saving through ADFS,
+    including persistence after remounting the image. The expansion also
+    supported an external 5¼-inch drive. [Acorn Plus 3 user guide](https://chrisacorns.computinghistory.org.uk/docs/Acorn/Manuals/Acorn_Plus3UG.pdf)
 
 - **Oric Atmos (1984) emulator (`esp32oric`)** follows the Acorn Electron.
 
-  Develop alongside `rpi5oric` (Raspberry Pi 5) using the existing ESP-IDF
+  Develop alongside the SDL desktop port, `sdloric`, using the existing ESP-IDF
   sibling-project layout. Use the shared `m6502` core and integrate with
   `esp32emu` through `emu_machine_t`. Optimize for ESP32-S3 with PSRAM-aware
   memory management and use the board runtime for LCD display, embedded
   audio, and keyboard input.
   Share emulator design concepts, compatibility tests, and technical
-  documentation with `rpi5oric` where practical.
+  documentation with `sdloric` where practical.
 
   - MOS 6502A CPU at 1 MHz, 48 KB RAM, 16 KB ROM, and memory banking.
   - Oric ULA with accurate video attributes, 40×28 text, and 240×200
     high-resolution graphics.
   - AY-3-8912 three-channel sound and MOS 6522 VIA with timers and interrupts.
-  - Oric keyboard emulation and cassette support for TAP files. Microdisc
-    floppy disk emulation is optional.
+  - Oric keyboard emulation and cassette support for TAP files.
+  - Required floppy support through the external Oric Microdisc expansion.
+    Emulate the controller, boot ROM, and 3-inch drive, with disk image
+    mounting and read/write support. Test booting DOS from a system disk
+    image and loading and saving files, including persistence after
+    remounting the image. [Oric Microdisc manual](https://www.museo8bits.com/biblioteca/oric/The%20Oric%20Microdisc%20Manual.pdf)
   - Compatibility with Oric Atmos BASIC 1.1 and testing with original Oric
     software.
 
