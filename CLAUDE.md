@@ -663,7 +663,22 @@ and the cores.
 
 ## To do
 
-- **NEXT PLANNED IMPLEMENTATION — Oric Atmos (1984) emulator (`esp32oric`)**
+- **NEXT PLANNED IMPLEMENTATION — Acorn Electron (1983) emulator (`esp32electron`)**
+
+  Develop for ESP32-S3 alongside `rpi5electron` (Raspberry Pi 5). Use the
+  shared `m6502` core and the existing `emu_machine_t` interface for LCD
+  display, embedded audio, and keyboard input. Keep the machine core
+  portable so both projects can share it and its compatibility tests.
+
+  - 6502A with ULA-controlled timing, including 2 MHz ROM accesses, 1 MHz
+    RAM accesses, and video contention in modes 0–3.
+  - 32 KB RAM, 32 KB ROM, Acorn MOS, and BBC BASIC.
+  - Screen modes 0–6, single-channel sound, and keyboard emulation.
+  - Cassette loading from UEF images and compatibility tests with original
+    Electron software. Consider Plus 1 and Plus 3 support after the base
+    machine.
+
+- **Oric Atmos (1984) emulator (`esp32oric`)** follows the Acorn Electron.
 
   Develop alongside `rpi5oric` (Raspberry Pi 5) using the existing ESP-IDF
   sibling-project layout. Use the shared `m6502` core and integrate with
