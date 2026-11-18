@@ -9,9 +9,10 @@
 #              .mx1 .mx2, .ccc and .cpr cartridges into cbm, msx, coco, cpc
 #   cbm\ coco\ cpc\ msx\  their cartridges into their roms\ (.crt; .rom .ccc
 #              .bin; .cpr .rom; .rom .mx1 .mx2)
-#   floppies\  .st .msa .hd into st\; .adl, and .adf or .img of the
-#              Archimedes' floppy sizes (640 KB, 800 KB, 1.6 MB), into arc\;
-#              the other .img into st\ (the ST's hard disks), the other .adf
+#   floppies\  .st .msa .hd into st\; .adl, .adf of the Archimedes' floppy
+#              sizes (640 KB, 800 KB, 1.6 MB) and .img of them with an ADFS
+#              directory, into arc\; the other .img into st\ (the ST's hard
+#              disks: HDDRIVER's demo is 640 KB too), the other .adf
 #              and .rp9 into amiga\; .hdf with the Amiga's RDSK or DOS mark
 #              into amiga\, else in whole 516096-byte cylinders into arc\
 #   disks\     into mac\
@@ -81,6 +82,14 @@ function Get-CartMachine([string]$name) {
     return $null
 }
 
+# The first 8 KB of a file as text
+function Get-Head([IO.FileInfo]$file) {
+    $head = [byte[]]::new(8192)
+    $s = [IO.File]::OpenRead($file.FullName)
+    try { $n = $s.Read($head, 0, $head.Length) } finally { $s.Dispose() }
+    return [Text.Encoding]::ASCII.GetString($head, 0, $n)
+}
+
 # st, arc or amiga for an image in floppies\, none if unknown
 function Get-FloppyMachine([IO.FileInfo]$file) {
     $archie = $file.Length -in 655360, 819200, 1638400
@@ -88,13 +97,15 @@ function Get-FloppyMachine([IO.FileInfo]$file) {
         { $_ -in '.st', '.msa', '.hd' } { return 'st' }
         '.adl' { return 'arc' }
         '.rp9' { return 'amiga' }
-        '.img' { return $archie ? 'arc' : 'st' }
+        '.img' {
+            # An Archimedes floppy's size and an ADFS directory ("Hugo",
+            # "Nick"); else the ST's (HDDRIVER's demo hard disk is 640 KB too)
+            $text = $archie ? (Get-Head $file) : ''
+            return ($text.Contains('Hugo') -or $text.Contains('Nick')) ? 'arc' : 'st'
+        }
         '.adf' { return $archie ? 'arc' : 'amiga' }
         '.hdf' {
-            $head = [byte[]]::new(8192)
-            $s = [IO.File]::OpenRead($file.FullName)
-            try { $n = $s.Read($head, 0, $head.Length) } finally { $s.Dispose() }
-            $text = [Text.Encoding]::ASCII.GetString($head, 0, $n)
+            $text = Get-Head $file
             if ($text.Contains('RDSK') -or $text.StartsWith('DOS')) { return 'amiga' }
             if ($file.Length % 516096 -eq 0) { return 'arc' }
             return $null
