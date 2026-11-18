@@ -209,7 +209,7 @@ points (below) and its internal RAM.
 | `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings (PSRAM, esp_hosted SDIO pins, NimBLE over VHCI, fonts, speaker on) |
 | `components/emu/json.c` | Small JSON builder for the web API |
 | `tools/emu_console.py` | Console client (run with the IDF venv's Python, `-I`); `profile ELF [N [TOP [CORE]]]` runs `p` and names the hottest functions (the ROM's too, from the chip's ROM ELF; a static name in several files gets its file) |
-| `tools/sd_folders.ps1` | An SD card's shared folders (until 2026-11-17: `roms`, `floppies`, `disks`, `atari`) into each machine's own (`<folder>/roms` for its cartridges and the ROMs that override the built-in ones, the cartridges from `cbm`, `coco`, `cpc`, `msx` there too; the Macs share `mac`), as rpi5emu's `tools/data_folders.sh` does the Pi's data folder. `-DryRun` only says |
+| `tools/sd_folders.ps1` | An SD card's shared folders (until 2026-11-17: `roms`, `floppies`, `disks`, `atari`) into each machine's own (`<folder>/roms` for its cartridges and the ROMs that override the built-in ones, the cartridges from `cbm`, `coco`, `cpc`, `msx` there too; the Macs share `mac`), as rpi5emu's `tools/data_folders.sh` does the Pi's data folder. `-DryRun` only says. Runs on Linux too (`pwsh` 7.6, a .NET global tool on the PC: `dotnet tool install --global PowerShell --version 7.6.10`; 7.7.0's Linux package is missing on NuGet): checked 2026-11-18 on a made-up card with a file for every rule, nested folders right, a name already there kept |
 
 ## How a machine plugs in
 
