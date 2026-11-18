@@ -317,7 +317,7 @@ points (below) and its internal RAM.
   page offers every drive; `insert()` refuses what doesn't fit.
 - **Its own folder on the SD card** (`disks_config_t.folder`; one per
   machine since 2026-11-17, the user's wish: `zx cpc cbm coco apple2gs msx
-  xl st pc arc amiga`, the three Macs sharing `mac`): its images, and in
+  xl st pc ql arc amiga`, the three Macs sharing `mac`): its images, and in
   its `roms/` (since 2026-11-18, the user's call: the built-in ROMs come
   from the project's `roms/` through `idf.py flash`) the cartridges
   (`disks_config_t.cart_extensions`: the CBM's, CoCo's, CPC's and MSX's;
