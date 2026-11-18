@@ -612,6 +612,24 @@ boards send none of them and their page reads as before.
   `--gc-sections` dropped it). It is allocated on first use now (PSRAM).
 - **The Commodores type as a PC keyboard**: lowercase letters are the
   C64's capitals; "RUN" typed as capitals comes out shifted (graphics).
+- **An empty list's summary was the "redraw" mark** (2026-11-18): the
+  Bluetooth page redraws its list when a text summary of its rows
+  changes, and Forget emptied the stored summary to force that; with the
+  last device forgotten the new summary was empty as well, so the row
+  stayed until a restart (the pairing page the same with no candidates).
+  Forget had worked (the log: off the list, saved, bond deleted). A mark
+  no list makes now (`REDRAW`).
+- **Directed advertising was taken from any device** (2026-11-18): a
+  forgotten keyboard still holds its bond with us, asks to reconnect, and
+  re-paired in the background, running unlisted ("HID device"); forgetting
+  a connected keyboard once restarted the MaTouch (not caught in a log:
+  likely that reconnect racing Forget's bond deletion). Now a directed
+  advert from an address not on the list counts only if it is a private
+  (resolvable) one, a reconnected device whose identity isn't on the list
+  is dropped once encrypted (with any bond it just made) and its address
+  ignored until pairing starts. Four forgets of a connected keyboard and
+  mouse on the MaTouch after it: rows gone, no restart; the dropping
+  itself not seen yet (the devices didn't come back).
 
 ## Repositories
 

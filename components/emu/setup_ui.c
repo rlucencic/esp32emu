@@ -89,7 +89,7 @@ static struct {
     lv_obj_t *pass_title, *pass_field;
     char chosen_ssid[33];
     lv_obj_t *bt_list, *bt_status, *pair_list, *pair_status;
-    char bt_shown[512], pair_shown[512];   /* what the lists show now */
+    char bt_shown[512], pair_shown[512];   /* what the lists show now (REDRAW: not known) */
     lv_obj_t *disk_screen, *images_screen;
     lv_obj_t *disk_status, *drive_label[DISKS_MAX_DRIVES], *drive_buttons[DISKS_MAX_DRIVES][3];
     lv_obj_t *offer_button;                 /* the machine's offer for a disk (disks_offer()) */
@@ -872,10 +872,15 @@ static const char *kind_symbol(uint8_t kind)
            kind == HID_KIND_MOUSE ? LV_SYMBOL_GPS : LV_SYMBOL_BLUETOOTH;
 }
 
+/* A list's summary that no list makes (an empty list's is ""): it is
+ * redrawn whatever it holds now, also when that is nothing
+ */
+#define REDRAW  "\x01"
+
 static void forget_clicked(lv_event_t *e)
 {
     ble_hid_forget((int)(intptr_t)lv_event_get_user_data(e));
-    ui.bt_shown[0] = 0;
+    strcpy(ui.bt_shown, REDRAW);
 }
 
 static void pair_clicked(lv_event_t *e)
@@ -886,14 +891,14 @@ static void pair_clicked(lv_event_t *e)
 static void show_bluetooth(lv_event_t *e)
 {
     ble_hid_set_pairing(false);
-    ui.bt_shown[0] = 0;
+    strcpy(ui.bt_shown, REDRAW);
     lv_screen_load(ui.bt_screen);
 }
 
 static void show_pairing(lv_event_t *e)
 {
     ble_hid_set_pairing(true);
-    ui.pair_shown[0] = 0;
+    strcpy(ui.pair_shown, REDRAW);
     lv_screen_load(ui.pair_screen);
 }
 

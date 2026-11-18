@@ -80,6 +80,32 @@ static int s_known_count;
 static candidate_t s_cand[MAX_CANDIDATES];
 static int s_cand_count;
 static bool s_pairing;
+
+/* Addresses of devices dropped because they aren't paired here (any more):
+ * a forgotten device that still has its bond with us keeps asking to
+ * reconnect (directed advertising); not again from the same address
+ */
+#define MAX_REJECTED    4
+static ble_addr_t s_rejected[MAX_REJECTED];
+static int s_rejected_next;
+
+static bool rejected(const ble_addr_t *addr)
+{
+    for (int i = 0; i < MAX_REJECTED; i++) {
+        if (ble_addr_cmp(&s_rejected[i], addr) == 0) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/* A resolvable private address (random, top bits 01): whose it is shows
+ * only once the link is encrypted
+ */
+static bool is_rpa(const ble_addr_t *addr)
+{
+    return addr->type == BLE_ADDR_RANDOM && (addr->val[5] & 0xC0) == 0x40;
+}
 static char s_status[64];
 
 /* ---- reports -> callbacks --------------------------------------------- */
@@ -540,8 +566,14 @@ static int gap_event(struct ble_gap_event *event, void *arg)
         int known = known_find(&d->addr);
 
         /* A paired device asking to reconnect (directed advertising is
-         * only aimed at a bonded central), or advertising again
+         * only aimed at a bonded central), or advertising again. Directed
+         * from an address of ours we know only if it's private (checked
+         * once the link is encrypted): a forgotten device may still have
+         * its bond with us.
          */
+        if (directed && known < 0 && (!is_rpa(&d->addr) || rejected(&d->addr))) {
+            directed = false;
+        }
         if ((directed || known >= 0) && !peer_connected(&d->addr) && have_free_slot() &&
             !s_connecting) {
             ESP_LOGI(TAG, "reconnecting %s", known >= 0 ? s_known[known].name : "bonded device");
@@ -596,6 +628,20 @@ static int gap_event(struct ble_gap_event *event, void *arg)
             c->pairing = false;
         } else if (event->enc_change.status != 0 && c->pairing) {
             snprintf(s_status, sizeof(s_status), "Pairing with %s failed", c->name);
+        } else if (!c->pairing && ble_gap_conn_find(c->conn_handle, &desc) == 0 &&
+                   known_find(&desc.peer_id_addr) < 0 &&
+                   (event->enc_change.status == 0 || known_find(&desc.peer_ota_addr) < 0)) {
+            /* a device that reconnected but isn't paired here (forgotten):
+             * drop it, and the bond it may just have made
+             */
+            ESP_LOGI(TAG, "%s isn't paired here: dropped", c->name);
+            s_rejected[s_rejected_next] = desc.peer_ota_addr;
+            s_rejected_next = (s_rejected_next + 1) % MAX_REJECTED;
+            ble_gap_terminate(c->conn_handle, BLE_ERR_REM_USER_CONN_TERM);
+            if (event->enc_change.status == 0) {
+                ble_store_util_delete_peer(&desc.peer_id_addr);
+            }
+            return 0;
         }
         ble_gattc_disc_svc_by_uuid(c->conn_handle, BLE_UUID16_DECLARE(HID_SVC_UUID16), on_svc, c);
         return 0;
@@ -736,6 +782,9 @@ void ble_hid_set_pairing(bool on)
     portENTER_CRITICAL(&s_lock);
     s_pairing = on;
     s_cand_count = 0;
+    if (on) {
+        memset(s_rejected, 0, sizeof(s_rejected));  /* pairing one of them again */
+    }
     portEXIT_CRITICAL(&s_lock);
     s_status[0] = 0;
     if (on) {
@@ -795,7 +844,8 @@ void ble_hid_forget(int index)
             ble_gap_terminate(s_conns[i].conn_handle, BLE_ERR_REM_USER_CONN_TERM);
         }
     }
-    ble_store_util_delete_peer(&k.addr);
+    int rc = ble_store_util_delete_peer(&k.addr);
+    ESP_LOGI(TAG, "forgot %s (its bond: rc %d)", k.name, rc);
     snprintf(s_status, sizeof(s_status), "Forgot %s", k.name);
 }
 
