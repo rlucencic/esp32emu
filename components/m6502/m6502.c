@@ -45,6 +45,9 @@ typedef struct {
     uint32_t until;                     /* no instruction starts from n >= until */
     uint32_t stop_pc;
     uint64_t base;                      /* the cycle the instruction started at */
+#if M6502_SLOW
+    uint32_t odd;                       /* base's parity: a slow access waits while (n + odd) is odd */
+#endif
 } regs_t;
 
 /* t - base, in 0 ... 1 << 30 */
@@ -68,6 +71,9 @@ INLINE void load(m6502_t *c, regs_t *r)
     r->quirk = false;
     r->base = c->cycles;
     r->n = 0;
+#if M6502_SLOW
+    r->odd = (uint32_t)r->base & 1;
+#endif
     r->lim = relative(c->stall_from, r->base);
     r->wlim = c->stall_writes ? r->lim : UINT32_MAX;
     r->until = relative(c->until, r->base);
@@ -120,6 +126,11 @@ static uint8_t __attribute__((noinline)) M6502_HOT rd_slow(m6502_t *c, uint16_t 
         c->bus.stall(c->bus.ctx, c);
     }
     const uint8_t *p = c->rd[a >> 8];
+#if M6502_SLOW
+    if (p && c->slow[a >> 8]) {
+        c->cycles += (c->cycles & 1) + 1;       /* the next even cycle; two of them */
+    }
+#endif
     uint8_t v = p ? p[a & 0xFF] : c->bus.read(c->bus.ctx, a);
     c->cycles++;
     return v;
@@ -134,6 +145,11 @@ static void __attribute__((noinline)) M6502_HOT wr_slow(m6502_t *c, uint16_t a, 
     }
     uint8_t *p = c->wr[a >> 8];
     if (p) {
+#if M6502_SLOW
+        if (c->slow[a >> 8]) {
+            c->cycles += (c->cycles & 1) + 1;
+        }
+#endif
         p[a & 0xFF] = v;
     } else {
         c->bus.write(c->bus.ctx, a, v);
@@ -166,9 +182,22 @@ INLINE uint8_t rd(m6502_t *c, regs_t *r, uint16_t a)
 {
     const uint8_t *p = c->rd[a >> 8];
     if (__builtin_expect(p != NULL && r->n < r->lim, 1)) {
+#if M6502_SLOW
+        if (c->slow[a >> 8]) {
+            uint32_t n = r->n + ((r->n + r->odd) & 1);
+            if (__builtin_expect(n < r->lim, 1)) {
+                r->n = n + 2;
+                return p[a & 0xFF];
+            }
+            goto slow;
+        }
+#endif
         r->n++;
         return p[a & 0xFF];
     }
+#if M6502_SLOW
+slow:;
+#endif
     uint8_t v = rd_slow(c, a, r->base + r->n);
     resync(c, r);
     return v;
@@ -178,10 +207,24 @@ INLINE void wr(m6502_t *c, regs_t *r, uint16_t a, uint8_t v)
 {
     uint8_t *p = c->wr[a >> 8];
     if (__builtin_expect(p != NULL && r->n < r->wlim, 1)) {
+#if M6502_SLOW
+        if (c->slow[a >> 8]) {
+            uint32_t n = r->n + ((r->n + r->odd) & 1);
+            if (__builtin_expect(n < r->wlim, 1)) {
+                p[a & 0xFF] = v;
+                r->n = n + 2;
+                return;
+            }
+            goto slow;
+        }
+#endif
         p[a & 0xFF] = v;
         r->n++;
         return;
     }
+#if M6502_SLOW
+slow:;
+#endif
     wr_slow(c, a, v, r->base + r->n);
     resync(c, r);
 }

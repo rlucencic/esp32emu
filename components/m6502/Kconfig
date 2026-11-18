@@ -1,0 +1,11 @@
+menu "6502 core"
+
+    config M6502_SLOW_PAGES
+        bool "Slow pages: 1 MHz accesses on 2 MHz cycles"
+        default n
+        help
+            Pages with their slow flag set wait for the next even cycle and
+            take two (the Acorn Electron's RAM, without a bus callback).
+            Off, the core is as before.
+
+endmenu

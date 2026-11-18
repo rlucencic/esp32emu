@@ -26,9 +26,22 @@
 
 #ifdef ESP_PLATFORM
 #include "esp_attr.h"
+#include "sdkconfig.h"
 #define M6502_HOT   IRAM_ATTR
 #else
 #define M6502_HOT
+#endif
+
+/* Slow pages (CONFIG_M6502_SLOW_PAGES; M6502_SLOW_PAGES in host builds): an
+ * access through a page pointer whose page has its `slow` flag set waits
+ * for the next even cycle and takes two (the Electron's 1 MHz RAM on 2 MHz
+ * cycles: no bus callback for it). Off, the core is as before (the C64's
+ * and the Atari's builds).
+ */
+#if defined(M6502_SLOW_PAGES) || defined(CONFIG_M6502_SLOW_PAGES)
+#define M6502_SLOW  1
+#else
+#define M6502_SLOW  0
 #endif
 
 typedef struct m6502 m6502_t;
@@ -87,6 +100,9 @@ struct m6502 {
     /* The 6510's I/O port at $00/$01 is the machine's business */
     uint8_t *rd[256];               /* 256-byte pages; NULL: bus.read */
     uint8_t *wr[256];               /* NULL: bus.write */
+#if M6502_SLOW
+    uint8_t slow[256];              /* 1: the page's accesses on even cycles, two each */
+#endif
     m6502_bus_t bus;
     /* An IRQ is taken after the instruction that saw it at its last
      * cycle but one; set by the core
