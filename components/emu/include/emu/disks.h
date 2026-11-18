@@ -7,6 +7,10 @@
 /*
  * Disk images in one folder on the SD card, for the machine's drives. The
  * inserted disks are remembered in NVS and go back in at the next start.
+ * Cartridges (cart_extensions) are in its roms/ subfolder, with the ROM
+ * files that override the built-in ones (the machine's rom_store; no drive
+ * accepts those, so they aren't listed). Names are plain file names either
+ * way: the extension says which folder (disks_path()).
  *
  * Insert, eject and create only while the emulation is paused or not
  * started yet (emu_paused() does that).
@@ -23,6 +27,7 @@ typedef struct {
 typedef struct {
     const char *folder;                 /* relative to the card's root, e.g. "floppies" */
     const char *const *extensions;      /* ".st", ".msa", ..., NULL */
+    const char *const *cart_extensions; /* those of them in roms/: ".crt", NULL (optional) */
     const char *description;            /* "Disk images (.ST, .MSA)" */
     const char *title;                  /* setup screen: "Floppy disks" */
     const char *button;                 /* its button: "Floppy" */
@@ -99,6 +104,12 @@ const char *disks_name(int drive);
 
 /* Path of the folder (no trailing slash) */
 const char *disks_folder(void);
+
+/* Path of an image: in the folder, a cartridge in its roms/ */
+void disks_path(char *path, size_t len, const char *name);
+
+/* The drive takes cartridges (its images are in roms/) */
+bool disks_cart_drive(int drive);
 
 /* `name` is a plain file name with one of the extensions: no folders */
 bool disks_valid_name(const char *name);

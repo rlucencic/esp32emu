@@ -1,10 +1,14 @@
 # tools/sd_folders.ps1 [-DryRun] <SD card, e.g. E:\>
 #
 # A board's SD card from the old shared folders into each machine's own
-# (since 2026-11-17: every machine its folder, its ROMs in that folder's
-# roms/, the three Macs sharing mac/; rpi5emu's data folder the same, its
+# (since 2026-11-17: every machine its folder, the three Macs sharing mac/;
+# since 2026-11-18 its cartridges and the ROMs that override the built-in
+# ones in that folder's roms/; rpi5emu's data folder the same, its
 # tools/data_folders.sh):
-#   roms\      each ROM into its machine's <folder>\roms\, by its name
+#   roms\      each ROM into its machine's <folder>\roms\, by its name; .crt,
+#              .mx1 .mx2, .ccc and .cpr cartridges into cbm, msx, coco, cpc
+#   cbm\ coco\ cpc\ msx\  their cartridges into their roms\ (.crt; .rom .ccc
+#              .bin; .cpr .rom; .rom .mx1 .mx2)
 #   floppies\  .st .msa .hd into st\; .adl, and .adf or .img of the
 #              Archimedes' floppy sizes (640 KB, 800 KB, 1.6 MB), into arc\;
 #              the other .img into st\ (the ST's hard disks), the other .adf
@@ -65,6 +69,18 @@ function Get-RomMachine([string]$name) {
     return $null
 }
 
+# The machine folder for a cartridge in the old roms\ by its extension (.rom
+# and .bin could be anyone's), none if unknown
+function Get-CartMachine([string]$name) {
+    switch ([IO.Path]::GetExtension($name).ToLowerInvariant()) {
+        '.crt' { return 'cbm' }
+        { $_ -in '.mx1', '.mx2' } { return 'msx' }
+        '.ccc' { return 'coco' }
+        '.cpr' { return 'cpc' }
+    }
+    return $null
+}
+
 # st, arc or amiga for an image in floppies\, none if unknown
 function Get-FloppyMachine([IO.FileInfo]$file) {
     $archie = $file.Length -in 655360, 819200, 1638400
@@ -91,7 +107,17 @@ $roms = Join-Path $Card 'roms'
 if (Test-Path -LiteralPath $roms) {
     foreach ($f in Get-ChildItem -LiteralPath $roms -File) {
         $m = Get-RomMachine $f.Name
+        if (-not $m) { $m = Get-CartMachine $f.Name }
         if ($m) { Move-ToFolder $f "$m\roms" } else { Write-Kept $f 'whose ROM is it?' }
+    }
+}
+$carts = @{ cbm = @('.crt'); coco = @('.rom', '.ccc', '.bin'); cpc = @('.cpr', '.rom'); msx = @('.rom', '.mx1', '.mx2') }
+foreach ($m in $carts.Keys) {
+    $from = Join-Path $Card $m
+    if (Test-Path -LiteralPath $from) {
+        foreach ($f in Get-ChildItem -LiteralPath $from -File) {
+            if ($f.Extension.ToLowerInvariant() -in $carts[$m]) { Move-ToFolder $f "$m\roms" }
+        }
     }
 }
 $floppies = Join-Path $Card 'floppies'

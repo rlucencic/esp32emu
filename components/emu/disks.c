@@ -11,6 +11,7 @@
 #include "emu/sdcard.h"
 
 #define MAX_IMAGES  500
+#define ROMS        "roms"              /* the cartridges' subfolder */
 
 static const char *TAG = "disks";
 
@@ -26,13 +27,51 @@ static bool has_extension(const char *name, const char *ext)
     return len > elen && strcasecmp(name + len - elen, ext) == 0;
 }
 
+static bool has_one_of(const char *name, const char *const *extensions)
+{
+    for (const char *const *e = extensions; e && *e; e++) {
+        if (has_extension(name, *e)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool is_cart(const char *name)
+{
+    return has_one_of(name, s_cfg.cart_extensions);
+}
+
 static bool is_image(const char *name)
 {
-    if (name[0] == '.') {
-        return false;
+    return name[0] != '.' && (has_one_of(name, s_cfg.extensions) || is_cart(name));
+}
+
+void disks_path(char *path, size_t len, const char *name)
+{
+    snprintf(path, len, is_cart(name) ? "%s/" ROMS "/%s" : "%s/%s", s_folder, name);
+}
+
+bool disks_cart_drive(int drive)
+{
+    for (const char *const *e = s_cfg.cart_extensions; e && *e; e++) {
+        char name[16];
+        snprintf(name, sizeof(name), "x%s", *e);
+        if (s_cfg.accepts == NULL || s_cfg.accepts(drive, name)) {
+            return true;
+        }
     }
-    for (const char *const *e = s_cfg.extensions; *e; e++) {
-        if (has_extension(name, *e)) {
+    return false;
+}
+
+/* A cartridge some drive takes (not a ROM that overrides a built-in one) */
+static bool listed_cart(const char *name)
+{
+    if (s_cfg.accepts == NULL) {
+        return true;
+    }
+    for (int d = 0; d < s_cfg.drives; d++) {
+        if (s_cfg.accepts(d, name)) {
             return true;
         }
     }
@@ -65,6 +104,13 @@ bool disks_init(const disks_config_t *config)
     if (stat(s_folder, &st) != 0 && mkdir(s_folder, 0777) != 0) {
         ESP_LOGW(TAG, "can't make %s", s_folder);
         return false;
+    }
+    if (s_cfg.cart_extensions != NULL) {
+        char roms[sizeof(s_folder) + sizeof(ROMS) + 1];
+        snprintf(roms, sizeof(roms), "%s/" ROMS, s_folder);
+        if (stat(roms, &st) != 0 && mkdir(roms, 0777) != 0) {
+            ESP_LOGW(TAG, "can't make %s", roms);
+        }
     }
     s_ready = true;
     return true;
@@ -105,20 +151,19 @@ static int compare_names(const void *a, const void *b)
     return strcasecmp(*(char *const *)a, *(char *const *)b);
 }
 
-int disks_list(char ***names)
+/* The images in the folder (carts: in roms/) onto the list */
+static int list_folder(const char *folder, bool carts, char **list, int n)
 {
-    *names = NULL;
-    DIR *dir = s_ready ? opendir(s_folder) : NULL;
+    DIR *dir = opendir(folder);
     if (dir == NULL) {
-        return 0;
+        return n;
     }
-    char **list = malloc(MAX_IMAGES * sizeof(char *));
-    int n = 0;
     struct dirent *e;
-    while (list != NULL && n < MAX_IMAGES && (e = readdir(dir)) != NULL) {
-        if (e->d_type != DT_DIR && is_image(e->d_name)) {
+    while (n < MAX_IMAGES && (e = readdir(dir)) != NULL) {
+        if (e->d_type != DT_DIR && is_image(e->d_name) && is_cart(e->d_name) == carts &&
+            (!carts || listed_cart(e->d_name))) {
             list[n] = strdup(e->d_name);
-        } else if (e->d_type == DT_DIR && s_cfg.folders && e->d_name[0] != '.' &&
+        } else if (!carts && e->d_type == DT_DIR && s_cfg.folders && e->d_name[0] != '.' &&
                    strlen(e->d_name) < DISKS_NAME_LEN - 2) {
             list[n] = malloc(strlen(e->d_name) + 2);
             if (list[n] != NULL) {
@@ -132,9 +177,23 @@ int disks_list(char ***names)
         }
     }
     closedir(dir);
-    if (list != NULL) {
-        qsort(list, n, sizeof(char *), compare_names);
+    return n;
+}
+
+int disks_list(char ***names)
+{
+    *names = NULL;
+    char **list = s_ready ? malloc(MAX_IMAGES * sizeof(char *)) : NULL;
+    if (list == NULL) {
+        return 0;
     }
+    int n = list_folder(s_folder, false, list, 0);
+    if (s_cfg.cart_extensions != NULL) {
+        char roms[sizeof(s_folder) + sizeof(ROMS) + 1];
+        snprintf(roms, sizeof(roms), "%s/" ROMS, s_folder);
+        n = list_folder(roms, true, list, n);
+    }
+    qsort(list, n, sizeof(char *), compare_names);
     *names = list;
     return n;
 }
@@ -152,8 +211,8 @@ bool disks_insert(int drive, const char *name)
     if (!s_ready || drive < 0 || drive >= s_cfg.drives) {
         return false;
     }
-    char path[sizeof(s_folder) + DISKS_NAME_LEN + 1];
-    snprintf(path, sizeof(path), "%s/%s", s_folder, name);
+    char path[sizeof(s_folder) + sizeof(ROMS) + DISKS_NAME_LEN + 1];
+    disks_path(path, sizeof(path), name);
     /* One image in one drive at a time: move it */
     for (int d = 0; d < s_cfg.drives; d++) {
         if (d != drive && disks_name(d) != NULL && strcasecmp(disks_name(d), name) == 0) {
@@ -267,8 +326,8 @@ const char *disks_offer(int drive)
 void disks_removed(const char *name)
 {
     if (s_cfg.removed) {
-        char path[sizeof(s_folder) + DISKS_NAME_LEN + 1];
-        snprintf(path, sizeof(path), "%s/%s", s_folder, name);
+        char path[sizeof(s_folder) + sizeof(ROMS) + DISKS_NAME_LEN + 1];
+        disks_path(path, sizeof(path), name);
         s_cfg.removed(path);
     }
 }
@@ -315,8 +374,8 @@ bool disks_create(int drive, uint32_t bytes, char *name, size_t len)
 
     const char *ext = s_cfg.extension_for ? s_cfg.extension_for(bytes) : s_cfg.new_extension;
     snprintf(name, len, "%s%04u%s", s_cfg.new_prefix, last + 1, ext);
-    char path[sizeof(s_folder) + DISKS_NAME_LEN + 1];
-    snprintf(path, sizeof(path), "%s/%s", s_folder, name);
+    char path[sizeof(s_folder) + sizeof(ROMS) + DISKS_NAME_LEN + 1];
+    disks_path(path, sizeof(path), name);
     if (!s_cfg.create(path, bytes)) {
         return false;
     }

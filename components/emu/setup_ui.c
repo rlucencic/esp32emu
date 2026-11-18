@@ -1125,8 +1125,13 @@ static void insert_clicked(lv_event_t *e)
     }
     if (ui.image_count == 0) {
         lv_obj_t *l = lv_label_create(ui.images_list);
-        lv_label_set_text_fmt(l, "No disk images yet. Copy them into the \"%s\" folder on the SD card,\n"
-                                 "or make a new empty disk.", ui.disks->folder);
+        if (disks_cart_drive(d)) {
+            lv_label_set_text_fmt(l, "No cartridges yet. Copy them into the \"%s/roms\" folder on the SD card.",
+                                  ui.disks->folder);
+        } else {
+            lv_label_set_text_fmt(l, "No disk images yet. Copy them into the \"%s\" folder on the SD card,\n"
+                                     "or make a new empty disk.", ui.disks->folder);
+        }
         lv_obj_set_style_text_color(l, COLOR_DIM, 0);
         lv_obj_set_style_pad_all(l, 16, 0);
     }

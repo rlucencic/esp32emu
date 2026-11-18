@@ -122,7 +122,7 @@ static bool disk_name(httpd_req_t *req, char *name, size_t len)
 
 static void disk_path(char *path, size_t len, const char *name)
 {
-    snprintf(path, len, "%s/%s", disks_folder(), name);
+    disks_path(path, len, name);
 }
 
 static esp_err_t send_conflict(httpd_req_t *req, const char *name)

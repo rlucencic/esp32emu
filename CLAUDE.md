@@ -209,7 +209,7 @@ points (below) and its internal RAM.
 | `boards/m5stack_tab5/sdkconfig.defaults` | The Tab5's settings (PSRAM, esp_hosted SDIO pins, NimBLE over VHCI, fonts, speaker on) |
 | `components/emu/json.c` | Small JSON builder for the web API |
 | `tools/emu_console.py` | Console client (run with the IDF venv's Python, `-I`); `profile ELF [N [TOP [CORE]]]` runs `p` and names the hottest functions (the ROM's too, from the chip's ROM ELF; a static name in several files gets its file) |
-| `tools/sd_folders.ps1` | An SD card's shared folders (until 2026-11-17: `roms`, `floppies`, `disks`, `atari`) into each machine's own (`<folder>/roms` for the ROMs a board reads from the card; the Macs share `mac`), as rpi5emu's `tools/data_folders.sh` does the Pi's data folder. `-DryRun` only says |
+| `tools/sd_folders.ps1` | An SD card's shared folders (until 2026-11-17: `roms`, `floppies`, `disks`, `atari`) into each machine's own (`<folder>/roms` for its cartridges and the ROMs that override the built-in ones, the cartridges from `cbm`, `coco`, `cpc`, `msx` there too; the Macs share `mac`), as rpi5emu's `tools/data_folders.sh` does the Pi's data folder. `-DryRun` only says |
 
 ## How a machine plugs in
 
@@ -317,9 +317,15 @@ points (below) and its internal RAM.
 - **Its own folder on the SD card** (`disks_config_t.folder`; one per
   machine since 2026-11-17, the user's wish: `zx cpc cbm coco apple2gs msx
   xl st pc arc amiga`, the three Macs sharing `mac`): its images, and in
-  its `roms/` the ROMs the board reads from the card when its flash has
-  none (`ROM_FOLDER` in `rom_store.c`, e.g. `SDCARD_MOUNT_POINT
-  "/zx/roms"`). Shared before: `roms/` for all, `floppies/` for the ST,
+  its `roms/` (since 2026-11-18, the user's call: the built-in ROMs come
+  from the project's `roms/` through `idf.py flash`) the cartridges
+  (`disks_config_t.cart_extensions`: the CBM's, CoCo's, CPC's and MSX's;
+  `disks_path()` puts a name with one of them there, `disks_list()` lists
+  them by plain name, only those some drive `accepts()`) and ROM files
+  that override the built-in ones (`ROM_FOLDER` in `rom_store.c`, e.g.
+  `SDCARD_MOUNT_POINT "/zx/roms"`, read before the flash partition; the
+  cartridge drives' `accepts()` refuses their names: `rom_store_is_rom()`).
+  Shared before: `roms/` for all, `floppies/` for the ST,
   Archimedes and Amiga (whose `.adf` and `.hdf` look alike), `disks/` for
   the Macs, the XL's `atari/`; `tools/sd_folders.ps1` moves an old card.
   The Pi's data folder is laid out the same (rpi5emu's `emu_rom_dir()`).
@@ -414,8 +420,9 @@ boards send none of them and their page reads as before.
 
 - **`emu_set_message()` keeps 255 characters** (2026-11-17; 127 before):
   the machines' "No ROM: put it in roms/ and flash with idf.py flash, or
-  copy it into the "mac/roms" folder on the SD card." texts run to ~180,
-  and the old buffer cut them off just where they said where the file goes.
+  copy it into the "mac/roms" folder on the SD card." texts ran to ~180,
+  and the old buffer cut them off just where they said where the file goes
+  (since 2026-11-18 they name roms/ and idf.py flash only).
 
 - **Dependency solves broke on registry drift (2026-11-16)**: a project
   whose lock no longer matched `components/emu/idf_component.yml` re-solved
