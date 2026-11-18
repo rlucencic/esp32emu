@@ -471,7 +471,9 @@ async function sendOne(name, data) {
 
 /* "Disk images (.ST, .MSA), Mac archives (.SIT, ...) or .ZIP files" */
 function accepted() {
-  const d = info.disks.description;               /* "Disk images (...)" mid-sentence */
+  /* "Disk images (...)" mid-sentence; null without an SD card or drives
+   * (/api/info's disks are then empty): the rest of the page must still come */
+  const d = info.disks.description || "Disk images";
   return [d.charAt(0).toLowerCase() + d.slice(1), ...converters.map(c => c.description),
           ...(packer ? [packer.description] : [])].join(", ") + " or .ZIP files";
 }

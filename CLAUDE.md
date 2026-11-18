@@ -650,6 +650,16 @@ boards send none of them and their page reads as before.
   (the device name: the hostname); +24 KB of code. On the Tab5 the
   request is answered and the link stays (70 s and more, until the
   keyboard was switched away).
+- **The web page showed only its title for a machine without drives**
+  (2026-11-18, the Electron, which had no `disks` yet): `/api/info`'s
+  `disks` are then nulls and empty lists, as on any board without an SD
+  card (`disks_init()` doesn't run), and `accepted()` in index.html called
+  `description.charAt()`: the TypeError ended `start()` before `refresh()`,
+  `status()` and their timers, so the machine, drives and board cards
+  stayed empty and the list said "Loading…". It falls back to "Disk
+  images" now. Found and checked by running the page's script under node
+  with a stub DOM and fetch against the board's JSON (the old page threw
+  there, the new one fills every card).
 
 ## Repositories
 
