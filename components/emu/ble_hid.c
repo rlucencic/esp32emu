@@ -18,6 +18,8 @@
 #include "nimble/hci_common.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
+#include "services/gap/ble_svc_gap.h"
+#include "services/gatt/ble_svc_gatt.h"
 #include "emu/ble_hid.h"
 
 #define TAG "ble_hid"
@@ -752,6 +754,19 @@ bool ble_hid_start(const ble_hid_callbacks_t *callbacks)
     ble_hs_cfg.sm_our_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
     ble_hs_cfg.sm_their_key_dist = BLE_SM_PAIR_KEY_DIST_ENC | BLE_SM_PAIR_KEY_DIST_ID;
     ble_store_config_init();
+
+    /* Our own GATT server, with the GAP and GATT services: keyboards ask
+     * for the host's services once connected (a Logitech MX Keys S at 0.35
+     * s), and without a server NimBLE drops the request unanswered: the
+     * keyboard hung up 30 s later (ATT's timeout), every time.
+     */
+    ble_svc_gap_init();
+    ble_svc_gatt_init();
+#if CONFIG_EMU_WIFI
+    ble_svc_gap_device_name_set(CONFIG_EMU_HOSTNAME);
+#else
+    ble_svc_gap_device_name_set("esp32emu");
+#endif
 
     nimble_port_freertos_init(host_task);
     ESP_LOGI(TAG, "BLE HID host started, %d paired device(s)", s_known_count);

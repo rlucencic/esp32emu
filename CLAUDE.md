@@ -630,6 +630,20 @@ boards send none of them and their page reads as before.
   ignored until pairing starts. Four forgets of a connected keyboard and
   mouse on the MaTouch after it: rows gone, no restart; the dropping
   itself not seen yet (the devices didn't come back).
+- **A keyboard hung up 30 s after every connect** (2026-11-18): the MX Keys
+  S asks for the host's services 0.35 s after connecting (ATT Read By
+  Group Type); NimBLE built as a central only has no GATT server and drops
+  the request unanswered ("ATT handler not found; op=0x10 ... packet
+  dropped" in the log), and 30.0 s later (ATT's transaction timeout) the
+  keyboard ended the link (reason 531, remote user terminated). It came
+  back at the next key press, which was lost: on the boards it looked
+  like a key that sometimes didn't register. `EMU_BLE_HID` selects the
+  peripheral role and the GATT server now (Kconfig: a build needs
+  `idf.py reconfigure` to see that, a Kconfig change alone doesn't
+  rerun it), and `ble_hid_start()` registers the GAP and GATT services
+  (the device name: the hostname); +24 KB of code. On the Tab5 the
+  request is answered and the link stays (70 s and more, until the
+  keyboard was switched away).
 
 ## Repositories
 

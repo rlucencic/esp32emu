@@ -62,6 +62,10 @@ menu "Emulator board"
         bool "BLE keyboard and mouse"
         default y
         depends on BT_NIMBLE_ENABLED
+        # a GATT server, to answer the keyboards' service discovery
+        # (unanswered, they hang up after 30 s: ble_hid.c)
+        select BT_NIMBLE_ROLE_PERIPHERAL
+        select BT_NIMBLE_GATT_SERVER
         help
             Connect a Bluetooth LE keyboard and mouse as the machine's.
             New devices pair when put into pairing mode.
