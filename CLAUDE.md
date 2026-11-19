@@ -794,9 +794,11 @@ and the cores.
 
 - **IN PROGRESS — Oric Atmos (1984) emulator (`esp32oric`)** (started
   2026-11-19: both boards, as the Electron; its TODO.md has the steps; BASIC
-  1.1 and 1.0, the ULA's picture, the AY's sound, the VIA, the keyboard and
-  TAP tapes (trapped and real time) done, on the host and the Tab5; the
-  Microdisc next)
+  1.1 and 1.0, the ULA's picture, the AY's sound, the VIA, the keyboard,
+  TAP tapes (trapped and real time) and the Microdisc (its EPROM, a WD1793
+  in real time, MFM_DISK images: Sedoric and Oric DOS) done, on the host
+  and the Tab5; the MaTouch, the web page's detail and original software
+  next)
 
   Develop alongside the SDL desktop port, `sdloric`, using the existing ESP-IDF
   sibling-project layout. Use the shared `m6502` core and integrate with
