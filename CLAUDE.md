@@ -386,7 +386,12 @@ core 1 from 64% to 44% at the BASIC prompt); `linker.lf` keeps its jump table in
   (`emu_json_drive_space()` with the disk's free space and size: "N free
   of M" and a bar under the drive; every machine reports it, checked on
   the Tab5 2026-10-21, the C64 on the host only). status() runs on the
-  HTTP task: it only reads figures the machine keeps.
+  HTTP task: it only reads figures the machine keeps. The machine cards
+  show live state (2026-11-19, every machine: the mode, resolution and
+  colours, memory paging, palette swatches, the sound chip's channels, the
+  keys' places, the disks); the whole reply must fit `STATUS_SIZE` in
+  `web.c` (8 KB since then, 4 KB before: the cards run to ~2 KB of HTML
+  inside JSON).
 - Presenter: `render_line()` at the machine's resolution, scaled to
   `emu_view_width()` x the panel's height (centred) when
   `screen_signature()` changes, then `lcd_flush()` of the rows it wrote;

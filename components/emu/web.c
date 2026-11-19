@@ -63,7 +63,7 @@
 #define WHOLE_ALIGN     128
 #define WHOLE_RESERVE   (4 * 1024 * 1024)
 #endif
-#define STATUS_SIZE     4096
+#define STATUS_SIZE     8192            /* the machine cards run to ~2 KB of HTML in JSON */
 #define TRANSFERS       2           /* uploads + downloads at the same time */
 
 static const char *TAG = "web";
