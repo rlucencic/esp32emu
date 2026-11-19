@@ -796,9 +796,10 @@ and the cores.
   2026-11-19: both boards, as the Electron; its TODO.md has the steps; BASIC
   1.1 and 1.0, the ULA's picture, the AY's sound, the VIA, the keyboard,
   TAP tapes (trapped and real time) and the Microdisc (its EPROM, a WD1793
-  in real time, MFM_DISK images: Sedoric and Oric DOS) and the web page's
-  card done, on the host, the Tab5 and the MaTouch; original software
-  next)
+  in real time, MFM_DISK images: Sedoric and Oric DOS), the web page's
+  card and the original software's run (`~/Development/oric-dl/
+  FINDINGS.md`: 349 tapes, 29 disks, no emulator faults) done, on the
+  host, the Tab5 and the MaTouch; the Oric-1's tapes and CAPS next)
 
   Develop alongside the SDL desktop port, `sdloric`, using the existing ESP-IDF
   sibling-project layout. Use the shared `m6502` core and integrate with
