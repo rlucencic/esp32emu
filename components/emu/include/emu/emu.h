@@ -9,7 +9,8 @@
  *           clock (or by the speaker's I2S clock with CONFIG_EMU_SPEAKER)
  *   core 0: presenter (machine screen scaled onto the LCD when it changed),
  *           serial console, stats (1 s), the supervisor (2 s hold on the
- *           top-right corner opens the setup screen), WiFi, NimBLE, web
+ *           top-right corner: the main task opens the setup screen), WiFi,
+ *           NimBLE, web
  *
  * Boot order: NVS, the machine's memory (first: big blocks fragment
  * later), SD card and disks, LCD, touch, console, WiFi (before BLE: it
@@ -125,7 +126,11 @@ typedef struct {
 
 enum { EMU_STATUS_ROWS, EMU_STATUS_DRIVES };
 
-/* Never returns to the caller's work: everything runs in tasks afterwards */
+/* Call it last in app_main(). With the setup screen it never returns: the
+ * calling task (the main task, its stack in internal RAM) goes on to show
+ * the setup screen whenever the corner is held. Without one it returns once
+ * everything runs in tasks.
+ */
 void emu_run(const emu_machine_t *machine);
 
 const emu_machine_t *emu_machine(void);

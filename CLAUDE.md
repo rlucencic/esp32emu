@@ -6,8 +6,10 @@ ESP-IDF components used by `../esp32ste` (Atari STE), `../esp32mac`
 128), `../esp32xl` (Atari 800XL and 130XE), `../esp32msx` (MSX1, MSX2),
 `../esp32gs` (Apple IIGS), `../esp32coco` (Tandy Color Computer 2 and 3,
 a 6809 or 6309), `../esp32pc` (IBM PC/XT, an 8088), `../esp32ql` (Sinclair QL,
-a 68008; since 2026-11-18, in development) and `../esp32electron` (Acorn
-Electron, a 6502; since 2026-11-18, in development) on two boards: the Makerfabs
+a 68008; since 2026-11-18, in development), `../esp32electron` (Acorn
+Electron, a 6502; since 2026-11-18, in development) and `../esp32oric` (Oric
+Atmos and Oric-1, a 6502; since 2026-11-19, in development, its repository
+private for now) on two boards: the Makerfabs
 MaTouch ESP32-S3 7" (target esp32s3, the default) and the M5Stack Tab5
 (target esp32p4); and `../esp32mac2` (Macintosh LC and II, a 68020 and
 the II's 68881), `../esp32mac3` (Macintosh LC II and LC III, a 68030
@@ -199,7 +201,7 @@ core 1 from 64% to 44% at the BASIC prompt); `linker.lf` keeps its jump table in
 | `components/diskspace/` | Free space on disk images as their own filesystems count it, for the web page's drive bars (`include/diskspace.h`): FAT12/16/32 and MBR disks (`fat.c`: ST, MSX, PC, Archimedes DOS), MFS/HFS/HFS+, partition maps, ProDOS, DOS 3.3 (`apple.c`), CP/M 2.2/3 (`cpm.c`: CPC, +3), TR-DOS, D64/D71/D81 BAM (`cbm.c`), Atari DOS 2/2.5/MyDOS/SpartaDOS, RS-DOS and OS-9 (`coco.c`), ADFS old and new map (`acorn.c`); each reads through the machine's callback by offset and refuses figures that don't add up. The machines count where the image is safe to read (the emulation task or with it paused: at insert, a second after the last write, or after a flush) and keep the answer for `status()`. `test/`: a program per family with images made in it, matched against the machines' own DOS figures on the host (`make -C components/diskspace/test`). The Amiga counts its own (esp32ami's `space.c`) |
 | `components/emudbg/` | The debugger for programs in the machines (`docs/debugger.md`, the VS Code extension `../esp32emu-vscode`): `emudbg.c` the protocol, breakpoints and steps (platform independent), `emudbg_freertos.c` the board's TCP server (port 6502, core 0), `emudbg_posix.c` the host builds' (`<M>_DEBUG=<port>`, `emudbg_host_run()`); `test/`: `dbg_test` (the commands and steps against the 6502 and Z80 cores) and `demo`, a bare 6502 or Z80 with RAM serving the debugger (the extension's tests run against it). The cores' adapters: `m6502_dbg.c`, `z80_dbg.c`, `w65816_dbg.c`, `m6809/m6809_dbg.c`, `musashi/m68k_dbg.c`, `arm2/arm2_dbg.c` |
 | `components/emu/include/emu/emu.h` | The machine interface (`emu_machine_t`) and runtime API |
-| `components/emu/emu.c` | Boot order, emulation task (core 1), presenter (its drawing in internal RAM on the S3, `PRESENT_HOT`: from flash/PSRAM it took the shared instruction cache from core 1's emulation, 3-6% of the PC's Wolfenstein 3D), stats, temperature, supervisor (touch: setup corner and machine touches), pausing |
+| `components/emu/emu.c` | Boot order, emulation task (core 1), presenter (its drawing in internal RAM on the S3, `PRESENT_HOT`: from flash/PSRAM it took the shared instruction cache from core 1's emulation, 3-6% of the PC's Wolfenstein 3D), stats, temperature, supervisor (touch: setup corner and machine touches; the main task shows the setup screen for it), pausing |
 | `components/emu/setup_ui.c` | LVGL setup screen (status, WiFi, password, Bluetooth, pairing, drives, images) |
 | `components/emu/web.c` + `web/index.html` | Web server and the page (one page for all machines: it reads `/api/info`) |
 | `components/emu/disks.c` | Disk image folder, drives, NVS memory of inserted disks, blank disks |
@@ -226,7 +228,10 @@ core 1 from 64% to 44% at the BASIC prompt); `linker.lf` keeps its jump table in
   `storage(sd)`, disks restored, LCD, touch, console, (Tab5: esp_hosted),
   WiFi, web, (Tab5: the C6's Bluetooth controller), BLE, (Tab5 Keyboard),
   stats/temperature tasks, setup screen, `start()`; the setup screen comes back with `emu_set_message()` text when
-  `start()` fails (e.g. no ROM).
+  `start()` fails (e.g. no ROM). Then the emulation task and the
+  supervisor, and `emu_run()` never returns: the main task waits to show
+  the setup screen whenever the supervisor sees the corner held
+  (`show_setup()`, `setup_loop()`; see the lessons).
 - `start()` may be called again (setup screen choices changed, console):
   always with the emulation paused. If it can't get its memory any more,
   `emu_reboot_into_machine()` restarts the board straight into the machine.
@@ -595,6 +600,23 @@ boards send none of them and their page reads as before.
   74.6% against 74.9% of real time (within the runs' spread), the XL at
   DOS core 1 63.0% against 61.5%, the IIGS at the Finder 79.2% against
   79.1%, the ST on the Tab5 at 8 and 16 MHz and Fastest the same.
+- **The setup screen runs on the main task, also while the machine runs**
+  (2026-11-19): since 2026-10-27 the supervisor, its stack in PSRAM, had
+  shown it itself, and anything there that turns the caches off asserts
+  (`spi_flash_disable_interrupts_caches_and_other_cpu`:
+  `esp_task_stack_is_sane_cache_disabled()`) and reboots the board: a
+  choice's `set()` writing NVS (every machine's `settings_save()`), the
+  volume saved as the screen closes, `start()` on a Restart mapping a ROM
+  slot for the first time (`esp_partition_mmap()`, the ROM stores). Found
+  with esp32oric's Model row on the Tab5 (two reboots). Now the main task,
+  which shows it at boot (16 KB, internal RAM), stays (`emu_run()` doesn't
+  return) and shows it when the supervisor asks; the supervisor only polls
+  the touch. Its stack's high-water mark is logged as the screen closes
+  ("setup screen closed: N bytes ... never used": 10844 of 16384 with the
+  Oric's). The cost: those 16 KB of internal RAM stay taken after boot
+  (before, `app_main`'s return freed them); not yet seen on the MaTouch.
+  Checked on the Tab5 with esp32oric: Model changes with Restart, the
+  volume changed while running; all the projects built.
 - **The debugger's server task has its stack in PSRAM** (12 KB): with 4 KB
   of internal RAM the S3 had no 16 KB block left for the supervisor in the
   Commodore's build: its creation failed without a word, and the setup
@@ -770,7 +792,10 @@ and the cores.
     including persistence after remounting the image. The expansion also
     supported an external 5¼-inch drive. [Acorn Plus 3 user guide](https://chrisacorns.computinghistory.org.uk/docs/Acorn/Manuals/Acorn_Plus3UG.pdf)
 
-- **Oric Atmos (1984) emulator (`esp32oric`)** follows the Acorn Electron.
+- **IN PROGRESS — Oric Atmos (1984) emulator (`esp32oric`)** (started
+  2026-11-19: both boards, as the Electron; its TODO.md has the steps; BASIC
+  1.1 and 1.0, the ULA's picture, the AY's sound, the VIA and the keyboard
+  done, on the host and the Tab5; tapes and the Microdisc next)
 
   Develop alongside the SDL desktop port, `sdloric`, using the existing ESP-IDF
   sibling-project layout. Use the shared `m6502` core and integrate with

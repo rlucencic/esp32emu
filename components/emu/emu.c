@@ -643,7 +643,19 @@ static PRESENT_HOT void present_task(void *arg)
 
 /* ---- Setup screen and touch (core 0) ---- */
 
+#define SUPERVISOR_PRIO 6
+
 #if CONFIG_EMU_SETUP_SCREEN
+
+/* The setup screen while the machine runs is shown by the main task (the
+ * one that showed it at boot: emu_run() keeps it), not by the supervisor
+ * that sees the corner held: the supervisor's stack is in PSRAM, and what
+ * the screen does — a choice's set() saving to NVS, the volume saved as it
+ * closes, start() on a Restart mapping a ROM's flash — turns the caches
+ * off, which asserts on a PSRAM stack and rebooted the board (esp32oric's
+ * Model row on the Tab5, 2026-11-19). The main task's 16 KB are internal.
+ */
+static SemaphoreHandle_t s_setup_go, s_setup_done;
 
 /* Pause the machine, show the setup screen, restart it if a choice changed */
 static void setup_while_running(void)
@@ -668,6 +680,32 @@ static void setup_while_running(void)
     }
     resume();
     xSemaphoreGive(s_pause_lock);
+}
+
+/* From the supervisor: the main task shows the setup screen; back when it
+ * closes (the supervisor mustn't read the touch meanwhile)
+ */
+static void show_setup(void)
+{
+    if (s_setup_go == NULL) {
+        setup_while_running();          /* (no main task waiting: never so) */
+        return;
+    }
+    xSemaphoreGive(s_setup_go);
+    xSemaphoreTake(s_setup_done, portMAX_DELAY);
+}
+
+/* The main task, once the machine runs: the setup screen when asked */
+static void setup_loop(void)
+{
+    vTaskPrioritySet(NULL, SUPERVISOR_PRIO);    /* as when the supervisor showed it */
+    for (;;) {
+        xSemaphoreTake(s_setup_go, portMAX_DELAY);
+        setup_while_running();
+        ESP_LOGI(TAG, "setup screen closed: %u bytes of the main task's stack never used",
+                 (unsigned)uxTaskGetStackHighWaterMark(NULL));
+        xSemaphoreGive(s_setup_done);
+    }
 }
 
 #endif
@@ -822,7 +860,7 @@ static void supervisor_task(void *arg)
                 vTaskDelay(pdMS_TO_TICKS(50));
                 touch_read(&x, &y, &pressed);
             } while (pressed);
-            setup_while_running();
+            show_setup();
         }
 #endif
     }
@@ -968,15 +1006,23 @@ void emu_run(const emu_machine_t *machine)
 #endif
     xTaskCreatePinnedToCore(emulation_task, "emulation", 8192, NULL, 10, NULL, 1);
     s_started = true;
+#if CONFIG_EMU_SETUP_SCREEN
+    if (s_fb != NULL) {
+        s_setup_go = xSemaphoreCreateBinary();
+        s_setup_done = xSemaphoreCreateBinary();
+    }
+#endif
     /* Above the presenter (5): a blinking cursor keeps presenting, and at
      * priority 4 the long-press corner never got 2 s of polls (even idle).
-     * Stack in PSRAM (like emudbg): LVGL needs ~16 KB, and on the CBM the
-     * largest internal block at start is often under 10 KB — without this
-     * the supervisor never ran ("no supervisor task"), so the corner died.
+     * Stack in PSRAM (like emudbg): on the CBM the largest internal block at
+     * start is often under 10 KB — without this the supervisor never ran
+     * ("no supervisor task"), so the corner died. It only polls the touch:
+     * the setup screen (LVGL's ~16 KB, flash writes) is the main task's.
      */
-    if (s_fb != NULL &&
-        xTaskCreatePinnedToCoreWithCaps(supervisor_task, "supervisor", 16384, NULL, 6,
-                                        NULL, 0, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) != pdPASS) {
+    bool supervisor = s_fb != NULL &&
+        xTaskCreatePinnedToCoreWithCaps(supervisor_task, "supervisor", 16384, NULL, SUPERVISOR_PRIO,
+                                        NULL, 0, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT) == pdPASS;
+    if (s_fb != NULL && !supervisor) {
         ESP_LOGE(TAG, "no supervisor task: PSRAM %u free, largest block %u",
                  (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM),
                  (unsigned)heap_caps_get_largest_free_block(MALLOC_CAP_SPIRAM));
@@ -985,4 +1031,9 @@ void emu_run(const emu_machine_t *machine)
     ESP_LOGI(TAG, "Free internal: %u bytes, PSRAM: %u bytes",
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_INTERNAL),
              (unsigned)heap_caps_get_free_size(MALLOC_CAP_SPIRAM));
+#if CONFIG_EMU_SETUP_SCREEN
+    if (supervisor) {
+        setup_loop();                   /* never returns */
+    }
+#endif
 }
