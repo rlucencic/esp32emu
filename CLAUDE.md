@@ -794,8 +794,9 @@ and the cores.
 
 - **IN PROGRESS — Oric Atmos (1984) emulator (`esp32oric`)** (started
   2026-11-19: both boards, as the Electron; its TODO.md has the steps; BASIC
-  1.1 and 1.0, the ULA's picture, the AY's sound, the VIA and the keyboard
-  done, on the host and the Tab5; tapes and the Microdisc next)
+  1.1 and 1.0, the ULA's picture, the AY's sound, the VIA, the keyboard and
+  TAP tapes (trapped and real time) done, on the host and the Tab5; the
+  Microdisc next)
 
   Develop alongside the SDL desktop port, `sdloric`, using the existing ESP-IDF
   sibling-project layout. Use the shared `m6502` core and integrate with
@@ -818,6 +819,14 @@ and the cores.
   - Compatibility with Oric Atmos BASIC 1.1 and testing with original Oric
     software.
 
+- **`/api/status` before the machine's first start** (seen 2026-11-19 on
+  the Tab5 with esp32oric): with the setup screen up after a boot, the
+  status request got no answer (curl timed out, or the connection was
+  reset after ~8 s) while `/`, `/api/info` and `/api/disks` answered; no
+  crash in the log; after Start it answered in 0.02-0.3 s. Not looked
+  into: which of `status_get()`'s calls waits (the battery's and
+  temperature's reads, `sdcard_space()`, the Bluetooth list), and whether
+  other machines show it.
 - **README screenshots, from time to time** (the user, 2026-10-21): for
   every emulator, replace them with more spectacular ones as we find them
   (games, demos, desktops at their best), following "README screenshots"
