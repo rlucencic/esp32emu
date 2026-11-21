@@ -44,6 +44,10 @@ bool sdcard_mount(void)
 #else
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.max_freq_khz = SDMMC_FREQ_DEFAULT;
+    /* S3 cannot DMA from PSRAM. Reserve a sector buffer at mount time;
+     * Wi-Fi and the emulator can leave too little DMA memory for later I/O.
+     */
+    host.flags |= SDMMC_HOST_FLAG_ALLOC_ALIGNED_BUF;
 
     sdmmc_slot_config_t slot = SDMMC_SLOT_CONFIG_DEFAULT();
     slot.width = 1;

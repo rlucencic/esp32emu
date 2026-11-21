@@ -50,6 +50,15 @@
 #endif
 
 #define CHUNK           8192
+#if CONFIG_IDF_TARGET_ESP32S3
+/* The SD driver reserves its own DMA sector buffer at mount. Keep web
+ * transfer buffers in PSRAM so concurrent uploads and downloads leave
+ * internal memory available for Wi-Fi and the filesystem.
+ */
+#define CHUNK_CAPS      MALLOC_CAP_SPIRAM
+#else
+#define CHUNK_CAPS      MALLOC_CAP_DMA
+#endif
 
 /* The Tab5: its SD card and the C6's WiFi link share the SDMMC host, so a
  * transfer that alternates between them waits on both, and while the card
@@ -562,10 +571,7 @@ static bool receive_file(httpd_req_t *req, FILE *f)
         return ok;
     }
 
-    /* DMA-capable: the SD driver then writes whole runs of sectors at once
-     * instead of copying them one by one (several times faster)
-     */
-    char *buf = heap_caps_malloc(CHUNK, MALLOC_CAP_DMA);
+    char *buf = heap_caps_malloc(CHUNK, CHUNK_CAPS);
     if (buf == NULL) {
         return false;
     }
@@ -652,7 +658,7 @@ static esp_err_t disk_get_work(httpd_req_t *req)
         heap_caps_free(whole);
         return err;
     }
-    char *buf = heap_caps_malloc(CHUNK, MALLOC_CAP_DMA);
+    char *buf = heap_caps_malloc(CHUNK, CHUNK_CAPS);
     if (buf == NULL) {
         fclose(f);
         return send_text(req, "500 Internal Server Error", "Out of memory");
