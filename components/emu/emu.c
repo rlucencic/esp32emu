@@ -868,6 +868,31 @@ static void supervisor_task(void *arg)
 
 /* ---- Boot ---- */
 
+static void log_reset_reason(void)
+{
+    static const char *const names[] = {
+        [ESP_RST_UNKNOWN] = "unknown",
+        [ESP_RST_POWERON] = "power-on",
+        [ESP_RST_EXT] = "external reset",
+        [ESP_RST_SW] = "software restart",
+        [ESP_RST_PANIC] = "panic",
+        [ESP_RST_INT_WDT] = "interrupt watchdog",
+        [ESP_RST_TASK_WDT] = "task watchdog",
+        [ESP_RST_WDT] = "watchdog",
+        [ESP_RST_DEEPSLEEP] = "deep sleep",
+        [ESP_RST_BROWNOUT] = "brownout",
+        [ESP_RST_SDIO] = "SDIO",
+        [ESP_RST_USB] = "USB",
+        [ESP_RST_JTAG] = "JTAG",
+        [ESP_RST_EFUSE] = "eFuse",
+        [ESP_RST_PWR_GLITCH] = "power glitch",
+        [ESP_RST_CPU_LOCKUP] = "CPU lockup",
+    };
+    unsigned reason = esp_reset_reason();
+    const char *name = reason < sizeof(names) / sizeof(names[0]) ? names[reason] : NULL;
+    ESP_LOGI(TAG, "reset reason: %s (%u)", name ? name : "unknown", reason);
+}
+
 static void hid_key(uint8_t usage, bool pressed)
 {
     if (M->hid_key) {
@@ -928,6 +953,8 @@ void emu_run(const emu_machine_t *machine)
     }
     touch_init();
     emu_console_start(s_fb);
+    /* The MaTouch routes logs to UART0 when the console starts. */
+    log_reset_reason();
 
 #if CONFIG_IDF_TARGET_ESP32P4
     bool radio = tab5_radio_start();    /* WiFi and Bluetooth are the C6's */
