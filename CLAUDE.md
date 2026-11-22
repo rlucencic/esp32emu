@@ -687,6 +687,10 @@ boards send none of them and their page reads as before.
   images" now. Found and checked by running the page's script under node
   with a stub DOM and fetch against the board's JSON (the old page threw
   there, the new one fills every card).
+- **Oric web status before Start** (fixed 2026-11-22 in esp32oric).
+  The drives section calls into the machine even on the setup screen.
+  Oric status now checks for attached RAM before reading its CAPS byte.
+  `/api/status` answered during setup, emulation and pause on both boards.
 
 ## Repositories
 
@@ -771,26 +775,23 @@ and the cores.
   - Serial ports: done (2026-11-18), SER1 and SER2 as TCP ports 2301 and
     2302 on both boards; the QL network later, if wanted.
 
-- **IN PROGRESS — Acorn Electron (1983) emulator (`esp32electron`)** (started
-  2026-11-18: both boards, as the QL; its TODO.md has the steps; MOS and
-  BASIC, display, sound, keyboard and the ULA's timing done)
+- **DONE — Acorn Electron (1983) emulator (`esp32electron`)** (2026-11-22
+  on the MaTouch and Tab5. The Electron repository's CLAUDE.md records
+  the original software test pass and the per-board checks.)
 
-  Develop for ESP32-S3 alongside the SDL desktop port, `sdlelectron`. Use the
-  shared `m6502` core and the existing `emu_machine_t` interface for LCD
-  display, embedded audio, and keyboard input. Keep the machine core
-  portable so both projects can share it and its compatibility tests.
+  The ESP32 project uses the shared `m6502` core and the `emu_machine_t`
+  interface for display, audio and input. The portable machine core and
+  host tests can be shared with the planned SDL port, `sdlelectron`.
 
   - 6502A with ULA-controlled timing, including 2 MHz ROM accesses, 1 MHz
     RAM accesses, and video contention in modes 0–3.
   - 32 KB RAM, 32 KB ROM, Acorn MOS, and BBC BASIC.
   - Screen modes 0–6, single-channel sound, and keyboard emulation.
-  - Cassette loading from UEF images and compatibility tests with original
-    Electron software. Consider Plus 1 support after the base machine.
-  - Required floppy support through the Acorn Plus 3 expansion. Emulate the
-    controller, ADFS ROM, and 3½-inch drive, with disk image mounting and
-    read/write support. Test cataloguing, loading, and saving through ADFS,
-    including persistence after remounting the image. The expansion also
-    supported an external 5¼-inch drive. [Acorn Plus 3 user guide](https://chrisacorns.computinghistory.org.uk/docs/Acorn/Manuals/Acorn_Plus3UG.pdf)
+  - UEF cassette playback and recording. Plus 1 ROM cartridges, including
+    split two-bank dumps, load in SK1 or SK2.
+  - Acorn Plus 3 ADFS and ACP 1770 DFS. Both boards loaded and saved files
+    and verified persistence after remounting. The original software
+    tests covered tapes, disks and cartridges.
 
 - **IN PROGRESS — Oric Atmos (1984) emulator (`esp32oric`)** (started
   2026-11-19: both boards, as the Electron; its TODO.md has the steps; BASIC
@@ -799,7 +800,8 @@ and the cores.
   in real time, MFM_DISK images: Sedoric and Oric DOS), the web page's
   card and the original software's run (`~/Development/oric-dl/
   FINDINGS.md`: 349 tapes, 29 disks, no emulator faults) done, on the
-  host, the Tab5 and the MaTouch; the Oric-1's tapes and CAPS next)
+  host, the Tab5 and the MaTouch. Oric-1 tapes and CAPS were verified on
+  both boards on 2026-11-21. The Oric TODO tracks the MaTouch reset loop.)
 
   Develop alongside the SDL desktop port, `sdloric`, using the existing ESP-IDF
   sibling-project layout. Use the shared `m6502` core and integrate with
@@ -822,14 +824,6 @@ and the cores.
   - Compatibility with Oric Atmos BASIC 1.1 and testing with original Oric
     software.
 
-- **`/api/status` before the machine's first start** (seen 2026-11-19 on
-  the Tab5 with esp32oric): with the setup screen up after a boot, the
-  status request got no answer (curl timed out, or the connection was
-  reset after ~8 s) while `/`, `/api/info` and `/api/disks` answered; no
-  crash in the log; after Start it answered in 0.02-0.3 s. Not looked
-  into: which of `status_get()`'s calls waits (the battery's and
-  temperature's reads, `sdcard_space()`, the Bluetooth list), and whether
-  other machines show it.
 - **README screenshots, from time to time** (the user, 2026-10-21): for
   every emulator, replace them with more spectacular ones as we find them
   (games, demos, desktops at their best), following "README screenshots"
