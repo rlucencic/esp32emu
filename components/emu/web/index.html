@@ -139,6 +139,7 @@
 
   <h2><span><span id="on-storage">On the SD card</span> <small id="free"></small></span>
     <span class="new" id="new" hidden>New blank disk <select id="new-size"></select><button id="new-make">Make</button></span></h2>
+  <p id="new-unavailable" hidden></p>
   <table><tbody id="disks"><tr><td class="empty">Loading…</td></tr></tbody></table>
 </main>
 
@@ -655,6 +656,10 @@ async function start() {
   if (info.disks.can_create && info.disks.sizes.length) {
     $("new-size").innerHTML = info.disks.sizes.map(s => `<option value="${s.bytes}">${esc(s.label)}</option>`).join("");
     $("new").hidden = false;
+  }
+  if (info.disks.create_unavailable) {
+    $("new-unavailable").textContent = info.disks.create_unavailable;
+    $("new-unavailable").hidden = false;
   }
   refresh();
   status();

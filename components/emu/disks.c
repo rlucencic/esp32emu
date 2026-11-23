@@ -346,7 +346,8 @@ uint32_t disks_default_size(int drive)
 
 bool disks_create(int drive, uint32_t bytes, char *name, size_t len)
 {
-    if (!s_ready || s_cfg.create == NULL) {
+    if (!s_ready || s_cfg.create == NULL ||
+        (s_cfg.create_unavailable && s_cfg.create_unavailable(bytes))) {
         return false;
     }
     uint16_t last = 0;

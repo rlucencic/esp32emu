@@ -189,14 +189,23 @@ static esp_err_t info_get(httpd_req_t *req)
         emu_json_str(&j, NULL, *e);
     }
     emu_json_end_array(&j);
+    const char *unavailable = NULL;
     emu_json_array(&j, "sizes");
     for (int i = 0; i < d->size_count; i++) {
+        const char *reason = d->create_unavailable ? d->create_unavailable(d->sizes[i].bytes) : NULL;
+        if (reason) {
+            unavailable = reason;
+            continue;
+        }
         emu_json_object(&j, NULL);
         emu_json_int(&j, "bytes", d->sizes[i].bytes);
         emu_json_str(&j, "label", d->sizes[i].label);
         emu_json_end_object(&j);
     }
     emu_json_end_array(&j);
+    if (unavailable) {
+        emu_json_str(&j, "create_unavailable", unavailable);
+    }
     emu_json_end_object(&j);
     emu_json_end_object(&j);
     return send_json(req, &j);
@@ -497,6 +506,11 @@ static esp_err_t new_post(httpd_req_t *req)
     }
     if (!known || !disks_ready()) {
         return send_text(req, "400 Bad Request", "No such disk size, or no SD card");
+    }
+    const disks_config_t *d = disks_config();
+    const char *reason = d->create_unavailable ? d->create_unavailable(bytes) : NULL;
+    if (reason) {
+        return send_text(req, "409 Conflict", reason);
     }
     char name[32];
     if (!disks_create(-1, bytes, name, sizeof(name))) {

@@ -76,6 +76,8 @@ typedef struct {
      */
     const char *(*offer)(int drive);
     void (*take_offer)(int drive);
+    /* Optional reason a listed size is currently unavailable. NULL allows creation. */
+    const char *(*create_unavailable)(uint32_t bytes);
 } disks_config_t;
 
 /* Make the folder if needed; false without an SD card */
