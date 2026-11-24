@@ -82,3 +82,9 @@ CONFIG_LWIP_TCP_WND_DEFAULT=65535
 CONFIG_LWIP_TCP_SND_BUF_DEFAULT=65535
 CONFIG_LWIP_TCP_RECVMBOX_SIZE=64
 CONFIG_LWIP_TCPIP_RECVMBOX_SIZE=64
+# The C6's WiFi transmit buffers (esp_hosted passes the count at
+# esp_wifi_init): with 16, a 64 KB send window (45 segments in flight)
+# overflowed them, the C6 dropped ~2.5% of the packets and downloads ran at
+# 0.4 MB/s; 32: 0.73 MB/s; 64 (the most, ~100 KB of the C6's RAM; BLE
+# still starts): 2.3 MB/s, none lost (2026-11-24)
+CONFIG_WIFI_RMT_STATIC_TX_BUFFER_NUM=64

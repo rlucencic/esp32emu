@@ -540,7 +540,8 @@ boards send none of them and their page reads as before.
   them). A file is received whole into PSRAM, then written (`write()` past
   stdio, a 128-byte aligned buffer: FATFS writes cluster runs from it); a
   download is read whole, then sent with a Content-Length (`WHOLE_FILES` in
-  `web.c`, when it fits with 4 MB to spare; else 8 KB pieces). With the
+  `web.c`, when it fits with 4 MB to spare; else pieces: 8 KB up, 64 KB
+  down). With the
   Tab5's TCP windows at 64 KB (board `sdkconfig.defaults`; the S3's 16 KB /
   5.7 KB stay): 4 MB up 0.28 → 1.3-1.6 MB/s, 16 MB 2 MB/s; down 0.6 →
   0.75-1.6 MB/s (the C6 sends; it reads 4 MB from the card in 0.26 s).
@@ -557,12 +558,28 @@ boards send none of them and their page reads as before.
   upload failed (internal RAM's low point 29 KB). The pieces are now in
   PSRAM, aligned like a whole file's, through `read()`/`write()` past
   stdio, and uploads fill each to 8 KB before writing. With the A1200
-  running, 50 MB goes up in 40 s and down in 143 s: reading it took 4.7 s
-  of that, so the sends are the limit (64 KB pieces were only 18% faster).
-  The driver takes the buffer's length from `heap_caps_get_allocated_size()`,
+  running, 50 MB went up in 40 s and down in 143 s, the sends the limit
+  (the next lesson). The driver takes the buffer's length from `heap_caps_get_allocated_size()`,
   so `sdcard.c` checks that it's a multiple of the alignment. The MaTouch
   gave the same times with the old and the new `web.c` (esp32coco, 8 MB up
   in 37 s, down in 16–18 s).
+- **Tab5: the C6 dropped packets it had no transmit buffer for** (2026-11-24).
+  Downloads ran at 0.4 MB/s even from memory, with no card reads and the
+  cores idle: the PC queued ~1 segment in 10 out of order, and esp_hosted's
+  own counters (`CONFIG_ESP_HOSTED_PKT_STATS`) showed the host handing the
+  C6 every packet (no throttle drops, ~2.5% resent). The C6 had 16 static
+  WiFi transmit buffers (`CONFIG_WIFI_RMT_STATIC_TX_BUFFER_NUM`, which
+  esp_hosted passes at `esp_wifi_init`) against TCP's 64 KB send window,
+  ~45 segments in flight. 32 gave 0.73 MB/s; 64 (the most, ~100 KB of the
+  C6's RAM; BLE still starts) 2.3 MB/s from memory, nothing out of order.
+  Not the causes, tried first: modem sleep (`WIFI_PS_NONE`), esp_hosted's
+  throttle (threshold 0), the transfer task's priority, chunked against a
+  raw stream. Dynamic transmit buffers aren't selectable while
+  `SPIRAM_TRY_ALLOCATE_WIFI_LWIP` is set. Board `sdkconfig.defaults` has
+  64; existing `build-tab5/sdkconfig`s needed the line changed (defaults
+  don't override a value already there). esp32ami, the A1200 running:
+  50 MB down 143 s → 27.5 s (1.9 MB/s; from the card in 64 KB pieces,
+  8 KB ones 1.75), byte for byte; uploads unchanged (~1.2 MB/s, no resends).
 - **Tab5: power the C6 before esp_hosted connects** (BSP WiFi feature and
   PI4IOE5V6408 0x44 pin 0, ~2 s to boot); esp_hosted's constructor tries at
   boot, `esp_hosted_init()` connects later. Its Bluetooth controller is off

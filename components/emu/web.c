@@ -50,6 +50,14 @@
 #endif
 
 #define CHUNK           8192
+/* Downloads on the Tab5 in bigger pieces: with the C6 no longer dropping
+ * packets, 64 KB ones send 1.95 MB/s against 8 KB ones' 1.75 (fewer turns
+ * between the card and the C6 on the shared SDMMC host) */
+#if CONFIG_IDF_TARGET_ESP32P4
+#define SEND_CHUNK      65536
+#else
+#define SEND_CHUNK      CHUNK
+#endif
 #if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4
 /* The SD driver reserves its own DMA buffer at mount (sdcard.c). Keep web
  * transfer buffers in PSRAM so concurrent uploads and downloads leave
@@ -554,12 +562,12 @@ static bool read_all(FILE *f, char *p, size_t n)
 /* A piece's buffer: on the Tab5 aligned to the cache line like a whole
  * file's, so FATFS reads and writes its sectors by DMA straight from it
  */
-static char *chunk_alloc(void)
+static char *chunk_alloc(size_t size)
 {
 #if WHOLE_FILES
-    return heap_caps_aligned_alloc(WHOLE_ALIGN, CHUNK, CHUNK_CAPS);
+    return heap_caps_aligned_alloc(WHOLE_ALIGN, size, CHUNK_CAPS);
 #else
-    return heap_caps_malloc(CHUNK, CHUNK_CAPS);
+    return heap_caps_malloc(size, CHUNK_CAPS);
 #endif
 }
 
@@ -601,7 +609,7 @@ static bool receive_file(httpd_req_t *req, FILE *f)
     /* Whole pieces, past stdio (its 128-byte buffer had FATFS write a
      * sector at a time): the Tab5 takes these with an A1200 running
      */
-    char *buf = chunk_alloc();
+    char *buf = chunk_alloc(CHUNK);
     if (buf == NULL) {
         return false;
     }
@@ -696,14 +704,14 @@ static esp_err_t disk_get_work(httpd_req_t *req)
         heap_caps_free(whole);
         return err;
     }
-    char *buf = chunk_alloc();
+    char *buf = chunk_alloc(SEND_CHUNK);
     if (buf == NULL) {
         fclose(f);
         return send_text(req, "500 Internal Server Error", "Out of memory");
     }
     ssize_t n;
     esp_err_t err = ESP_OK;
-    while (err == ESP_OK && (n = read(fileno(f), buf, CHUNK)) > 0) {
+    while (err == ESP_OK && (n = read(fileno(f), buf, SEND_CHUNK)) > 0) {
         err = httpd_resp_send_chunk(req, buf, n);
     }
     fclose(f);
