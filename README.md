@@ -2,7 +2,7 @@
 
 <p align="center">
   <b>The shared board runtime for emulators on the Makerfabs MaTouch ESP32-S3 7" and the M5Stack Tab5 (ESP32-P4).</b><br>
-  Used by <a href="https://github.com/rlucencic/esp32oric">esp32oric</a> (Oric Atmos and Oric-1), <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128), <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE), <a href="https://github.com/rlucencic/esp32msx">esp32msx</a> (MSX1, MSX2), <a href="https://github.com/rlucencic/esp32gs">esp32gs</a> (Apple IIGS), <a href="https://github.com/rlucencic/esp32coco">esp32coco</a> (Tandy Color Computer 2, 3), <a href="https://github.com/rlucencic/esp32mac2">esp32mac2</a> (Macintosh LC and II, Tab5 only), <a href="https://github.com/rlucencic/esp32mac3">esp32mac3</a> (Macintosh LC II and LC III, Tab5 only), <a href="https://github.com/rlucencic/esp32arc">esp32arc</a> (Acorn Archimedes, Tab5 only), <a href="https://github.com/rlucencic/esp32pc">esp32pc</a> (IBM PC/XT and PC/AT), <a href="https://github.com/rlucencic/esp32ql">esp32ql</a> (Sinclair QL), <a href="https://github.com/rlucencic/esp32electron">esp32electron</a> (Acorn Electron) and <a href="https://github.com/rlucencic/esp32ami">esp32ami</a> (Amiga 500, 2000 and 600, Tab5 only).
+  Used by <a href="https://github.com/rlucencic/esp32oric">esp32oric</a> (Oric Atmos and Oric-1), <a href="https://github.com/rlucencic/esp32ste">esp32ste</a> (Atari STE), <a href="https://github.com/rlucencic/esp32mac">esp32mac</a> (Macintosh Plus, SE, Classic), <a href="https://github.com/rlucencic/esp32cpc">esp32cpc</a> (Amstrad CPC), <a href="https://github.com/rlucencic/esp32zx">esp32zx</a> (ZX Spectrum 128K, +2, +3), <a href="https://github.com/rlucencic/esp32cbm">esp32cbm</a> (Commodore 64, 128), <a href="https://github.com/rlucencic/esp32xl">esp32xl</a> (Atari 800XL, 130XE), <a href="https://github.com/rlucencic/esp32msx">esp32msx</a> (MSX1, MSX2), <a href="https://github.com/rlucencic/esp32gs">esp32gs</a> (Apple IIGS), <a href="https://github.com/rlucencic/esp32coco">esp32coco</a> (Tandy Color Computer 2, 3), <a href="https://github.com/rlucencic/esp32mac2">esp32mac2</a> (Macintosh LC and II, Tab5 only), <a href="https://github.com/rlucencic/esp32mac3">esp32mac3</a> (Macintosh LC II and LC III, Tab5 only), <a href="https://github.com/rlucencic/esp32arc">esp32arc</a> (Acorn Archimedes, Tab5 only), <a href="https://github.com/rlucencic/esp32pc">esp32pc</a> (IBM PC/XT and PC/AT), <a href="https://github.com/rlucencic/esp32ql">esp32ql</a> (Sinclair QL), <a href="https://github.com/rlucencic/esp32electron">esp32electron</a> (Acorn Electron), <a href="https://github.com/rlucencic/esp32coupe">esp32coupe</a> (SAM Coupé) and <a href="https://github.com/rlucencic/esp32ami">esp32ami</a> (Amiga 500, 2000, 600 and 1200, Tab5 only).
 </p>
 
 esp32emu is everything an emulator on these boards needs apart from the
@@ -104,7 +104,7 @@ super-hires frames one to one that way.
 | | |
 |---|---|
 | Setup screen | WiFi networks and password, Bluetooth pairing, the machine's choices (e.g. system and memory), its drives. Before the first start (**Start**), and any time by holding the top-right corner of the screen for 2 s (**Back** returns, **Reset** resets the machine); changing a choice there restarts the machine (**Restart**), unless the machine applies it at once (e.g. the ST's CPU speed on the Tab5). With the speaker on, a **Sound** row for every machine: a mute button and a volume slider, applied at once and kept for every emulator on the board |
-| Disks | A folder on the SD card for each machine (`zx`, `cpc`, `cbm`, `coco`, `apple2gs`, `msx`, `xl`, `st`, `pc`, `ql`, `arc`, `amiga`; the three Macs share `mac`): its images for the drives, and in its `roms/` the cartridges (the machines with a cartridge slot) and ROM files that override the built-in ones (those come from each project's `roms/` through `idf.py flash`). Inserted disks are remembered in NVS. Blank disks of the sizes the machine offers. A card from before 2026-11-17 (shared `roms`, `floppies`, `disks`, `atari`): `tools/sd_folders.ps1` |
+| Disks | A folder on the SD card for each machine (`zx`, `cpc`, `cbm`, `coco`, `apple2gs`, `msx`, `xl`, `st`, `pc`, `ql`, `arc`, `amiga`, `coupe`, `electron`, `oric`; the three Macs share `mac`): its images for the drives, and in its `roms/` the cartridges (the machines with a cartridge slot) and ROM files that override the built-in ones (those come from each project's `roms/` through `idf.py flash`). Inserted disks are remembered in NVS. Blank disks of the sizes the machine offers. A card from before 2026-11-17 (shared `roms`, `floppies`, `disks`, `atari`): `tools/sd_folders.ps1` |
 | Web page | `http://<hostname>.local`: machine, drives, board and Bluetooth status live; upload (drag and drop, with a progress bar: how far, how fast, how long still; ZIP files are unpacked in the browser), insert, eject, download and delete images, make blank disks (a machine can add a script that turns other files into images in the browser, e.g. the Mac's StuffIt archives, or packs dropped files and folders onto one, the PC's FAT images); a machine can take the disk folder's subfolders as drives too (the PC's read-only hard disks) |
 | Console | Native USB port (MaTouch: the UART with the speaker on): screenshots, simulated touches, disk changes, reset, a sampling profiler, the speaker's volume, plus the machine's own commands |
 | Bluetooth | BLE keyboard and mouse (NimBLE central), paired on the setup screen, reconnecting by themselves; keys arrive as HID usages. On the Tab5 the radio is its ESP32-C6, through esp_hosted |
@@ -125,7 +125,7 @@ super-hires frames one to one that way.
 
 | Request | |
 |---|---|
-| `GET /api/info` | Machine name, drives, image kinds, blank disk sizes |
+| `GET /api/info` | Machine name, drives, image kinds, available blank disk sizes, and whether the machine supports disk creation (`disks.can_create`). When a size is unavailable, `disks.create_unavailable` gives the reason. |
 | `GET /machine.js` | The machine's script for the page (`web_script`), if it has one |
 | `GET /api/status` | Machine (state, speed, the machine's rows, the clock and where it came from), drives, board (its name, WiFi, memory, load, SD card), Bluetooth |
 | `GET /api/disks` | Images in the folder: name, size, drive (and the subfolders, "folder": true, for a machine that makes drives of them) |
@@ -180,6 +180,10 @@ and codec come through Espressif's `m5stack_tab5` BSP; the radio, keyboard
 and charging code follow M5Stack Tab5 projects that run on the hardware
 (esp32_basic, wmbus_hub). The Tab5's IP2326 charger is switched on at start:
 it charges the battery only when told to.
+
+## Roadmap
+
+See [TODO.md](TODO.md) for proposed work and how to verify it.
 
 ## Licence
 
