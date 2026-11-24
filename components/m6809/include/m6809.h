@@ -23,6 +23,13 @@
  * has loaded S (as on the chip). HALT (the DMA line the Color Computer's
  * disk controller uses) stops the CPU between instructions while `halt`
  * is set. CWAI and SYNC wait for an interrupt, spending cycles to `until`.
+ * Their timing follows the data sheet's cycle-by-cycle sequences as XRoar
+ * has them: a line latched at a cycle's start is seen at the end of the
+ * instruction that cycle belongs to (one that rises in an instruction's
+ * last cycle waits for the next); SYNC goes on 3 cycles after the line is
+ * latched (at least its own 4 cycles); CWAI's handler starts 22 cycles
+ * after the CWAI if the line was latched while it stacked, else 6 after
+ * the latch. Falling lines count at once.
  */
 #pragma once
 
@@ -82,12 +89,25 @@ struct m6809 {
     uint64_t cycles;                /* CPU cycles since power-on */
     uint64_t until;                 /* m6809_run() stops before an instruction at or after this */
 
-    /* Interrupt inputs */
+    /* Interrupt inputs (set them with m6809_set_interrupts() and
+     * m6809_nmi() for the timing below; written directly they count as
+     * latched long ago)
+     */
     uint32_t irq, firq;             /* levels: any bit set = asserted */
     bool nmi_pending;               /* an NMI edge to take */
     bool nmi_armed;                 /* S has been loaded since the reset */
     bool halt;                      /* the HALT line: no instructions while set */
     uint8_t wait;                   /* M6809_RUNNING, _CWAI, _SYNC */
+
+    /* When the inputs count: the 6809 latches them at each cycle's start
+     * and looks at an instruction's end, so a line that rises in its last
+     * cycle waits for the next one
+     */
+    uint64_t latch_at[3];           /* NMI, FIRQ, IRQ: the first instruction end that sees its rise */
+    uint8_t latch_next;             /* risen during the instruction running (its I/O): bits 1 << line */
+    bool in_run;                    /* in m6809_run(): bus callbacks are inside an instruction */
+    uint64_t target;                /* the until the last m6809_run() began with (UINT64_MAX: none yet) */
+    uint64_t wait_from;             /* SYNC: its earliest end; CWAI: the end of its stacking */
 
     uint8_t *rd[256];               /* 256-byte pages; NULL: bus.read */
     uint8_t *wr[256];               /* NULL: bus.write */
@@ -119,10 +139,13 @@ void m6809_run(m6809_t *cpu);
 /* One instruction (or an interrupt, or a wait); its cycles */
 int m6809_step(m6809_t *cpu);
 
-static inline void m6809_nmi(m6809_t *cpu)
-{
-    cpu->nmi_pending = true;
-}
+/* An NMI edge, and the IRQ and FIRQ levels (any bit set = asserted).
+ * Called between m6809_run()s, a rise counts from the event that ended
+ * the last run (its `until`); called from bus callbacks, from the last
+ * cycle of the instruction running.
+ */
+void m6809_nmi(m6809_t *cpu);
+void m6809_set_interrupts(m6809_t *cpu, uint32_t irq, uint32_t firq);
 
 /* From bus callbacks during m6809_run(): stop before the next instruction */
 static inline void m6809_end_run(m6809_t *cpu)

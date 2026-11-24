@@ -151,7 +151,9 @@ static const test_case_t cases[] = {
     { "RTI full frame", 0, "3B", "S=2FF4 M2FF4=80 01 02 09 03 04 05 06 07 08 20 00", 1,
       "S=3000 CC=80 A=01 B=02 DP=09 X=0304 Y=0506 U=0708 PC=2000", 15 },
     { "RTI FIRQ frame", 0, "3B", "S=2FFD M2FFD=01 20 00", 1, "S=3000 CC=01 PC=2000", 6 },
-    { "CWAI then IRQ", 0, "3C EF", "S=3000 CC=10 MFFF8=50 00 IRQ", 2, "PC=5000 S=2FF4 CC=90", 27 },
+    /* 20 for CWAI, then the vector 2 cycles later: 22 from the opcode to the handler (the data
+     * sheet's cycle-by-cycle sequence, as XRoar has it) */
+    { "CWAI then IRQ", 0, "3C EF", "S=3000 CC=10 MFFF8=50 00 IRQ", 2, "PC=5000 S=2FF4 CC=90", 22 },
     /* ---- 6809 undocumented ---- */
     { "6809 $10 prefix on a page 0 opcode", 0, "10 86 42", "", 1, "A=42 PC=1003", 3 },
 
@@ -212,7 +214,11 @@ static uint8_t bus_read(void *ctx, uint16_t a)
 
 static void bus_write(void *ctx, uint16_t a, uint8_t v)
 {
-    (void)ctx;
+    if (a == 0xFF00 && ctx) {
+        /* the timing tests: a write here raises FIRQ, during the instruction */
+        m6809_set_interrupts(ctx, 0, 1);
+        return;
+    }
     s_mem[a] = v;
 }
 
@@ -314,6 +320,91 @@ static bool apply(m6809_t *c, const char *text, bool check, char *why, size_t le
     return ok;
 }
 
+/* ---- Interrupt timing (m6809.h): through m6809_run(), the inputs set
+ * between runs as a machine does, or by the program's own writes ----
+ */
+static m6809_t s_cpu;
+
+static m6809_t *timing_cpu(const char *code, uint8_t cc)
+{
+    m6809_bus_t bus = { bus_read, bus_write, &s_cpu };
+    memset(s_mem, 0, sizeof(s_mem));
+    m6809_init(&s_cpu, &bus, false);
+    uint8_t bytes[64];
+    int n = parse_hex_bytes(code, bytes, 64);
+    memcpy(s_mem + 0x1000, bytes, (size_t)n);
+    s_mem[0xFFF6] = 0x20;                       /* FIRQ: $2000 */
+    s_mem[0xFFF8] = 0x30;                       /* IRQ: $3000 */
+    s_cpu.pc = 0x1000;
+    s_cpu.s = 0x8000;
+    s_cpu.cc = cc;
+    return &s_cpu;
+}
+
+static void run_to(m6809_t *c, uint64_t until)
+{
+    c->until = until;
+    m6809_run(c);
+}
+
+static int timing_check(const char *name, bool ok, const m6809_t *c)
+{
+    printf("%s timing: %s (PC %04X, cycles %llu)\n", ok ? "ok  " : "FAIL", name, c->pc,
+           (unsigned long long)c->cycles);
+    return ok ? 0 : 1;
+}
+
+static int timing_tests(void)
+{
+    int failed = 0;
+    m6809_t *c;
+
+    /* SYNC, FIRQ masked: the next instruction 3 cycles after the latch */
+    c = timing_cpu("13 12 12", 0x50);
+    run_to(c, 100);                             /* SYNC at 0, waiting from 4 */
+    m6809_set_interrupts(c, 0, 1);              /* at 100 */
+    run_to(c, 104);                             /* NOP at 103 */
+    failed += timing_check("SYNC goes on 3 cycles after the line", c->pc == 0x1002 && c->cycles == 105, c);
+
+    /* A line already up when SYNC starts: its own 4 cycles */
+    c = timing_cpu("13 12", 0x50);
+    m6809_set_interrupts(c, 0, 1);
+    run_to(c, 1);
+    run_to(c, 5);
+    failed += timing_check("SYNC with the line up takes 4 cycles", c->pc == 0x1002 && c->cycles == 6, c);
+
+    /* FIRQ rising where an instruction ends: one more instruction first */
+    c = timing_cpu("12 12 12 12 12 12 12 12", 0x10);
+    run_to(c, 10);                              /* five NOPs: 10, no overshoot */
+    m6809_set_interrupts(c, 0, 1);
+    run_to(c, 11);
+    failed += timing_check("a rise at an instruction's end waits one", c->pc == 0x1006 && c->cycles == 12, c);
+    run_to(c, 13);
+    failed += timing_check("... then the FIRQ", c->pc == 0x2000 && c->cycles == 22, c);
+
+    /* ... and one an instruction went past by a cycle: at once */
+    c = timing_cpu("12 12 12 12 12 12 12 12", 0x10);
+    run_to(c, 9);                               /* five NOPs: 10 */
+    m6809_set_interrupts(c, 0, 1);
+    run_to(c, 11);
+    failed += timing_check("a rise inside an instruction is taken after it", c->pc == 0x2000 && c->cycles == 20, c);
+
+    /* Raised by the program's own write (STA $FF00, its last cycle): after the next */
+    c = timing_cpu("B7 FF 00 12 12 12", 0x10);
+    run_to(c, 100);
+    /* the FIRQ's stacked PC: after STA and one NOP ($1004), not right after STA */
+    failed += timing_check("a rise in an instruction's last cycle waits one",
+                           s_mem[0x7FFE] == 0x10 && s_mem[0x7FFF] == 0x04 && c->pc >= 0x2000, c);
+
+    /* CWAI waiting: the handler 6 cycles after the latch */
+    c = timing_cpu("3C EF", 0x10);
+    run_to(c, 100);                             /* CWAI 0-20, waiting */
+    m6809_set_interrupts(c, 1, 0);              /* at 100 */
+    run_to(c, 101);
+    failed += timing_check("CWAI's handler 6 cycles after the line", c->pc == 0x3000 && c->cycles == 106, c);
+    return failed;
+}
+
 int main(int argc, char **argv)
 {
     bool verbose = argc > 1 && !strcmp(argv[1], "-v");
@@ -360,5 +451,6 @@ int main(int argc, char **argv)
         }
     }
     printf("%d cases, %d failed\n", n, failed);
-    return failed ? 1 : 0;
+    int timing_failed = timing_tests();
+    return failed || timing_failed ? 1 : 0;
 }

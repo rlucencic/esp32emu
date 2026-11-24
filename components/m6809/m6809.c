@@ -498,27 +498,105 @@ static int interrupt_all(m6809_t *c, uint16_t vector, uint8_t mask)
     return CYC(19, 21);
 }
 
+/* ---- Interrupt timing ----
+ *
+ * The 6809 latches its interrupt inputs at the start of each cycle and
+ * looks at the latch at an instruction's end (the data sheet's cycle by
+ * cycle sequences, as XRoar has them): latch_at[] is the first instruction
+ * end that sees a line's rise. A rise between m6809_run()s comes at the
+ * event that ended the last run (its target): an instruction that went
+ * past it by a cycle or more sees it. One during an instruction (its own
+ * I/O) is taken to be in its last cycle: the next end sees it.
+ */
+enum { LINE_NMI, LINE_FIRQ, LINE_IRQ };
+
+static void note_rise(m6809_t *c, int line)
+{
+    if (c->in_run) {
+        c->latch_next |= (uint8_t)(1u << line);
+    } else {
+        c->latch_at[line] = c->target == UINT64_MAX ? 0 : c->target + 1;
+    }
+}
+
+void m6809_nmi(m6809_t *c)
+{
+    if (!c->nmi_pending) {
+        note_rise(c, LINE_NMI);
+    }
+    c->nmi_pending = true;
+}
+
+void m6809_set_interrupts(m6809_t *c, uint32_t irq, uint32_t firq)
+{
+    if (firq && !c->firq) {
+        note_rise(c, LINE_FIRQ);
+    }
+    if (irq && !c->irq) {
+        note_rise(c, LINE_IRQ);
+    }
+    c->irq = irq;
+    c->firq = firq;
+}
+
+/* Lines that rose during the instruction just run: seen from the next end */
+static void latch_late(m6809_t *c)
+{
+    for (int line = LINE_NMI; line <= LINE_IRQ; line++) {
+        if (c->latch_next & (1u << line)) {
+            c->latch_at[line] = c->cycles + 1;
+        }
+    }
+    c->latch_next = 0;
+}
+
+static inline bool latched(const m6809_t *c, int line)
+{
+    return c->cycles >= c->latch_at[line];
+}
+
+/* SYNC goes on 3 cycles after the waking line is latched (at the start of
+ * the cycle before latch_at), and not before its own cycles are done
+ */
+static uint64_t sync_end(const m6809_t *c)
+{
+    uint64_t at = UINT64_MAX;
+    if (c->nmi_pending && c->latch_at[LINE_NMI] < at) at = c->latch_at[LINE_NMI];
+    if (c->firq && c->latch_at[LINE_FIRQ] < at) at = c->latch_at[LINE_FIRQ];
+    if (c->irq && c->latch_at[LINE_IRQ] < at) at = c->latch_at[LINE_IRQ];
+    return at + 2 > c->wait_from ? at + 2 : c->wait_from;
+}
+
+/* CWAI: the vector fetch (4 cycles) follows at once if the line was
+ * latched while the registers were stacked (by 2 cycles before CWAI's own
+ * end: 22 cycles in all), else a cycle after the latch is seen
+ */
+static int cwai_vector(m6809_t *c, uint16_t vector, uint8_t mask, int line)
+{
+    c->wait = M6809_RUNNING;
+    c->cc |= mask;
+    c->pc = rd16(c, vector);
+    uint64_t latch = c->latch_at[line];
+    uint64_t start = latch + 2 <= c->wait_from ? c->wait_from + 2 : latch + 5;
+    return start > c->cycles ? (int)(start - c->cycles) : 1;
+}
+
 static int take_interrupt(m6809_t *c)
 {
-    if (c->nmi_pending) {
+    bool cwai = c->wait == M6809_CWAI;
+    if (c->nmi_pending && (cwai || latched(c, LINE_NMI))) {
         c->nmi_pending = false;
         if (c->nmi_armed) {
-            if (c->wait == M6809_CWAI) {
-                c->wait = M6809_RUNNING;
-                c->cc |= M6809_I | M6809_F;
-                c->pc = rd16(c, VEC_NMI);
-                return 7;
+            if (cwai) {
+                return cwai_vector(c, VEC_NMI, M6809_I | M6809_F, LINE_NMI);
             }
             c->wait = M6809_RUNNING;
             return interrupt_all(c, VEC_NMI, M6809_I | M6809_F);
         }
     }
-    if (c->firq && !(c->cc & M6809_F)) {
-        if (c->wait == M6809_CWAI) {
-            c->wait = M6809_RUNNING;
-            c->cc |= M6809_I | M6809_F;
-            c->pc = rd16(c, VEC_FIRQ);
-            return 7;
+    if (c->firq && !(c->cc & M6809_F) && (cwai || latched(c, LINE_FIRQ))) {
+        if (cwai) {
+            return cwai_vector(c, VEC_FIRQ, M6809_I | M6809_F, LINE_FIRQ);
         }
         c->wait = M6809_RUNNING;
         if (c->h6309 && (c->md & M6309_FM)) {
@@ -531,12 +609,9 @@ static int take_interrupt(m6809_t *c)
         c->pc = rd16(c, VEC_FIRQ);
         return 10;
     }
-    if (c->irq && !(c->cc & M6809_I)) {
-        if (c->wait == M6809_CWAI) {
-            c->wait = M6809_RUNNING;
-            c->cc |= M6809_I;
-            c->pc = rd16(c, VEC_IRQ);
-            return 7;
+    if (c->irq && !(c->cc & M6809_I) && (cwai || latched(c, LINE_IRQ))) {
+        if (cwai) {
+            return cwai_vector(c, VEC_IRQ, M6809_I, LINE_IRQ);
         }
         c->wait = M6809_RUNNING;
         return interrupt_all(c, VEC_IRQ, M6809_I);
@@ -1095,7 +1170,10 @@ static int exec_page0(m6809_t *c, uint8_t op)
     case 0x10: return page2(c);
     case 0x11: return page3(c);
     case 0x12: return CYC(2, 1);                                    /* NOP */
-    case 0x13: c->wait = M6809_SYNC; return CYC(4, 3);              /* SYNC */
+    case 0x13:                                                       /* SYNC */
+        c->wait = M6809_SYNC;
+        c->wait_from = c->cycles + CYC(4, 3);
+        return CYC(4, 3);
     case 0x14:
         if (c->h6309) {                                             /* SEXW */
             c->d = (c->w & 0x8000) ? 0xFFFF : 0;
@@ -1191,6 +1269,7 @@ static int exec_page0(m6809_t *c, uint8_t op)
         c->cc |= M6809_E;
         push_all(c);
         c->wait = M6809_CWAI;
+        c->wait_from = c->cycles + CYC(20, 22);
         return CYC(20, 22);
     case 0x3D: {                                                                                       /* MUL */
         c->d = (uint16_t)(c->a * c->b);
@@ -1483,6 +1562,7 @@ void m6809_init(m6809_t *c, const m6809_bus_t *bus, bool h6309)
     memset(c, 0, sizeof(*c));
     c->bus = *bus;
     c->h6309 = h6309;
+    c->target = UINT64_MAX;     /* no run yet: rises count as long latched */
 }
 
 void m6809_reset(m6809_t *c)
@@ -1493,6 +1573,7 @@ void m6809_reset(m6809_t *c)
     c->wait = M6809_RUNNING;
     c->nmi_pending = false;
     c->nmi_armed = false;
+    c->latch_next = 0;
     c->pc = rd16(c, VEC_RESET);
     c->cycles += 7;
 }
@@ -1513,6 +1594,12 @@ int M6809_HOT m6809_step(m6809_t *c)
         if (c->wait == M6809_SYNC && (c->nmi_pending || c->firq || c->irq)) {
             /* SYNC ends on any interrupt line, masked ones too (then go on) */
             c->wait = M6809_RUNNING;
+            uint64_t end = sync_end(c);
+            if (end > c->cycles) {
+                cyc = (int)(end - c->cycles);
+                c->cycles = end;
+                return cyc;
+            }
         } else if (!(nmi || firq || irq)) {
             cyc = c->until > c->cycles ? (int)(c->until - c->cycles) : 1;
             c->cycles += cyc;
@@ -1529,6 +1616,9 @@ int M6809_HOT m6809_step(m6809_t *c)
     c->ppc = c->pc;
     cyc = exec_page0(c, fetch(c));
     c->cycles += cyc;
+    if (__builtin_expect(c->latch_next != 0, 0)) {
+        latch_late(c);
+    }
     return cyc;
 }
 
@@ -1538,6 +1628,8 @@ void m6809_host_hook(m6809_t *c);       /* host builds: tracing */
 
 void M6809_HOT m6809_run(m6809_t *c)
 {
+    uint64_t target = c->until;
+    c->in_run = true;
     while (c->cycles < c->until) {
 #ifdef M6809_HOST_HOOK
         m6809_host_hook(c);
@@ -1551,4 +1643,6 @@ void M6809_HOT m6809_run(m6809_t *c)
 #endif
         m6809_step(c);
     }
+    c->in_run = false;
+    c->target = target;         /* the machine's events come at it (note_rise()) */
 }
