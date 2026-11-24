@@ -4,6 +4,7 @@
  * the native USB pins (MaTouch). Commands: see emu/console.h.
  */
 #include <stdarg.h>
+#include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -343,6 +344,22 @@ static void profile(int samples, int core)
     emu_console_printf("EMUPROF END\n");
 }
 
+/* A command is a letter, then a space or nothing. The first line a tool
+ * sends after the chip resets can carry the chip's own output: the PC's
+ * tty comes back with echo on, and what the chip had queued (its ROM's
+ * "ESP-ROM:esp32p4-...") is echoed into its input before the tool sets it
+ * raw, glued to the command. emu_console.py sends a newline first so the
+ * echo is a line of its own; this drops it (the ROM's "rst:0x17 ..." would
+ * otherwise read as r, a reset; "W (1234) ..." log lines as a W command)
+ */
+static bool command_line(const char *line)
+{
+    if (!isalpha((unsigned char)line[0]) || (line[1] != '\0' && line[1] != ' ')) {
+        return false;
+    }
+    return !(strchr("IWEDV", line[0]) && line[1] == ' ' && line[2] == '(' && isdigit((unsigned char)line[3]));
+}
+
 static void console_task(void *arg)
 {
     char line[128];
@@ -352,6 +369,9 @@ static void console_task(void *arg)
             continue;
         }
         line[strcspn(line, "\r\n")] = 0;
+        if (!command_line(line)) {
+            continue;
+        }
         switch (line[0]) {
         case 's':
             if (emu_started()) {

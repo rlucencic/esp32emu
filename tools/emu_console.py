@@ -55,6 +55,12 @@ def open_port(name):
         port.dtr = False
         port.rts = False
     port.open()
+    # After the chip resets, its port comes back with the tty's echo on: what
+    # the chip had queued is echoed into its input until open() sets it raw,
+    # with no newline ("ESP-ROM:esp32p4-"), and the first command would be
+    # glued to it. A newline makes that a line of its own, which the console
+    # drops (console.c, command_line()).
+    port.write(b"\n")
     return port
 
 

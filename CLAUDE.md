@@ -505,6 +505,20 @@ boards send none of them and their page reads as before.
 - **Opening the serial port** with RTS=1 and DTR=0 resets the chip;
   `emu_console.py` keeps DTR high. Writes use 1 KB chunks with a timeout (a
   `portMAX_DELAY` write once hung the board).
+- **The first console command after a reset was lost** (Tab5, Linux,
+  2026-11-24): a Start tap (`t x y`) sent after esptool's
+  `--after watchdog_reset` never arrived, every time, while a second one
+  did. The chip's USB port comes back as a new tty with echo on, and what
+  the chip had queued (the ROM's "ESP-ROM:esp32p4-...") is echoed into its
+  input in the moment before pyserial sets it raw, with no newline: the
+  console got "ESP-ROM:esp32p4-i" (logged in hex to find it). The ROM's
+  next line, "rst:0x17 ...", would have read as `r`, a reset.
+  `emu_console.py`'s `open_port()` now sends a newline first, and the
+  console drops lines that can't be commands (a letter, then a space or
+  nothing; not a log line like "W (1234) ..."; `command_line()`): the
+  first tap after three esptool resets started the machine each time, at
+  12 s. Scripts that open the port themselves should send a newline first
+  too.
 - **Simulated touches** (`t x y`) last 150 ms: send taps in separate
   `emu_console.py send` calls, or LVGL sees one press sliding between them.
   `t x y ms x2 y2` drags (moving for 3/4 of the time, then still: no
