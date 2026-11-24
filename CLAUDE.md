@@ -547,6 +547,22 @@ boards send none of them and their page reads as before.
   32 KB pieces in between were worse (0.33 MB/s up). The MaTouch: 0.55 up,
   0.31 down, as before. The C6's own transmit settings (BA window) are in
   its firmware: esp_hosted passes only buffer counts and the receive window.
+- **Tab5: the SD driver's bounce buffer is reserved in PSRAM** (`sdcard.c`,
+  2026-11-24). FATFS's sector windows and file caches aren't aligned to
+  the cache line, so most transfers go through a bounce buffer. Without a
+  reserved one, the driver allocates internal DMA memory for each transfer
+  (8 KB, halved down to a sector) and fails when none is left. esp32ami's
+  A1200 leaves ~3.4 MB of PSRAM, under `WHOLE_FILES`' 4 MB reserve, so
+  every transfer went in pieces, which were internal DMA memory too: every
+  upload failed (internal RAM's low point 29 KB). The pieces are now in
+  PSRAM, aligned like a whole file's, through `read()`/`write()` past
+  stdio, and uploads fill each to 8 KB before writing. With the A1200
+  running, 50 MB goes up in 40 s and down in 143 s: reading it took 4.7 s
+  of that, so the sends are the limit (64 KB pieces were only 18% faster).
+  The driver takes the buffer's length from `heap_caps_get_allocated_size()`,
+  so `sdcard.c` checks that it's a multiple of the alignment. The MaTouch
+  gave the same times with the old and the new `web.c` (esp32coco, 8 MB up
+  in 37 s, down in 16–18 s).
 - **Tab5: power the C6 before esp_hosted connects** (BSP WiFi feature and
   PI4IOE5V6408 0x44 pin 0, ~2 s to boot); esp_hosted's constructor tries at
   boot, `esp_hosted_init()` connects later. Its Bluetooth controller is off

@@ -4,6 +4,7 @@
  * Tab5: the BSP's slot 0, 4-bit; the C6 has slot 1.
  */
 #include "driver/sdmmc_host.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_vfs_fat.h"
 #include "sdmmc_cmd.h"
@@ -26,6 +27,31 @@ static esp_err_t keep_host(int slot)
 {
     return ESP_OK;
 }
+
+/* The driver's bounce buffer, reserved once in PSRAM. FATFS's sector
+ * windows and file caches aren't aligned to the cache line, so most
+ * transfers go through one; without it the driver allocates internal DMA
+ * memory for each (8 KB, halved down to a sector) and fails outright when
+ * none is left: every upload failed while an A1200 ran (esp32ami, internal
+ * free down to 29 KB). The P4's SDMMC reads and writes PSRAM directly once
+ * the buffer and its length are aligned to the cache line; the driver takes
+ * the length from heap_caps_get_allocated_size(), so that is checked too.
+ */
+#define BOUNCE_ALIGN    128             /* the L2 cache line, 64 or 128 */
+static void *bounce_buffer(const sdmmc_host_t *host)
+{
+    size_t sectors = host->unaligned_multi_block_rw_max_chunk_size;
+    size_t size = (sectors ? sectors : 1) * 512;
+    void *buf = heap_caps_aligned_alloc(BOUNCE_ALIGN, size, MALLOC_CAP_SPIRAM);
+    if (buf != NULL && heap_caps_get_allocated_size(buf) % BOUNCE_ALIGN != 0) {
+        heap_caps_free(buf);
+        buf = NULL;
+    }
+    if (buf == NULL) {
+        ESP_LOGW(TAG, "no bounce buffer: transfers allocate their own");
+    }
+    return buf;
+}
 #endif
 
 bool sdcard_mount(void)
@@ -41,6 +67,7 @@ bool sdcard_mount(void)
     host.pwr_ctrl_handle = NULL;
     host.flags |= SDMMC_HOST_FLAG_DEINIT_ARG;
     host.deinit_p = keep_host;
+    host.dma_aligned_buffer = bounce_buffer(&host);
 #else
     sdmmc_host_t host = SDMMC_HOST_DEFAULT();
     host.max_freq_khz = SDMMC_FREQ_DEFAULT;
@@ -70,6 +97,9 @@ bool sdcard_mount(void)
     esp_err_t err = esp_vfs_fat_sdmmc_mount(SDCARD_MOUNT_POINT, &host, &slot, &mount, &card);
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "no SD card (%s)", esp_err_to_name(err));
+#if CONFIG_IDF_TARGET_ESP32P4
+        heap_caps_free(host.dma_aligned_buffer);
+#endif
         return false;
     }
     ESP_LOGI(TAG, "%s: %llu MB", card->cid.name,

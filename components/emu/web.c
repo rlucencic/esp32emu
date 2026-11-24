@@ -50,10 +50,11 @@
 #endif
 
 #define CHUNK           8192
-#if CONFIG_IDF_TARGET_ESP32S3
-/* The SD driver reserves its own DMA sector buffer at mount. Keep web
+#if CONFIG_IDF_TARGET_ESP32S3 || CONFIG_IDF_TARGET_ESP32P4
+/* The SD driver reserves its own DMA buffer at mount (sdcard.c). Keep web
  * transfer buffers in PSRAM so concurrent uploads and downloads leave
- * internal memory available for Wi-Fi and the filesystem.
+ * internal memory available for Wi-Fi and the filesystem (the Tab5 takes
+ * these pieces when PSRAM is too short for a whole file: an A1200 running).
  */
 #define CHUNK_CAPS      MALLOC_CAP_SPIRAM
 #else
@@ -550,6 +551,18 @@ static bool read_all(FILE *f, char *p, size_t n)
     return true;
 }
 
+/* A piece's buffer: on the Tab5 aligned to the cache line like a whole
+ * file's, so FATFS reads and writes its sectors by DMA straight from it
+ */
+static char *chunk_alloc(void)
+{
+#if WHOLE_FILES
+    return heap_caps_aligned_alloc(WHOLE_ALIGN, CHUNK, CHUNK_CAPS);
+#else
+    return heap_caps_malloc(CHUNK, CHUNK_CAPS);
+#endif
+}
+
 /* A buffer for a whole file in PSRAM, or NULL: then in pieces */
 static char *whole_alloc(size_t size)
 {
@@ -585,21 +598,32 @@ static bool receive_file(httpd_req_t *req, FILE *f)
         return ok;
     }
 
-    char *buf = heap_caps_malloc(CHUNK, CHUNK_CAPS);
+    /* Whole pieces, past stdio (its 128-byte buffer had FATFS write a
+     * sector at a time): the Tab5 takes these with an A1200 running
+     */
+    char *buf = chunk_alloc();
     if (buf == NULL) {
         return false;
     }
-    size_t left = size;
+    size_t left = size, fill = 0;
     bool ok = true;
     while (left > 0 && ok) {
-        int n = httpd_req_recv(req, buf, left < CHUNK ? left : CHUNK);
+        size_t want = CHUNK - fill < left ? CHUNK - fill : left;
+        int n = httpd_req_recv(req, buf + fill, want);
         if (n == HTTPD_SOCK_ERR_TIMEOUT) {
             continue;
         }
-        ok = n > 0 && fwrite(buf, 1, n, f) == (size_t)n;
-        left -= n > 0 ? n : 0;
+        ok = n > 0;
+        if (ok) {
+            fill += n;
+            left -= n;
+            if (fill == CHUNK || left == 0) {
+                ok = write_all(f, buf, fill);
+                fill = 0;
+            }
+        }
     }
-    free(buf);
+    heap_caps_free(buf);
     return ok;
 }
 
@@ -672,18 +696,18 @@ static esp_err_t disk_get_work(httpd_req_t *req)
         heap_caps_free(whole);
         return err;
     }
-    char *buf = heap_caps_malloc(CHUNK, CHUNK_CAPS);
+    char *buf = chunk_alloc();
     if (buf == NULL) {
         fclose(f);
         return send_text(req, "500 Internal Server Error", "Out of memory");
     }
-    size_t n;
+    ssize_t n;
     esp_err_t err = ESP_OK;
-    while (err == ESP_OK && (n = fread(buf, 1, CHUNK, f)) > 0) {
+    while (err == ESP_OK && (n = read(fileno(f), buf, CHUNK)) > 0) {
         err = httpd_resp_send_chunk(req, buf, n);
     }
     fclose(f);
-    free(buf);
+    heap_caps_free(buf);
     return err == ESP_OK ? httpd_resp_send_chunk(req, NULL, 0) : err;
 }
 
