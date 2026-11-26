@@ -202,12 +202,78 @@ static void test_self_modifying_code(void)
 #endif
 }
 
+/* Trace: an instruction is traced when T1 was set as it began (or, on the
+ * 68020, T0 and it changed the flow). m68k_execute()'s quick loop runs
+ * while neither bit is set as a slice starts: an SR write that sets one
+ * (MOVE to SR, RTE) must hand over before the next instruction. The
+ * handler at $800 stores each traced instruction's next PC at (A0)+.
+ * Run as one slice and as slices of an instruction or two.
+ */
+static void trace_run(const unsigned short *code, int words, int slice, const unsigned int *want, int n,
+                      const char *what)
+{
+    load(code, words);
+    wr32(0x024, 0x0800);                    /* trace vector */
+    wr16(0x800, 0x20EF);                    /* MOVE.L 2(A7),(A0)+ */
+    wr16(0x802, 0x0002);
+    wr16(0x804, 0x4E73);                    /* RTE */
+    m68k_set_reg(M68K_REG_A0, 0x500);
+    for (int i = 0; i < 400 && !(reg(M68K_REG_PC) >= 0x1000 && rd16(reg(M68K_REG_PC) - 4) == 0x4E72); i++) {
+        m68k_execute(slice);
+    }
+    int got = (reg(M68K_REG_A0) - 0x500) / 4;
+    CHECK(got == n, "%s, slices of %d: %d traces, expected %d", what, slice, got, n);
+    for (int i = 0; i < got && i < n; i++) {
+        CHECK(rd32(0x500 + i * 4) == want[i], "%s, slices of %d: trace %d after %06x, expected %06x",
+              what, slice, i, rd32(0x500 + i * 4), want[i]);
+    }
+}
+
+static void test_trace(int cpu020)
+{
+    static const unsigned short t1[] = {
+        0x46FC, 0xA700,         /* MOVE #$A700,SR: T1 on (not traced) */
+        0x7001,                 /* MOVEQ #1,D0: traced */
+        0x7202,                 /* MOVEQ #2,D1: traced */
+        0x46FC, 0x2700,         /* MOVE #$2700,SR: T1 off (traced: on as it began) */
+        0x7403,                 /* MOVEQ #3,D2 */
+        0x4E72, 0x2700          /* STOP */
+    };
+    static const unsigned int t1_want[] = { 0x1006, 0x1008, 0x100C };
+    static const unsigned short t0[] = {
+        0x46FC, 0x6700,         /* MOVE #$6700,SR: T0 on */
+        0x7001,                 /* MOVEQ #1,D0: no change of flow */
+        0x6002,                 /* BRA.S $100A: traced */
+        0x4E71,
+        0x7202,                 /* MOVEQ #2,D1 */
+        0x46FC, 0x2700,         /* MOVE #$2700,SR: T0 off */
+        0x6000, 0x0002,         /* BRA.W $1014 */
+        0x4E72, 0x2700          /* STOP */
+    };
+    static const unsigned int t0_want[] = { 0x100A, 0x1010 };
+    static const int slices[] = { 1, 4, 8, 100000 };
+    for (int s = 0; s < 4; s++) {
+        trace_run(t1, sizeof(t1) / 2, slices[s], t1_want, 3, "T1");
+        if (cpu020) {
+            trace_run(t0, sizeof(t0) / 2, slices[s], t0_want, 2, "T0");
+        }
+    }
+}
+
 int main(void)
 {
     m68k_init();
-    m68k_set_cpu_type(M68K_CPU_TYPE_68000);
     m68k_set_int_ack_callback(int_ack);
+#ifdef M68K_68020
+    /* (the 68020's own checks: trace with T0) */
+    m68k_set_cpu_type(M68K_CPU_TYPE_68020);
+    test_trace(1);
+    printf(failures ? "%d check(s) failed\n" : "all checks passed\n", failures);
+    return failures != 0;
+#endif
+    m68k_set_cpu_type(M68K_CPU_TYPE_68000);
 
+    test_trace(0);
     test_cycles_and_timeslice();
     test_bus_error();
     test_address_error();

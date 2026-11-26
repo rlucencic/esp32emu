@@ -12,6 +12,9 @@ run: $(BUILD)/host_test
 run-prefetch:
 	$(MAKE) BUILD=build/prefetch CFLAGS="$(CFLAGS) -DM68K_PREFETCH" run
 
+run-020:
+	$(MAKE) BUILD=build/020 CFLAGS="$(CFLAGS) -DM68K_68020" run
+
 $(BUILD)/host_test: host_test.c $(OBJS)
 	$(CC) $(CFLAGS) $^ -lm -o $@
 
@@ -22,4 +25,4 @@ $(BUILD)/%.o: $(COMPONENT)/%.c $(COMPONENT)/m68kconf.h $(wildcard $(COMPONENT)/m
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: run run-prefetch clean
+.PHONY: run run-prefetch run-020 clean

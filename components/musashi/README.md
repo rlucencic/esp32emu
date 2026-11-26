@@ -60,15 +60,35 @@ options on top of upstream; pico-mac uses it to run a Mac on an RP2040:
   `fatalerror()` logs the first few times instead of calling `exit()`
   (which on a board restarts it).
 
-- `M68K_EMULATE_PREFETCH` (`CONFIG_M68K_PREFETCH`, off by default; the
-  Amiga's on): `m68ki_read_opcode_16()` takes the opcode from the prefetch
-  too and fetches the word after it, as `m68ki_read_imm_16()` already did
-  for extension words (the fork's opcode fetch skipped it). An instruction
-  writing over the next one then runs the old word, as on a 68000:
-  Copylock-style trace decoders (Razor 1911's Voyage) toggle the next
-  instruction and rely on it. `make -C components/musashi/test run-prefetch`
-  checks self-modifying opcodes, extension-word prefetch and branch
-  refetching with the option on; the default test also checks it off.
+- `M68K_EMULATE_PREFETCH` (`CONFIG_M68K_PREFETCH`, off by default, no
+  project uses it now: the Amiga fetches ahead for its 68000 in its own
+  `m68k_read_immediate_16()` since 2026-11-25, which spares its 68EC020
+  the bookkeeping): `m68ki_read_opcode_16()` takes the opcode from the
+  prefetch too and fetches the word after it, as `m68ki_read_imm_16()`
+  already did for extension words (the fork's opcode fetch skipped it). An
+  instruction writing over the next one then runs the old word, as on a
+  68000: Copylock-style trace decoders (Razor 1911's Voyage) toggle the
+  next instruction and rely on it. `make -C components/musashi/test
+  run-prefetch` checks self-modifying opcodes, extension-word prefetch and
+  branch refetching with the option on; the default test also checks it
+  off.
+- `m68k_execute()`'s quick loop (2026-11-25): while T1 and T0 are clear
+  and no debugger looks as a slice starts (`M68K_DEBUGGER_WANTED()`,
+  `m68kconf.h`), an instruction is the opcode, the handler and the cycles,
+  and `m68ki_tracing` is the only test after it. An SR write that sets a
+  trace bit marks `m68ki_tracing` (`m68ki_trace_sr()`, bit 0, which
+  `m68ki_exception_if_trace()` ignores), and the loop hands over to the
+  original one before the next instruction; a debugger's map takes effect
+  at the next slice. `m68ki_trace_t0()` tests T0 before writing. The hosts'
+  own hook (`M68K_QUICK_CALLBACK()`) runs in both loops. `make -C
+  components/musashi/test run run-020` traces T1 set by MOVE to SR and RTE,
+  cleared by MOVE to SR, and T0 on a 68020, in slices of 1 to 100000
+  cycles: the old loop gives the same; without the mark the one-slice case
+  traces nothing.
+- No odd-PC check on extension words without the prefetch
+  (`m68ki_read_imm_16/32()`): the opcode's fetch checks the PC, and an
+  instruction's words follow it two bytes at a time, so it never fired;
+  without it GCC inlines the read into the handlers and operand helpers.
 - `M68K_HALT_CALLBACK()` (in `m68kcpu.h`, both double-fault halts): tells
   the machine that the CPU halted (`m68k_host_halted()`), so the emulation
   stops running it and logs the fault once.

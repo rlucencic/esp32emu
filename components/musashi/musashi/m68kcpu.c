@@ -1007,6 +1007,54 @@ int M68K_FAST_FUNC(m68k_execute)(int num_cycles)
 
 		m68ki_check_bus_error_trap();
 
+#if M68K_BUS_ERR_ENABLE
+		/* Record previous D/A register state (in case of bus error).
+		 * The 68000 does not restore registers, so it needs no copy.
+		 */
+		#define m68ki_save_da() \
+			if(!CPU_TYPE_IS_000(CPU_TYPE)) \
+			{ \
+				for (int i = 15; i >= 0; i--){ \
+					REG_DA_SAVE[i] = REG_DA[i]; \
+				} \
+			}
+#else
+		#define m68ki_save_da()
+#endif
+
+#if M68K_EMULATE_TRACE
+		/* The quick loop (esp32emu): while T1 and T0 are clear and no
+		 * debugger looks as the slice starts, nothing to set or check
+		 * before an instruction, and only m68ki_tracing after it. An
+		 * instruction that sets a trace bit (m68ki_trace_sr()) ends the
+		 * loop before the next one; a debugger's map takes effect at the
+		 * next slice. M68K_QUICK_CALLBACK: hooks that stay (the hosts').
+		 */
+		if(!(FLAG_T1 | FLAG_T0) && !M68K_DEBUGGER_WANTED())
+		{
+			m68ki_tracing = 0;
+			do
+			{
+				M68K_QUICK_CALLBACK(REG_PC);
+				REG_PPC = REG_PC;
+				m68ki_save_da();
+				uint ir = m68ki_read_opcode_16();
+				REG_IR = ir;
+				instruction_jump_table[ir]();
+				USE_CYCLES(CYC_INSTRUCTION(ir));
+				if(m68ki_tracing)
+				{
+					/* (a T0 this instruction set traces its change of flow, as before) */
+					m68ki_exception_if_trace();
+					if(GET_CYCLES() > 0)
+						goto traced;
+					goto done;
+				}
+			} while(GET_CYCLES() > 0);
+			goto done;
+		}
+traced:
+#endif
 		/* Main loop.  Keep going until we run out of clock cycles */
 		do
 		{
@@ -1022,17 +1070,8 @@ int M68K_FAST_FUNC(m68k_execute)(int num_cycles)
 			/* Record previous program counter */
 			REG_PPC = REG_PC;
 
-#if M68K_BUS_ERR_ENABLE
-			/* Record previous D/A register state (in case of bus error).
-			 * The 68000 does not restore registers, so it needs no copy.
-			 */
-			if(!CPU_TYPE_IS_000(CPU_TYPE))
-			{
-				for (int i = 15; i >= 0; i--){
-					REG_DA_SAVE[i] = REG_DA[i];
-				}
-			}
-#endif
+			m68ki_save_da();
+
 			/* Read an instruction and call its handler */
 			REG_IR = m68ki_read_opcode_16();
 			instruction_jump_table[REG_IR]();
@@ -1041,6 +1080,9 @@ int M68K_FAST_FUNC(m68k_execute)(int num_cycles)
 			/* Trace m68k_exception, if necessary */
 			m68ki_exception_if_trace(); /* auto-disable (see m68kcpu.h) */
 		} while(GET_CYCLES() > 0);
+#if M68K_EMULATE_TRACE
+done:
+#endif
 
 		/* set previous PC to current PC for the next entry into the loop */
 		REG_PPC = REG_PC;

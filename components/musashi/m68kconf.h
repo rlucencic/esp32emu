@@ -180,6 +180,7 @@ static inline void m68k_dbg_instruction(unsigned int pc)
 }
 void m68k_host_instruction(unsigned int pc);
 #if defined(M68K_INSTRUCTION_HOOK)
+#define M68K_HOST_HOOK              1
 #define M68K_INSTRUCTION_CALLBACK(pc) do { m68k_host_instruction(pc); m68k_dbg_instruction(pc); } while (0)
 #elif EMUDBG_ENABLED
 #define M68K_INSTRUCTION_HOOK       OPT_SPECIFY_HANDLER
@@ -187,6 +188,21 @@ void m68k_host_instruction(unsigned int pc);
 #else
 #define M68K_INSTRUCTION_HOOK       OPT_OFF
 #define M68K_INSTRUCTION_CALLBACK(pc)
+#endif
+
+/* m68k_execute()'s quick loop (no trace bit, no debugger as a slice
+ * starts) checks nothing before an instruction but the hosts' own hook;
+ * a debugger's map makes the slice run the loop that checks it
+ */
+#if EMUDBG_ENABLED
+#define M68K_DEBUGGER_WANTED()      (m68k_dbg_map != 0)
+#else
+#define M68K_DEBUGGER_WANTED()      0
+#endif
+#ifdef M68K_HOST_HOOK
+#define M68K_QUICK_CALLBACK(pc)     m68k_host_instruction(pc)
+#else
+#define M68K_QUICK_CALLBACK(pc)
 #endif
 
 #define M68K_LOG_ENABLE             OPT_OFF

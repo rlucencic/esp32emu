@@ -28,8 +28,10 @@ restart it after one; `CONFIG_M68K_PROGRAM_READS`, Musashi's
 `m68k_read_pcrelative_8/16/32()`, the Amiga's 68EC020 instruction cache;
 `CONFIG_M68K_PREFETCH`, Musashi's `M68K_EMULATE_PREFETCH` with the opcode
 fetch through it too: the next word fetched ahead, so an instruction
-writing over the next one runs the old word, the Amiga's Copylock-style
-decoders),
+writing over the next one runs the old word (no project uses it now: the
+Amiga fetches ahead for its 68000 in its own callback, 2026-11-25).
+`m68k_execute()` runs a quick loop while no trace bit is set and no
+debugger looks as a slice starts (Musashi's README),
 the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
 Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core, the

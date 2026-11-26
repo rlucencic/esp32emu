@@ -565,6 +565,15 @@ typedef uint32 uint64;
 	#define m68ki_instr_hook(pc)
 #endif /* M68K_INSTRUCTION_HOOK */
 
+/* m68k_execute()'s quick loop (esp32emu's m68kconf.h): elsewhere any
+ * instruction hook keeps the loop that calls it */
+#ifndef M68K_DEBUGGER_WANTED
+	#define M68K_DEBUGGER_WANTED() (M68K_INSTRUCTION_HOOK != OPT_OFF)
+#endif
+#ifndef M68K_QUICK_CALLBACK
+	#define M68K_QUICK_CALLBACK(pc)
+#endif
+
 #if M68K_MONITOR_PC
 	#if M68K_MONITOR_PC == OPT_SPECIFY_HANDLER
 		#define m68ki_pc_changed(A) M68K_SET_PC_CALLBACK(ADDRESS_68K(A))
@@ -599,15 +608,21 @@ typedef uint32 uint64;
 	/* Initiates trace checking before each instruction (t1) */
 	#define m68ki_trace_t1() m68ki_tracing = FLAG_T1
 	/* adds t0 to trace checking if we encounter change of flow */
-	#define m68ki_trace_t0() m68ki_tracing |= FLAG_T0
+	#define m68ki_trace_t0() if(FLAG_T0) m68ki_tracing |= FLAG_T0
 	/* Clear all tracing */
 	#define m68ki_clear_trace() m68ki_tracing = 0
+	/* m68k_execute()'s quick loop runs while T1 and T0 are clear: an SR
+	 * write that sets either marks m68ki_tracing with this bit, which ends
+	 * the loop (esp32emu) */
+	#define M68KI_TRACE_SR 1
+	#define m68ki_trace_sr() if(FLAG_T1 | FLAG_T0) m68ki_tracing |= M68KI_TRACE_SR
 	/* Cause a trace exception if we are tracing */
-	#define m68ki_exception_if_trace() if(m68ki_tracing) m68ki_exception_trace()
+	#define m68ki_exception_if_trace() if(m68ki_tracing & ~M68KI_TRACE_SR) m68ki_exception_trace()
 #else
 	#define m68ki_trace_t1()
 	#define m68ki_trace_t0()
 	#define m68ki_clear_trace()
+	#define m68ki_trace_sr()
 	#define m68ki_exception_if_trace()
 #endif /* M68K_EMULATE_TRACE */
 
@@ -1080,7 +1095,12 @@ static inline uint pmmu_translate(uint addr, uint fc, int write)
 static inline uint m68ki_read_imm_16(void)
 {
 	m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
+#if M68K_EMULATE_PREFETCH
 	m68ki_check_address_error(REG_PC, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
+#endif
+	/* (esp32emu: without the prefetch no check here. The opcode's fetch
+	 * found the PC even, and an instruction's words follow it two bytes at
+	 * a time: the check never fired, and kept this from being inlined) */
 
 #if M68K_SEPARATE_READS
 #if M68K_EMULATE_PMMU
@@ -1173,7 +1193,7 @@ static inline uint m68ki_read_imm_32(void)
 	return temp_val;
 #else
 	m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
-	m68ki_check_address_error(REG_PC, MODE_READ, FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
+	/* (no address check: as m68ki_read_imm_16()'s) */
 	REG_PC += 4;
 	return m68k_read_immediate_32(ADDRESS_68K(REG_PC-4));
 #endif /* M68K_EMULATE_PREFETCH */
@@ -1618,6 +1638,7 @@ static inline void m68ki_set_sr_noint(uint value)
 	/* Now set the status register */
 	FLAG_T1 = BIT_F(value);
 	FLAG_T0 = BIT_E(value);
+	m68ki_trace_sr();
 	FLAG_INT_MASK = value & 0x0700;
 	m68ki_set_ccr(value);
 	m68ki_set_sm_flag((value >> 11) & 6);
@@ -1634,6 +1655,7 @@ static inline void m68ki_set_sr_noint_nosp(uint value)
 	/* Now set the status register */
 	FLAG_T1 = BIT_F(value);
 	FLAG_T0 = BIT_E(value);
+	m68ki_trace_sr();
 	FLAG_INT_MASK = value & 0x0700;
 	m68ki_set_ccr(value);
 	m68ki_set_sm_flag_nosp((value >> 11) & 6);
