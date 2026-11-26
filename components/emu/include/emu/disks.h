@@ -78,6 +78,13 @@ typedef struct {
     void (*take_offer)(int drive);
     /* Optional reason a listed size is currently unavailable. NULL allows creation. */
     const char *(*create_unavailable)(uint32_t bytes);
+    /* Optional: an image goes into `drive` while drive `other` has it too.
+     * True: it stays there as well, the machine giving each drive its own
+     * copy (the Amiga's RP9 packages: each floppy drive a disk of its own).
+     * NULL or false: it moves (one image in one drive: two drives writing
+     * one image would spoil it).
+     */
+    bool (*shared)(int drive, int other, const char *path);
 } disks_config_t;
 
 /* Make the folder if needed; false without an SD card */

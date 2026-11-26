@@ -1098,7 +1098,16 @@ static inline uint pmmu_translate(uint addr, uint fc, int write)
 /* Handles all immediate reads, does address error check, function code setting,
  * and prefetching if they are enabled in m68kconf.h
  */
-static inline uint m68ki_read_imm_16(void)
+/* (esp32emu: without the prefetch the reads are a few instructions, and
+ * GCC left them out of line in some 270 handlers (the DBcc ones among
+ * them): a call more for each extension word there. Always inline then.) */
+#if M68K_EMULATE_PREFETCH
+#define M68KI_IMM_INLINE static inline
+#else
+#define M68KI_IMM_INLINE static inline __attribute__((always_inline))
+#endif
+
+M68KI_IMM_INLINE uint m68ki_read_imm_16(void)
 {
 	m68ki_set_fc(FLAG_S | FUNCTION_CODE_USER_PROGRAM); /* auto-disable (see m68kcpu.h) */
 #if M68K_EMULATE_PREFETCH
@@ -1166,7 +1175,7 @@ static inline uint m68ki_read_imm_8(void)
 	return MASK_OUT_ABOVE_8(m68ki_read_imm_16());
 }
 
-static inline uint m68ki_read_imm_32(void)
+M68KI_IMM_INLINE uint m68ki_read_imm_32(void)
 {
 #if M68K_SEPARATE_READS
 #if M68K_EMULATE_PMMU

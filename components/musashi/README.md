@@ -104,8 +104,9 @@ options on top of upstream; pico-mac uses it to run a Mac on an RP2040:
   `.sdata.m68k`, so the linker reaches them from gp and every handler and
   helper builds `m68ki_cpu`'s address in one instruction instead of two.
   `m68ki_cpu` is 560 bytes for that: the 68030 MMU's page cache is apart
-  (`m68ki_mmu_last`). Not plain `.sdata`: that comes first, at the window's
-  edge, where the linker keeps a margin for alignment and doesn't relax.
+  (`m68ki_mmu_last`): the linker relaxes a reference only if the whole
+  object, plus a margin for alignment, lies within the window. Not plain
+  `.sdata` either: that starts at the window's very edge.
   The state lands 168 bytes below gp on the Amiga, 440-456 on the other
   P4 projects, every reference relaxed.
 - `m68ki_get_ea_ix()`: the 68020's full extension format out of line
@@ -119,6 +120,10 @@ options on top of upstream; pico-mac uses it to run a Mac on an RP2040:
   (`m68ki_read_imm_16/32()`): the opcode's fetch checks the PC, and an
   instruction's words follow it two bytes at a time, so it never fired;
   without it GCC inlines the read into the handlers and operand helpers.
+  Not into all: 268 handlers (the DBcc ones among them) called an out-of-line
+  copy, a call more per extension word; without the prefetch the reads are
+  always inline now (`M68KI_IMM_INLINE`, 2026-11-26; ~24 KB more code on
+  the Amiga).
 - `M68K_HALT_CALLBACK()` (in `m68kcpu.h`, both double-fault halts): tells
   the machine that the CPU halted (`m68k_host_halted()`), so the emulation
   stops running it and logs the fault once.

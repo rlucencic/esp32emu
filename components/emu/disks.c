@@ -213,9 +213,11 @@ bool disks_insert(int drive, const char *name)
     }
     char path[sizeof(s_folder) + sizeof(ROMS) + DISKS_NAME_LEN + 1];
     disks_path(path, sizeof(path), name);
-    /* One image in one drive at a time: move it */
+    /* One image in one drive at a time: move it (unless the machine keeps a
+     * copy per drive, shared()) */
     for (int d = 0; d < s_cfg.drives; d++) {
-        if (d != drive && disks_name(d) != NULL && strcasecmp(disks_name(d), name) == 0) {
+        if (d != drive && disks_name(d) != NULL && strcasecmp(disks_name(d), name) == 0 &&
+            !(s_cfg.shared && s_cfg.shared(drive, d, path))) {
             disks_eject(d);
         }
     }

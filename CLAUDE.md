@@ -333,6 +333,13 @@ core 1 from 64% to 44% at the BASIC prompt); `linker.lf` keeps its jump table in
   before); optional `disks_config_t.accepts(drive, name)` limits the setup screen's
   image list for a drive, `takes_blank(drive)` its "New" button. The web
   page offers every drive; `insert()` refuses what doesn't fit.
+- One image in one drive: `disks_insert()` ejects it from any other drive
+  first (two drives writing one image would spoil it). Optional
+  `disks_config_t.shared(drive, other, path)` keeps it there too where the
+  machine gives each drive its own copy (2026-11-26: the Amiga's RP9
+  packages with several floppies, each floppy drive a disk of its own).
+  The setup screen's and web page's "(in X:)" name the last drive that has
+  it.
 - **Its own folder on the SD card** (`disks_config_t.folder`; one per
   machine since 2026-11-17, the user's wish: `zx cpc cbm coco apple2gs msx
   xl st pc ql arc amiga`, the three Macs sharing `mac`): its images, and in

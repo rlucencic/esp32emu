@@ -256,8 +256,9 @@ int m68k_host_run(void);
  * within 2 KB of the global pointer: the linker then reaches them from gp,
  * without the lui every handler spent on m68ki_cpu's address (its hot
  * fields are its first ~450 bytes; the 68030 MMU's page cache is apart).
- * Not plain .sdata: that comes first, at the window's very edge, where the
- * linker keeps a margin for alignment and doesn't relax.
+ * The linker relaxes a reference only if the whole object, plus a margin
+ * for alignment, lies in the window: not plain .sdata, which starts at the
+ * window's very edge.
  */
 #if defined(ESP_PLATFORM) && defined(__riscv)
 #define M68K_STATE_ATTR             __attribute__((section(".sdata.m68k")))
