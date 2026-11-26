@@ -252,4 +252,15 @@ int m68k_host_run(void);
 #define M68K_FAST_FUNC(x)           IRAM_ATTR x
 #endif
 
+/* On RISC-V (the P4) the CPU's state and the cycle count go into small data,
+ * within 2 KB of the global pointer: the linker then reaches them from gp,
+ * without the lui every handler spent on m68ki_cpu's address (its hot
+ * fields are its first ~450 bytes; the 68030 MMU's page cache is apart).
+ * Not plain .sdata: that comes first, at the window's very edge, where the
+ * linker keeps a margin for alignment and doesn't relax.
+ */
+#if defined(ESP_PLATFORM) && defined(__riscv)
+#define M68K_STATE_ATTR             __attribute__((section(".sdata.m68k")))
+#endif
+
 #endif /* M68KCONF__HEADER */

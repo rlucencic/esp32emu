@@ -34,7 +34,9 @@ Amiga fetches ahead for its 68000 in its own callback, 2026-11-25).
 debugger looks as a slice starts (Musashi's README);
 `CONFIG_M68K_HOST_LOOP`: the quick loop hands runs of instructions to the
 machine's `m68k_host_run()`, which may fetch opcodes its own way (the
-Amiga's 68EC020, 2026-11-26),
+Amiga's 68EC020, 2026-11-26); on the P4 the CPU's state is reached from gp
+(`M68K_STATE_ATTR`, `.sdata.m68k`: keep `m68ki_cpu` small, its 68030 MMU
+page cache is apart),
 the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
 Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core, the

@@ -71,10 +71,15 @@ extern const unsigned char m68ki_static_cycles[][0x10000];
 /* ================================= DATA ================================= */
 /* ======================================================================== */
 
-int  m68ki_initial_cycles;
-int  m68ki_remaining_cycles = 0;                     /* Number of clocks remaining */
-uint m68ki_tracing = 0;
-uint m68ki_address_space;
+/* (M68K_STATE_ATTR, m68kconf.h: where the handlers reach them cheaply) */
+#ifndef M68K_STATE_ATTR
+#define M68K_STATE_ATTR
+#endif
+
+int  m68ki_initial_cycles M68K_STATE_ATTR;
+int  m68ki_remaining_cycles M68K_STATE_ATTR = 0;     /* Number of clocks remaining */
+uint m68ki_tracing M68K_STATE_ATTR = 0;
+uint m68ki_address_space M68K_STATE_ATTR;
 
 #ifdef M68K_HOST_LOOP
 /* (for the machine's own loop: m68kconf.h) */
@@ -102,7 +107,8 @@ const char *const m68ki_cpu_names[] =
 #endif /* M68K_LOG_ENABLE */
 
 /* The CPU core */
-m68ki_cpu_core m68ki_cpu = {0};
+m68ki_cpu_core m68ki_cpu M68K_STATE_ATTR = {0};
+m68ki_mmu_last_t m68ki_mmu_last[16 * 16];
 
 #if M68K_EMULATE_ADDRESS_ERROR
 #ifdef _BSD_SETJMP_H

@@ -98,6 +98,23 @@ options on top of upstream; pico-mac uses it to run a Mac on an RP2040:
   trace mark, or that fetches odd PCs itself, fails them. (Extension words
   read inline in the handlers through a window of the machine's were
   tried with it and measured no faster on the Tab5: not kept.)
+- The CPU's state within the RISC-V global pointer's reach
+  (`M68K_STATE_ATTR`, `m68kconf.h`, 2026-11-26; ESP-IDF on RISC-V only):
+  `m68ki_cpu`, the cycle counts and the trace mark in section
+  `.sdata.m68k`, so the linker reaches them from gp and every handler and
+  helper builds `m68ki_cpu`'s address in one instruction instead of two.
+  `m68ki_cpu` is 560 bytes for that: the 68030 MMU's page cache is apart
+  (`m68ki_mmu_last`). Not plain `.sdata`: that comes first, at the window's
+  edge, where the linker keeps a margin for alignment and doesn't relax.
+  The state lands 168 bytes below gp on the Amiga, 440-456 on the other
+  P4 projects, every reference relaxed.
+- `m68ki_get_ea_ix()`: the 68020's full extension format out of line
+  (`m68ki_get_ea_ix_full()`), so the brief format, the common one, saves
+  three registers around its call instead of five (2026-11-26).
+- `m68ki_check_address_error_010_less()` tests the address's bit before
+  the CPU type: with the type chosen at run time (`M68K_RUNTIME`) an even
+  access costs one test instead of the type's load and two; a fixed type
+  folds away as before (2026-11-26).
 - No odd-PC check on extension words without the prefetch
   (`m68ki_read_imm_16/32()`): the opcode's fetch checks the PC, and an
   instruction's words follow it two bytes at a time, so it never fired;

@@ -16,7 +16,7 @@
       descriptors, U and M written back, WP, S and limits noted
     - an address translation cache (direct mapped, 256 pages), flushed by
       PMOVE to TC/SRP/CRP (unless FD), PFLUSH and resets; before it, 16
-      recent pages for each function code and direction (m68ki_cpu.mmu_last,
+      recent pages for each function code and direction (m68ki_mmu_last,
       looked up inline in m68kcpu.h), emptied whenever translation changes
     - PMOVE (all three formats), PFLUSH/PFLUSHA, PLOAD, PTEST (MMUSR, An)
 
@@ -69,7 +69,7 @@ static void pmmu_log(const char *what, uint value)
 
 static void pmmu_forget_last(void)
 {
-	memset(m68ki_cpu.mmu_last, 0, sizeof(m68ki_cpu.mmu_last));
+	memset(m68ki_mmu_last, 0, sizeof(m68ki_mmu_last));
 }
 
 static void pmmu_flush(void)
@@ -83,8 +83,8 @@ static inline void pmmu_remember(uint addr, uint fc, int write, uint phys)
 {
 	uint i = ((((fc & 7) << 1) | write) << 4) | ((addr >> m68ki_cpu.mmu_page_shift) & 15);
 	uint mask = m68ki_cpu.mmu_page_mask;
-	m68ki_cpu.mmu_last[i].tag = (addr & mask) | 1;
-	m68ki_cpu.mmu_last[i].phys = phys & mask;
+	m68ki_mmu_last[i].tag = (addr & mask) | 1;
+	m68ki_mmu_last[i].phys = phys & mask;
 }
 
 /* After a PMOVE: TC, SRP and CRP flush the ATC unless FD is set (Apple's

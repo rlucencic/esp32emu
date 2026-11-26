@@ -685,8 +685,11 @@ extern jmp_buf m68ki_aerr_trap;
 		}
 #endif
 
+	/* (esp32emu: the address's bit first. With the type chosen at run time,
+	 * M68K_RUNTIME, an even access then costs one test, not the type's load
+	 * and test before it; a fixed type folds away as before) */
 	#define m68ki_check_address_error_010_less(ADDR, WRITE_MODE, FC) \
-		if (CPU_TYPE_IS_010_LESS(CPU_TYPE)) \
+		if (((ADDR) & 1) && CPU_TYPE_IS_010_LESS(CPU_TYPE)) \
 		{ \
 			m68ki_check_address_error(ADDR, WRITE_MODE, FC) \
 		}
@@ -1021,12 +1024,7 @@ typedef struct
 	uint mmu_srp_aptr, mmu_srp_limit;
 	uint mmu_tc;
 	uint16 mmu_sr;
-	/* Recent pages each function code read and wrote (m68kmmu.h): 16 for
-	 * each of them, by the page number's low bits; tag the logical page | 1
-	 * (0 = empty), phys its physical page
-	 */
-	uint mmu_page_mask, mmu_page_shift;
-	struct { uint tag, phys; } mmu_last[16 * 16];
+	uint mmu_page_mask, mmu_page_shift;  /* (for m68ki_mmu_last, below) */
 
 	const uint8* cyc_instruction;
 	const uint8* cyc_exception;
@@ -1048,6 +1046,14 @@ typedef struct
 
 extern m68ki_cpu_core m68ki_cpu;
 extern sint           m68ki_remaining_cycles;
+
+/* Recent pages each function code read and wrote (m68kmmu.h): 16 for each
+ * of them, by the page number's low bits; tag the logical page | 1 (0 =
+ * empty), phys its physical page. Apart from m68ki_cpu, which stays small
+ * (M68K_STATE_ATTR).
+ */
+typedef struct { uint tag, phys; } m68ki_mmu_last_t;
+extern m68ki_mmu_last_t m68ki_mmu_last[16 * 16];
 extern uint           m68ki_tracing;
 extern const uint8    m68ki_shift_8_table[];
 extern const uint16   m68ki_shift_16_table[];
@@ -1084,8 +1090,8 @@ static inline uint pmmu_translate(uint addr, uint fc, int write)
 {
 	uint i = ((((fc & 7) << 1) | write) << 4) | ((addr >> m68ki_cpu.mmu_page_shift) & 15);
 	uint page = addr & m68ki_cpu.mmu_page_mask;
-	if ((page | 1) == m68ki_cpu.mmu_last[i].tag)
-		return m68ki_cpu.mmu_last[i].phys | (addr & ~m68ki_cpu.mmu_page_mask);
+	if ((page | 1) == m68ki_mmu_last[i].tag)
+		return m68ki_mmu_last[i].phys | (addr & ~m68ki_cpu.mmu_page_mask);
 	return pmmu_translate_addr(addr, fc, write);
 }
 
@@ -1362,13 +1368,17 @@ static inline uint m68ki_get_ea_pcix(void)
  * 1  011  mem indir with long outer
  * 1  100-111  reserved
  */
+/* The 68020's full extension format (below): out of line, so that the
+ * brief format, the common one, saves three registers around its call to
+ * read the extension word instead of the full format's five (esp32emu)
+ */
+static uint m68ki_get_ea_ix_full(uint An, uint extension) __attribute__((noinline));
+
 static inline uint m68ki_get_ea_ix(uint An)
 {
 	/* An = base register */
 	uint extension = m68ki_read_imm_16();
 	uint Xn = 0;                        /* Index register */
-	uint bd = 0;                        /* Base Displacement */
-	uint od = 0;                        /* Outer Displacement */
 
 	if(CPU_TYPE_IS_010_LESS(CPU_TYPE))
 	{
@@ -1395,6 +1405,15 @@ static inline uint m68ki_get_ea_ix(uint An)
 		/* Add base register and displacement and return */
 		return An + Xn + MAKE_INT_8(extension);
 	}
+
+	return m68ki_get_ea_ix_full(An, extension);
+}
+
+static uint m68ki_get_ea_ix_full(uint An, uint extension)
+{
+	uint Xn = 0;                        /* Index register */
+	uint bd = 0;                        /* Base Displacement */
+	uint od = 0;                        /* Outer Displacement */
 
 	/* Full extension format */
 
