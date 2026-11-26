@@ -76,6 +76,14 @@ int  m68ki_remaining_cycles = 0;                     /* Number of clocks remaini
 uint m68ki_tracing = 0;
 uint m68ki_address_space;
 
+#ifdef M68K_HOST_LOOP
+/* (for the machine's own loop: m68kconf.h) */
+const m68k_loop_t m68k_loop = {
+	&REG_PC, &REG_PPC, &REG_IR, &instruction_jump_table, &m68ki_cpu.cyc_instruction,
+	&m68ki_remaining_cycles, &m68ki_tracing
+};
+#endif
+
 #ifdef M68K_LOG_ENABLE
 const char *const m68ki_cpu_names[] =
 {
@@ -1033,6 +1041,30 @@ int M68K_FAST_FUNC(m68k_execute)(int num_cycles)
 		if(!(FLAG_T1 | FLAG_T0) && !M68K_DEBUGGER_WANTED())
 		{
 			m68ki_tracing = 0;
+#ifdef M68K_HOST_LOOP
+			/* The machine's loop (m68kconf.h); here the PCs it leaves */
+			if(m68k_host_run())
+			{
+				while(!m68ki_tracing && GET_CYCLES() > 0)
+				{
+					M68K_QUICK_CALLBACK(REG_PC);
+					REG_PPC = REG_PC;
+					uint ir = m68ki_read_opcode_16();
+					REG_IR = ir;
+					instruction_jump_table[ir]();
+					USE_CYCLES(CYC_INSTRUCTION(ir));
+					if(!m68ki_tracing && GET_CYCLES() > 0)
+						m68k_host_run();
+				}
+				if(m68ki_tracing)
+				{
+					m68ki_exception_if_trace();
+					if(GET_CYCLES() > 0)
+						goto traced;
+				}
+				goto done;
+			}
+#endif
 			do
 			{
 				M68K_QUICK_CALLBACK(REG_PC);

@@ -31,7 +31,10 @@ fetch through it too: the next word fetched ahead, so an instruction
 writing over the next one runs the old word (no project uses it now: the
 Amiga fetches ahead for its 68000 in its own callback, 2026-11-25).
 `m68k_execute()` runs a quick loop while no trace bit is set and no
-debugger looks as a slice starts (Musashi's README),
+debugger looks as a slice starts (Musashi's README);
+`CONFIG_M68K_HOST_LOOP`: the quick loop hands runs of instructions to the
+machine's `m68k_host_run()`, which may fetch opcodes its own way (the
+Amiga's 68EC020, 2026-11-26),
 the Z80 ones the
 Z80 core (the MSX with its `CONFIG_Z80_MSX` memory), the Commodores and the
 Atari XL the 6502 core (the C128 the Z80 too), the IIGS the 65C816 core, the

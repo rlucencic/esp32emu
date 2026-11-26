@@ -85,6 +85,19 @@ options on top of upstream; pico-mac uses it to run a Mac on an RP2040:
   cleared by MOVE to SR, and T0 on a 68020, in slices of 1 to 100000
   cycles: the old loop gives the same; without the mark the one-slice case
   traces nothing.
+- The machine's own loop (`CONFIG_M68K_HOST_LOOP`, `-DM68K_HOST_LOOP`,
+  2026-11-26; off unless a project sets it, the Amiga does): the quick
+  loop hands runs of instructions to the machine's `m68k_host_run()`
+  (`m68kconf.h`), which does what the quick loop does with its own
+  instruction fetch inline and `m68k_loop`'s pointers to the state. It
+  returns 0 for a slice it leaves to Musashi (the Amiga's 68000), and
+  stops at the slice's end, a trace mark, or a PC it leaves to Musashi (odd
+  ones: the address error), which Musashi runs before calling it again.
+  `make -C components/musashi/test run-hostloop` runs every check through
+  a plain machine loop, 68000 and 68020; a loop that doesn't stop for the
+  trace mark, or that fetches odd PCs itself, fails them. (Extension words
+  read inline in the handlers through a window of the machine's were
+  tried with it and measured no faster on the Tab5: not kept.)
 - No odd-PC check on extension words without the prefetch
   (`m68ki_read_imm_16/32()`): the opcode's fetch checks the PC, and an
   instruction's words follow it two bytes at a time, so it never fired;

@@ -63,6 +63,33 @@ void m68k_host_exception(unsigned int vector)
 {
 }
 
+#ifdef M68K_HOST_LOOP
+/* The machine's own loop (m68kconf.h), the plain way: every check runs
+ * through it, Musashi's own loop only for odd PCs */
+static int host_runs, host_instructions;
+int m68k_host_run(void)
+{
+    unsigned int *pc = m68k_loop.pc, *ppc = m68k_loop.ppc, *ir = m68k_loop.ir;
+    void (**handlers)(void) = *m68k_loop.handlers;
+    const unsigned char *cycles = *m68k_loop.cycles;
+    host_runs++;
+    do {
+        unsigned int a = *pc;
+        if (a & 1) {
+            return 1;
+        }
+        *ppc = a;
+        *pc = a + 2;
+        unsigned int op = m68k_read_memory_16(a & 0xFFFFFF);
+        *ir = op;
+        handlers[op]();
+        *m68k_loop.remaining -= cycles[op];
+        host_instructions++;
+    } while (*m68k_loop.remaining > 0 && !*m68k_loop.tracing);
+    return 1;
+}
+#endif
+
 static int int_ack(int level)
 {
     last_ack_level = level;
@@ -260,6 +287,16 @@ static void test_trace(int cpu020)
     }
 }
 
+static int done(void)
+{
+#ifdef M68K_HOST_LOOP
+    CHECK(host_runs > 0 && host_instructions > 0, "the machine's loop ran %d times, %d instructions", host_runs,
+          host_instructions);
+#endif
+    printf(failures ? "%d check(s) failed\n" : "all checks passed\n", failures);
+    return failures != 0;
+}
+
 int main(void)
 {
     m68k_init();
@@ -268,8 +305,7 @@ int main(void)
     /* (the 68020's own checks: trace with T0) */
     m68k_set_cpu_type(M68K_CPU_TYPE_68020);
     test_trace(1);
-    printf(failures ? "%d check(s) failed\n" : "all checks passed\n", failures);
-    return failures != 0;
+    return done();
 #endif
     m68k_set_cpu_type(M68K_CPU_TYPE_68000);
 
@@ -280,7 +316,5 @@ int main(void)
     test_interrupts();
     test_disassembler();
     test_self_modifying_code();
-
-    printf(failures ? "%d check(s) failed\n" : "all checks passed\n", failures);
-    return failures != 0;
+    return done();
 }

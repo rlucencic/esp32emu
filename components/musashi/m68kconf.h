@@ -46,6 +46,9 @@
 #if defined(CONFIG_M68K_PREFETCH) && !defined(M68K_PREFETCH)
 #define M68K_PREFETCH
 #endif
+#if defined(CONFIG_M68K_HOST_LOOP) && !defined(M68K_HOST_LOOP)
+#define M68K_HOST_LOOP
+#endif
 
 #if defined(M68K_68020) || defined(M68K_68030) || defined(M68K_RUNTIME)
 /* Musashi's CPU_TYPE_IS_010_LESS() and friends are only right with the
@@ -203,6 +206,29 @@ void m68k_host_instruction(unsigned int pc);
 #define M68K_QUICK_CALLBACK(pc)     m68k_host_instruction(pc)
 #else
 #define M68K_QUICK_CALLBACK(pc)
+#endif
+
+/* The machine's own loop for runs of instructions (CONFIG_M68K_HOST_LOOP,
+ * -DM68K_HOST_LOOP: the Amiga's 68EC020, its instruction fetch inline in
+ * the loop). The quick loop calls m68k_host_run() as it starts: 0, not
+ * this slice (Musashi's loop runs it). Otherwise the machine has run
+ * instructions as the quick loop runs them (its hook M68K_QUICK_CALLBACK()
+ * with the PC, REG_PPC, the opcode at the PC through its own fetch with
+ * the PC moved on, REG_IR, the handler, the cycles) until the cycles ran
+ * out, m68ki_tracing was set, or a PC it leaves to Musashi (odd: the
+ * address error), and is called again after Musashi ran that one. The
+ * state it needs is in m68k_loop.
+ */
+#ifdef M68K_HOST_LOOP
+typedef struct {
+    unsigned int *pc, *ppc, *ir;            /* REG_PC, REG_PPC, REG_IR */
+    void (***handlers)(void);               /* the opcode jump table in use */
+    const unsigned char **cycles;           /* the cycle table in use */
+    int *remaining;                         /* the slice's cycles left */
+    unsigned int *tracing;                  /* m68ki_tracing */
+} m68k_loop_t;
+extern const m68k_loop_t m68k_loop;
+int m68k_host_run(void);
 #endif
 
 #define M68K_LOG_ENABLE             OPT_OFF

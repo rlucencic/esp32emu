@@ -15,6 +15,11 @@ run-prefetch:
 run-020:
 	$(MAKE) BUILD=build/020 CFLAGS="$(CFLAGS) -DM68K_68020" run
 
+# the machine's own loop (M68K_HOST_LOOP), the 68000's checks and the 68020's
+run-hostloop:
+	$(MAKE) BUILD=build/hostloop CFLAGS="$(CFLAGS) -DM68K_HOST_LOOP" run
+	$(MAKE) BUILD=build/hostloop-020 CFLAGS="$(CFLAGS) -DM68K_HOST_LOOP -DM68K_68020" run
+
 $(BUILD)/host_test: host_test.c $(OBJS)
 	$(CC) $(CFLAGS) $^ -lm -o $@
 
@@ -25,4 +30,4 @@ $(BUILD)/%.o: $(COMPONENT)/%.c $(COMPONENT)/m68kconf.h $(wildcard $(COMPONENT)/m
 clean:
 	rm -rf $(BUILD)
 
-.PHONY: run run-prefetch run-020 clean
+.PHONY: run run-prefetch run-020 run-hostloop clean

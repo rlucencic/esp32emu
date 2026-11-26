@@ -46,4 +46,14 @@ menu "68000 core (Musashi)"
             (Copylock-style checks; the Amiga). A taken branch reads one
             word more.
 
+    config M68K_HOST_LOOP
+        bool "The machine runs instructions in its own loop"
+        default n
+        help
+            m68k_execute()'s quick loop hands runs of instructions to the
+            machine's m68k_host_run() (m68kconf.h), which does what the quick
+            loop does with its own instruction fetch inline (the Amiga's
+            68EC020: no call, no address mask for the next word). Musashi
+            runs the PCs it leaves (odd ones: the address error).
+
 endmenu
