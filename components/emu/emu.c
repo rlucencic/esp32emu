@@ -51,6 +51,7 @@ static volatile uint32_t s_frames;      /* written by the emulation task only */
 static volatile bool s_pause_request;
 static volatile bool s_paused;
 static volatile bool s_present_on = true;
+static TaskHandle_t s_present_task;     /* woken after each frame (line keys) */
 static bool s_started;                  /* the emulation task runs */
 static SemaphoreHandle_t s_pause_lock;
 
@@ -137,6 +138,9 @@ static void emulation_task(void *arg)
         M->run_frame();
         s_frames++;
         emudbg_frame_end();
+        if (M->line_key != NULL && s_present_task != NULL) {
+            xTaskNotifyGive(s_present_task);    /* a frame to look at */
+        }
 
 #if CONFIG_EMU_SPEAKER
         /* The speaker's I2S clock sets the pace: stay ~2 frames ahead of it */
@@ -481,6 +485,22 @@ static PRESENT_HOT uint32_t line_hash(const uint16_t *line, int width)
  */
 #define MAX_SOURCE_LINES    1024
 
+/* With the machine's line keys, every 2 s the lines are rendered and
+ * compared all the same: a change a key missed shows within that
+ */
+#define AUDIT_MS            2000
+
+/* With line keys the presenter looks after each emulated frame (the
+ * emulation task wakes it; every PRESENT_MS at the longest) instead of every
+ * PRESENT_MS: a pointer's move shows within the frame. What it draws is held
+ * to PRESENT_ROWS_PER_S panel rows a second: a round over its share makes
+ * the next ones wait, so a scroll that changes every row leaves the PSRAM's
+ * time to the emulation.
+ */
+#ifndef PRESENT_ROWS_PER_S
+#define PRESENT_ROWS_PER_S  (VIEW_H * 30)
+#endif
+
 /* Widest source line (the Amiga's super-hires frames on the Tab5), widest
  * picture on the panel (the whole width on the Tab5; on the MaTouch the
  * machine's own, internal RAM is short there)
@@ -496,40 +516,126 @@ static PRESENT_HOT uint32_t line_hash(const uint16_t *line, int width)
 /* Where the picture is on the panel now (the presenter's; touches follow it) */
 static volatile int s_view_x, s_view_y, s_view_w, s_view_h, s_src_x, s_src_w;
 
+/* The picture's rows, made from the source lines: two scaled lines kept
+ * while the next rows use them (moving down, the second becomes the first)
+ */
+typedef struct {
+    uint16_t *src, *rows[2];
+    int have[2];                /* the source lines in rows[] (-1: none) */
+    const tap_t *xtaps, *ytaps;
+    uint32_t *hashes;
+    int width, vw;              /* a source line's pixels, a row's */
+    bool scale_3_2;
+} rows_t;
+
+static PRESENT_HOT bool row_changed(const uint8_t *changed, const tap_t *t)
+{
+    return changed[t->pos] || (t->w && changed[t->pos + 1]);
+}
+
+/* Picture row r: the scaled line, or the two blended into out */
+static PRESENT_HOT const uint16_t *make_row(rows_t *m, int r, uint16_t *out)
+{
+    int y = m->ytaps[r].pos, w = m->ytaps[r].w;
+    int need[2] = { y, w ? y + 1 : -1 };
+    for (int k = 0; k < 2; k++) {
+        if (need[k] < 0 || m->have[k] == need[k]) {
+            continue;
+        }
+        if (k == 0 && m->have[1] == need[0]) {
+            uint16_t *t = m->rows[0];
+            m->rows[0] = m->rows[1];
+            m->rows[1] = t;
+            m->have[0] = m->have[1];
+            m->have[1] = -1;
+            continue;
+        }
+        M->render_line(need[k], m->src);
+        /* Cache the snapshot actually scaled: the machine may change a row
+         * after the change-detection pass. */
+        m->hashes[need[k]] = line_hash(m->src, m->width);
+        if (m->scale_3_2) {
+            scale_row_3_2(m->src, m->rows[k], m->xtaps, m->vw);
+        } else {
+            scale_row(m->src, m->rows[k], m->xtaps, m->vw);
+        }
+        m->have[k] = need[k];
+    }
+    if (!w) {
+        return m->rows[0];
+    }
+    if (w == 16) {
+        blend_half_row(m->rows[0], m->rows[1], out, m->vw);
+    } else {
+        for (int x = 0; x < m->vw; x++) {
+            out[x] = blend565(m->rows[0][x], m->rows[1][x], w);
+        }
+    }
+    return out;
+}
+
 static PRESENT_HOT void present_task(void *arg)
 {
     uint16_t *fb = arg;
     const int default_w = emu_view_width();
     const int max_w = MAX_VIEW_W(default_w);
     const bool smooth = M->scale == EMU_SCALE_SMOOTH;
-    bool scale_3_2 = false;
-    uint16_t *src = heap_caps_malloc(MAX_SOURCE_WIDTH * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
-    uint16_t *rows[2] = {
-        heap_caps_malloc(max_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
-        heap_caps_malloc(max_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
+    rows_t rm = {
+        .src = heap_caps_malloc(MAX_SOURCE_WIDTH * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
+        .rows = {
+            heap_caps_malloc(max_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
+            heap_caps_malloc(max_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL),
+        },
     };
     uint16_t *out = heap_caps_malloc(max_w * sizeof(uint16_t), MALLOC_CAP_INTERNAL);
     tap_t *xtaps = heap_caps_malloc(max_w * sizeof(tap_t), MALLOC_CAP_INTERNAL);
     static tap_t ytaps[VIEW_H];
     uint32_t *hashes = heap_caps_calloc(MAX_SOURCE_LINES, sizeof(uint32_t), MALLOC_CAP_SPIRAM);
     uint8_t *changed = heap_caps_malloc(MAX_SOURCE_LINES, MALLOC_CAP_SPIRAM);
+    uint32_t *keys = M->line_key ? heap_caps_calloc(MAX_SOURCE_LINES, sizeof(uint32_t), MALLOC_CAP_SPIRAM)
+                                 : NULL;
+    /* Tab5: rows go to the panel through a strip in internal RAM (else into
+     * the framebuffer: the MaTouch's own, or the copy lcd_flush() turns)
+     */
+    uint16_t *strip = LCD_STRIPS ? heap_caps_aligned_calloc(64, LCD_STRIP_ROWS * BOARD_LCD_H_RES,
+                                                            sizeof(uint16_t),
+                                                            MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA)
+                                 : NULL;
+    rm.xtaps = xtaps;
+    rm.ytaps = ytaps;
+    rm.hashes = hashes;
+    int64_t audit_at = esp_timer_get_time() + AUDIT_MS * 1000LL;
+    int64_t ready_at = 0;                   /* the rows' budget: no round before */
     uint32_t last_signature = 0;
     emu_screen_t last = { 0 };
     int vx = 0, vy = 0, vw = 0, vh = 0;     /* the picture on the panel */
+    int sx = 0, sw = 0;                     /* the strips' columns: whole LCD_STRIP_COLS */
     bool redraw = true, clear = false;
 
     for (;;) {
-        vTaskDelay(pdMS_TO_TICKS(PRESENT_MS));
+        if (keys != NULL) {
+            ulTaskNotifyTake(pdTRUE, pdMS_TO_TICKS(PRESENT_MS));
+        } else {
+            vTaskDelay(pdMS_TO_TICKS(PRESENT_MS));
+        }
         if (!s_present_on) {
             last_signature = 0;     /* redraw everything afterwards */
             redraw = true;
             continue;
         }
+        int64_t now = esp_timer_get_time();
+        if (now < ready_at) {
+            continue;
+        }
         uint32_t signature = M->screen_signature();
-        if (signature == last_signature) {
+        bool audit = keys != NULL && now >= audit_at;
+        if (signature == last_signature && !audit) {
             continue;
         }
         last_signature = signature;
+        if (audit) {
+            audit_at = now + AUDIT_MS * 1000LL;
+        }
 
         emu_screen_t mode = { 0 };
         M->screen_mode(&mode);
@@ -549,12 +655,19 @@ static PRESENT_HOT void present_task(void *arg)
             vh = mode.view_h;
             vx = (BOARD_LCD_H_RES - vw) / 2;
             vy = (VIEW_H - vh) / 2;
-            scale_3_2 = use_3_2_scaler(mode.src_w, vw, smooth);
+            rm.scale_3_2 = use_3_2_scaler(mode.src_w, vw, smooth);
             make_taps(xtaps, vw, mode.src_w, smooth);
             for (int x = 0; x < vw; x++) {
                 xtaps[x].pos += mode.src_x;
             }
             make_taps(ytaps, vh, mode.height, smooth);
+            sx = vx & ~(LCD_STRIP_COLS - 1);
+            sw = (vx + vw + LCD_STRIP_COLS - 1) & ~(LCD_STRIP_COLS - 1);
+            sw = (sw > BOARD_LCD_H_RES ? BOARD_LCD_H_RES : sw) - sx;
+            if (strip != NULL) {
+                /* (the columns beside the picture stay black) */
+                memset(strip, 0, LCD_STRIP_ROWS * BOARD_LCD_H_RES * sizeof(uint16_t));
+            }
             s_view_x = vx;
             s_view_y = vy;
             s_view_w = vw;
@@ -564,7 +677,14 @@ static PRESENT_HOT void present_task(void *arg)
             last = mode;
             redraw = true;
         }
-        if (clear) {
+        rm.width = mode.width;
+        rm.vw = vw;
+        if (clear && strip != NULL) {
+            /* All black first: the copy holds none of the picture */
+            memset(fb, 0, VIEW_H * BOARD_LCD_H_RES * sizeof(uint16_t));
+            lcd_flush(0, VIEW_H);
+            clear = false;
+        } else if (clear) {
             /* Black around the picture: above, below, left and right */
             memset(fb, 0, vy * BOARD_LCD_H_RES * sizeof(uint16_t));
             memset(fb + (vy + vh) * BOARD_LCD_H_RES, 0,
@@ -576,68 +696,80 @@ static PRESENT_HOT void present_task(void *arg)
             }
         }
 
-        /* Which source lines changed since the last time */
+        /* Which source lines changed since the last time: their keys (each
+         * read before the line is rendered, so a change after it shows next
+         * time), or their pixels' hashes
+         */
         for (int y = 0; y < mode.height; y++) {
-            M->render_line(y, src);
-            uint32_t h = line_hash(src, mode.width);
-            changed[y] = redraw || h != hashes[y];
+            bool c = redraw;
+            if (keys != NULL) {
+                uint32_t k = M->line_key(y);
+                c |= k != keys[y];
+                keys[y] = k;
+            }
+            if (keys == NULL || audit) {
+                M->render_line(y, rm.src);
+                c |= line_hash(rm.src, mode.width) != hashes[y];
+            }
+            changed[y] = c;
         }
         redraw = false;
 
-        /* Scaled source rows, kept while consecutive output rows use them */
-        int have[2] = { -1, -1 };
-        int first = VIEW_H, last_row = -1;  /* rows written */
-        for (int r = 0; r < vh; r++) {
-            int y = ytaps[r].pos, w = ytaps[r].w;
-            if (!changed[y] && (!w || !changed[y + 1])) {
-                continue;
-            }
-            int need[2] = { y, w ? y + 1 : -1 };
-            for (int k = 0; k < 2; k++) {
-                if (need[k] < 0 || have[k] == need[k]) {
+        rm.have[0] = rm.have[1] = -1;
+        int drawn = 0;                      /* panel rows */
+        if (strip != NULL) {
+            /* Strips of rows with a changed one: every row made again (the
+             * strip's memory is the next one's), rows beside the picture black
+             */
+            for (int y0 = 0; y0 < VIEW_H; y0 += LCD_STRIP_ROWS) {
+                int n = VIEW_H - y0 < LCD_STRIP_ROWS ? VIEW_H - y0 : LCD_STRIP_ROWS;
+                int r0 = y0 - vy < 0 ? 0 : y0 - vy;
+                int r1 = y0 + n - vy > vh ? vh : y0 + n - vy;
+                bool any = false;
+                for (int r = r0; r < r1 && !any; r++) {
+                    any = row_changed(changed, &ytaps[r]);
+                }
+                if (!any) {
                     continue;
                 }
-                if (k == 0 && have[1] == need[0]) {
-                    /* Moving down one row: the second becomes the first */
-                    uint16_t *t = rows[0];
-                    rows[0] = rows[1];
-                    rows[1] = t;
-                    have[0] = have[1];
-                    have[1] = -1;
-                    continue;
-                }
-                M->render_line(need[k], src);
-                /* Cache the snapshot actually scaled: the machine may
-                 * change a row after the change-detection pass. */
-                hashes[need[k]] = line_hash(src, mode.width);
-                if (scale_3_2) {
-                    scale_row_3_2(src, rows[k], xtaps, vw);
-                } else {
-                    scale_row(src, rows[k], xtaps, vw);
-                }
-                have[k] = need[k];
-            }
-            const uint16_t *line = rows[0];
-            if (w) {
-                if (w == 16) {
-                    blend_half_row(rows[0], rows[1], out, vw);
-                } else {
-                    for (int x = 0; x < vw; x++) {
-                        out[x] = blend565(rows[0][x], rows[1][x], w);
+                for (int k = 0; k < n; k++) {
+                    uint16_t *d = strip + k * sw;
+                    int r = y0 + k - vy;
+                    if (r < 0 || r >= vh) {
+                        memset(d, 0, sw * sizeof(uint16_t));
+                        continue;
+                    }
+                    d += vx - sx;
+                    const uint16_t *line = make_row(&rm, r, d);
+                    if (line != d) {
+                        memcpy(d, line, vw * sizeof(uint16_t));
                     }
                 }
-                line = out;
+                lcd_put_strip(strip, sx, sw, y0, n);
+                drawn += n;
             }
-            memcpy(fb + (vy + r) * BOARD_LCD_H_RES + vx, line, vw * sizeof(uint16_t));
-            first = vy + r < first ? vy + r : first;
-            last_row = vy + r;
+        } else {
+            int first = VIEW_H, last_row = -1;  /* rows written */
+            for (int r = 0; r < vh; r++) {
+                if (!row_changed(changed, &ytaps[r])) {
+                    continue;
+                }
+                const uint16_t *line = make_row(&rm, r, out);
+                memcpy(fb + (vy + r) * BOARD_LCD_H_RES + vx, line, vw * sizeof(uint16_t));
+                first = vy + r < first ? vy + r : first;
+                last_row = vy + r;
+                drawn++;
+            }
+            if (clear) {
+                first = 0;
+                last_row = VIEW_H - 1;
+                clear = false;
+            }
+            lcd_flush(first, last_row + 1);
         }
-        if (clear) {
-            first = 0;
-            last_row = VIEW_H - 1;
-            clear = false;
+        if (keys != NULL && drawn > 0) {
+            ready_at = (ready_at > now ? ready_at : now) + drawn * 1000000LL / PRESENT_ROWS_PER_S;
         }
-        lcd_flush(first, last_row + 1);
     }
 }
 
@@ -1024,7 +1156,7 @@ void emu_run(const emu_machine_t *machine)
     s_session_start = esp_timer_get_time();
 
     if (s_fb != NULL) {
-        xTaskCreatePinnedToCore(present_task, "present", 4096, s_fb, 5, NULL, 0);
+        xTaskCreatePinnedToCore(present_task, "present", 4096, s_fb, 5, &s_present_task, 0);
     }
 #if CONFIG_EMU_SPEAKER
     if (M->audio_render) {

@@ -21,6 +21,7 @@
 #include "emu/board.h"
 #include "emu/console.h"
 #include "emu/disks.h"
+#include "emu/lcd.h"
 #include "emu/speaker.h"
 #include "emu/touch.h"
 #include "emu_internal.h"
@@ -200,11 +201,12 @@ static void dump_screen(bool lcd)
     console_write(text, len);
     for (int y = 0; y < mode.height; y += DUMP_ROWS) {
         int rows = mode.height - y < DUMP_ROWS ? mode.height - y : DUMP_ROWS;
+        if (lcd) {
+            lcd_read(y, rows, buf);     /* (the Tab5's panel, not the copy) */
+        }
         for (int r = 0; r < rows; r++) {
             uint16_t *row = buf + r * mode.width;
-            if (lcd) {
-                memcpy(row, s_lcd_fb + (y + r) * BOARD_LCD_H_RES, row_bytes);
-            } else {
+            if (!lcd) {
                 m->render_line(y + r, row);
             }
             for (int x = 0; x < mode.width; x++) {

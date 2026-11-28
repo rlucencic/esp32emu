@@ -4,7 +4,7 @@
  * Line commands on the serial console (tools/emu_console.py):
  *
  *   s                  dump the machine's screen (RGB565, base64)
- *   L                  dump the whole LCD (1024x600)
+ *   L                  dump the whole panel as shown (landscape: 1024x600, 1280x720)
  *   r                  cold reset
  *   F <drive> [name]   insert <name> from the disk folder into drive 0, 1, ...;
  *                      eject without a name, "+" for a new blank disk

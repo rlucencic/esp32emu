@@ -84,6 +84,15 @@ components a project requires get built: MINIMAL_BUILD).
   720x1280 portrait panel; landscape (x, y) is panel (y, 1279 - x), the
   orientation esp32_basic uses with the Tab5 Keyboard below the screen. A
   self-test at start checks it ("PPA rotation is not the expected one").
+  The presenter's rows skip that copy (2026-11-28): `lcd_put_strip()` has
+  the PPA turn an 8-row strip from internal RAM (20 KB; the picture's
+  columns, whole 32s, and 8 rows: the rotated DMA tail, DIG-734) straight
+  into the panel's framebuffer, a quarter of the PSRAM traffic of a row
+  written to the copy, read back and written again. The copy keeps the
+  setup screen's pixels and black: an `lcd_flush()` over the picture would
+  put stale rows back, so only the setup screen (drawn whole) and the
+  presenter's clear (all black first) flush. `L` reads the panel back
+  (`lcd_read()`).
 - The setup screen is laid out for 1024x600: `SX()`/`SY()` scale it (exact
   on the MaTouch), `FONT_BIG` is 34 px on the Tab5, the default font 28.
   Machines' `view_width` is for 600 lines: `emu_view_width()` scales it.
@@ -422,6 +431,24 @@ core 1 from 64% to 44% at the BASIC prompt); `linker.lf` keeps its jump table in
   to 1536 wide on the Tab5 (1024 on the MaTouch, whose presenter buffers
   stay at the machine's own width: internal RAM). Touches follow the
   presenter's last geometry. Callers zero their `emu_screen_t`.
+  Which lines changed: each line rendered and hashed (every 40 ms), or,
+  with the machine's optional `line_key(y)` (a value that changes whenever
+  the line's picture does: esp32mac3's, its VRAM's writes counted per 512
+  bytes), only the lines whose keys changed are rendered (each key read
+  before its line, so the machine bumps a key after the write it
+  describes), every 2 s (`AUDIT_MS`) the hashes compared all the same. With
+  keys the presenter looks after every emulated frame (the emulation task
+  wakes it, `s_present_task`) under a budget of `PRESENT_ROWS_PER_S`
+  panel rows a second (30 whole pictures; a round over its share makes the
+  next ones wait). esp32mac3 (2026-11-28, its `docs/cpu-cost-2026-11-28.md`):
+  a scrolled window ~15 pictures a second instead of 6.5, a pointer's move
+  on the panel in 25-30 ms instead of ~60, and the LC III's CPU 7% faster
+  meanwhile. `tools/test_presenter_snapshots.py` (576 cases) runs every
+  case through strips and the framebuffer against the framebuffer's
+  unkeyed picture (the panel mocked, starting as garbage), with the keyed
+  cases (a change after a line was rendered, a change no key saw, which
+  only the audit puts right, the picture's size changed) and a budget that
+  makes rounds wait.
 
 - Debugger (`emudbg.h`): the machine core (not `main/`, so the host build
   has it too) fills an `emudbg_machine_t` with its CPUs (`emudbg_cpu_t`: a
@@ -493,6 +520,15 @@ boards send none of them and their page reads as before.
   (cursor, pointer) that was constant PSRAM traffic against the LCD's reads,
   and the panel showed artefacts and a picture shifted by ~5 lines. It now
   hashes each source line and writes only rows that changed.
+- **The presenter slows the emulation by its PSRAM bytes, not its
+  instructions** (Tab5, esp32mac3, 2026-11-28): line keys took its change
+  detection from 14.4% to 4.0% of core 0, and the 68030 on core 1 gained
+  nothing: the presenter drew 1.4-1.7 times the rows instead, each written
+  into the landscape copy, read back and written again by the PPA. Strips
+  from internal RAM (a quarter of the bytes a row) then drew 2.2 times the
+  pictures with the 68030 7% faster than before. Count a change's PSRAM
+  traffic, and measure the picture too (pictures a second, the pointer's
+  delay), not only the emulation's speed.
 - **No `esp_partition_read()` of big blocks while the LCD runs**: it turns
   the caches off for the whole read. Memory-map partitions instead.
 - **LVGL is pinned to 9.4** (`idf_component.yml`): the version both boards
@@ -957,9 +993,10 @@ and the cores.
 
 `docs/display-reliability-2026-11-08.md` records a JTAG-confirmed Tab5 PPA
 completion stall and an independently reproduced presenter snapshot/hash
-race. Flushes now expand to eight-row boundaries; hashes describe the
-source snapshot actually scaled. Run `python3 tools/test_tab5_flush.py`
-and `python3 tools/test_presenter_snapshots.py` for ASan/UBSan checks of
-the actual functions. All 24 project/board builds pass. Fresh MSX sprite
+race. Flushes now expand to eight-row boundaries (strips are whole eight
+rows and 32 columns, 2026-11-28); hashes describe the source snapshot
+actually scaled. Run `python3 tools/test_tab5_flush.py` and `python3
+tools/test_presenter_snapshots.py` for ASan/UBSan checks of the actual
+functions. All 24 project/board builds pass. Fresh MSX sprite
 baseline/candidate measurements use both fixes; old timings across the
 runtime change are not directly comparable. S3 runtime remains untested.

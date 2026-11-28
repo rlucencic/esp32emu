@@ -3,6 +3,7 @@
  * One framebuffer in PSRAM, streamed to the panel through bounce buffers,
  * so the CPU can write it directly.
  */
+#include <string.h>
 #include "driver/gpio.h"
 #include "esp_idf_version.h"
 #include "esp_lcd_panel_ops.h"
@@ -14,6 +15,7 @@
 #include "emu/lcd.h"
 
 static const char *TAG = "lcd";
+static uint16_t *s_fb;
 
 static void reset_panel_and_touch(void)
 {
@@ -108,7 +110,15 @@ uint16_t *lcd_init(void)
 
     backlight_set(true);
     ESP_LOGI(TAG, "RGB panel %dx%d ready", BOARD_LCD_H_RES, BOARD_LCD_V_RES);
+    s_fb = fb;
     return fb;
+}
+
+void lcd_read(int y, int n, uint16_t *dst)
+{
+    if (s_fb != NULL) {
+        memcpy(dst, s_fb + y * BOARD_LCD_H_RES, n * BOARD_LCD_H_RES * sizeof(uint16_t));
+    }
 }
 
 uint32_t lcd_resyncs(void)

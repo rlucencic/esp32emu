@@ -3,6 +3,8 @@
  * ST7121, it finds out which), 720x1280 portrait with its framebuffer in
  * PSRAM. The runtime draws a 1280x720 landscape picture; lcd_flush() has
  * the PPA turn the changed rows by 90 degrees into the panel's framebuffer.
+ * The presenter's rows go there straight from internal RAM
+ * (lcd_put_strip()), past the landscape copy.
  */
 #include <string.h>
 #include "bsp/m5stack_tab5.h"
@@ -58,20 +60,22 @@ static bool is_st7121(void)
     return err == ESP_OK && version == 1;
 }
 
-/* Landscape rows y0 .. y1 - 1 become panel columns y0 .. y1 - 1: a quarter
+/* A block of a landscape picture (pic_w x pic_h, the block w x n from
+ * (in_x, in_y)) onto the panel at (x, y) of the landscape picture: a quarter
  * turn counter-clockwise, (x, y) -> (y, 1279 - x)
  */
-static esp_err_t rotate(int y0, int y1)
+static esp_err_t turn(const uint16_t *in, int pic_w, int pic_h, int in_x, int in_y, int w, int n,
+                      int x, int y)
 {
     const ppa_srm_oper_config_t op = {
         .in = {
-            .buffer = s_picture,
-            .pic_w = BOARD_LCD_H_RES,
-            .pic_h = BOARD_LCD_V_RES,
-            .block_w = BOARD_LCD_H_RES,
-            .block_h = y1 - y0,
-            .block_offset_x = 0,
-            .block_offset_y = y0,
+            .buffer = in,
+            .pic_w = pic_w,
+            .pic_h = pic_h,
+            .block_w = w,
+            .block_h = n,
+            .block_offset_x = in_x,
+            .block_offset_y = in_y,
             .srm_cm = PPA_SRM_COLOR_MODE_RGB565,
         },
         .out = {
@@ -79,8 +83,8 @@ static esp_err_t rotate(int y0, int y1)
             .buffer_size = BOARD_PANEL_W * BOARD_PANEL_H * sizeof(uint16_t),
             .pic_w = BOARD_PANEL_W,
             .pic_h = BOARD_PANEL_H,
-            .block_offset_x = y0,
-            .block_offset_y = 0,
+            .block_offset_x = y,
+            .block_offset_y = BOARD_LCD_H_RES - x - w,
             .srm_cm = PPA_SRM_COLOR_MODE_RGB565,
         },
         .rotation_angle = PPA_SRM_ROTATION_ANGLE_90,
@@ -89,6 +93,12 @@ static esp_err_t rotate(int y0, int y1)
         .mode = PPA_TRANS_MODE_BLOCKING,
     };
     return ppa_do_scale_rotate_mirror(s_ppa, &op);
+}
+
+/* Landscape rows y0 .. y1 - 1 become panel columns y0 .. y1 - 1 */
+static esp_err_t rotate(int y0, int y1)
+{
+    return turn(s_picture, BOARD_LCD_H_RES, BOARD_LCD_V_RES, 0, y0, BOARD_LCD_H_RES, y1 - y0, 0, y0);
 }
 
 void lcd_flush(int y0, int y1)
@@ -114,6 +124,44 @@ void lcd_flush(int y0, int y1)
     if (err != ESP_OK) {
         ESP_LOGW(TAG, "PPA rotate failed: %s", esp_err_to_name(err));
     }
+}
+
+/* (The rotated block's last macroblocks are what DIG-734 is about: its
+ * width (n) and height (w) as lcd.h asks keep them above the FIFO's
+ * threshold, as lcd_flush()'s eight rows by 1280 do)
+ */
+void lcd_put_strip(const uint16_t *pixels, int x, int w, int y, int n)
+{
+    if (s_ppa == NULL || w <= 0 || n <= 0) {
+        return;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    esp_err_t err = turn(pixels, w, n, 0, 0, w, n, x, y);
+    xSemaphoreGive(s_lock);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "PPA strip failed: %s", esp_err_to_name(err));
+    }
+}
+
+/* The panel's own pixels, turned back (each landscape row a panel column):
+ * the cache forgets the framebuffer first, the PPA wrote it
+ */
+void lcd_read(int y, int n, uint16_t *dst)
+{
+    if (s_ppa == NULL) {
+        return;
+    }
+    xSemaphoreTake(s_lock, portMAX_DELAY);
+    esp_cache_msync(s_panel_fb, BOARD_PANEL_W * BOARD_PANEL_H * sizeof(uint16_t),
+                    ESP_CACHE_MSYNC_FLAG_DIR_M2C);
+    for (int py = 0; py < BOARD_PANEL_H; py++) {
+        const uint16_t *p = s_panel_fb + py * BOARD_PANEL_W + y;
+        uint16_t *d = dst + (BOARD_LCD_H_RES - 1 - py);
+        for (int r = 0; r < n; r++) {
+            d[r * BOARD_LCD_H_RES] = p[r];
+        }
+    }
+    xSemaphoreGive(s_lock);
 }
 
 /* The corners land where the orientation above says */

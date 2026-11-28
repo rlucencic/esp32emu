@@ -73,6 +73,16 @@ typedef struct {
     void (*screen_mode)(emu_screen_t *mode);
     uint32_t (*screen_signature)(void);     /* changes when the picture does */
     void (*render_line)(int y, uint16_t *dst);      /* RGB565, mode.width pixels */
+    /* Optional: a key for line y, changing whenever what render_line(y)
+     * gives does. The presenter reads a line's key before it renders the
+     * line, so the machine changes the key after what it describes (the
+     * emulation's writes, on the other core). With it, the presenter looks
+     * after every frame (not every 40 ms) and renders only the lines whose
+     * keys changed (and every line every 2 s, compared as without it), as
+     * many rows a second as its budget allows; NULL: every 40 ms, every line
+     * rendered to find the changed ones.
+     */
+    uint32_t (*line_key)(int y);
 
     /* Sound, 16-bit stereo (render NULL: none) */
     int audio_hz;
